@@ -4,18 +4,13 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                sh 'make' 
-            }
-        }
-        stage('Cleanup') {
-            steps {
-                sh 'make clean' 
+                sh '/usr/local/sonar/build-wrapper-linux-x86/build-wrapper-linux-x86-64 make clean all' 
             }
         }
         stage('Sonarqube') {
             steps {
                 withSonarQubeEnv('sonarcloud') {
-                	sh 'mvn sonar:sonar -Dsonar.organization=laffer1-github'
+                	sh "${tool("sonarqube")}/bin/sonar-scanner -Dsonar.organization=laffer1-github"
                 }
                 timeout(time: 10, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
