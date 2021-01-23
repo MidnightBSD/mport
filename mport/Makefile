@@ -4,4 +4,6 @@ CFLAGS= -I ../libmport/ -fblocks -g -L../libmport -lmport -ldispatch -lBlocksRun
 
 LIBADD+=	mport dispatch BlocksRuntime
 
+BINDIR=	/usr/sbin
+
 .include <bsd.prog.mk>

@@ -9,4 +9,6 @@ LIBADD= mport dispatch BlocksRuntime pthread sqlite3
 
 LDFLAGS += -L../libmport -lmport -ldispatch -lBlocksRuntime -lpthread -lsqlite3
 
+BINDIR=/usr/libexec
+
 .include <bsd.prog.mk>

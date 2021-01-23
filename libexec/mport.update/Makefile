@@ -9,4 +9,6 @@ LIBADD= mport dispatch BlocksRuntime pthread
 
 LDFLAGS += -L../libmport -lmport -ldispatch -lBlocksRuntime -lpthread
 
+BINDIR=/usr/libexec
+
 .include <bsd.prog.mk>
