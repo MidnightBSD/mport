@@ -28,6 +28,9 @@
 *.so.*
 *.dylib
 
+*.pico
+*.depend
+
 # Executables
 *.exe
 *.out

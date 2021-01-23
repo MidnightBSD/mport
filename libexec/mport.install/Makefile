@@ -1,10 +1,12 @@
 PROG= mport.install
 
-CFLAGS+=	-I${.CURDIR}/../../lib/libmport/ -fblocks
+CFLAGS+=	-I${.CURDIR}/../../libmport/ -fblocks
 WARNS?= 	6
 
 MK_MAN= no
 
 LIBADD= mport dispatch BlocksRuntime pthread
+
+LDFLAGS += -L../libmport -lmport -ldispatch -lBlocksRuntime -lpthread
 
 .include <bsd.prog.mk>

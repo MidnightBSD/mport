@@ -1,5 +1,3 @@
-.include <src.opts.mk>
-
 PACKAGE=lib${LIB}
 
 LIB=	mport
@@ -27,5 +25,7 @@ MK_PROFILE=no
 #	-lpthread -ldispatch -lBlocksRuntime
 
 LIBADD=	md archive bz2 lzma z fetch sqlite3 dispatch BlocksRuntime pthread
+
+LDFLAGS+=	-lmd -larchive -lbz2 -llzma -lz -lfetch -lsqlite3 -ldispatch -lBlocksRuntime -lpthread
 
 .include <bsd.lib.mk>
