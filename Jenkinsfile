@@ -4,7 +4,7 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                sh '/usr/local/sonar/build-wrapper-linux-x86/build-wrapper-linux-x86-64 make clean all' 
+                sh '/usr/local/sonar/build-wrapper-linux-x86/build-wrapper-linux-x86-64  --out-dir . make clean all' 
             }
         }
         stage('Sonarqube') {
