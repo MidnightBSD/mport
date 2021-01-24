@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__MBSDID("$MidnightBSD$");
 
 #include <sys/cdefs.h>
 #include <stdio.h>
@@ -35,7 +34,6 @@ __MBSDID("$MidnightBSD$");
 #include <assert.h>
 #include "mport.h"
 #include "mport_private.h"
-
 
 #define CMND_MAGIC_COOKIE '@'
 #define STRING_EQ(r, l) (strcmp((r),(l)) == 0)
@@ -177,12 +175,11 @@ mport_parse_plistfile(FILE *fp, mportAssetList *list) {
 static int 
 parse_file_owner_mode(mportAssetListEntry **entry, char *cmdLine) {
 	char *start;
-        char *op = start = strdup(cmdLine);
-	char *tok;
+	char *op = start = strdup(cmdLine);
 	char *permissions[3] = {NULL, NULL, NULL};
 	int i = 0;
 
-	while((tok = strsep(&op, "(,)")) != NULL) {
+	while((char *tok = strsep(&op, "(,)")) != NULL) {
 		if (i == 3)
 			break;
 		permissions[i] = op;
@@ -279,13 +276,13 @@ parse_command(const char *s) {
     if (STRING_EQ(s, "sample"))
         return ASSET_SAMPLE;
     if (strncmp(s, "sample(", 7) == 0)
-	return ASSET_SAMPLE_OWNER_MODE;
+		return ASSET_SAMPLE_OWNER_MODE;
     if (STRING_EQ(s, "shell"))
         return ASSET_SHELL;
 
     /* special case, starts with ( as in @(root,wheel,0755) */
     if (s[0] == '(')
-	return ASSET_FILE_OWNER_MODE;
+		return ASSET_FILE_OWNER_MODE;
 
     return ASSET_INVALID;
 }

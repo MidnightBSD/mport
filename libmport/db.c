@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__MBSDID("$MidnightBSD$");
 
 #include <sqlite3.h>
 #include <stdlib.h>

@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__MBSDID("$MidnightBSD$");
 
 #include <archive.h>
 #include <archive_entry.h>

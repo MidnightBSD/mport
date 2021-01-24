@@ -1,6 +1,5 @@
 /*
  * Generic map implementation.
- * $MidnightBSD$
  */
 #include "hashmap.h"
 

@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__MBSDID("$MidnightBSD$");
 
 #include "mport.h"
 #include "mport_private.h"
@@ -37,7 +36,7 @@ static int mport_err;
 static char err_msg[256];
 
 /* This goes with the error codes in mport.h */
-static char default_error_msg[] = "An error occured.";
+static char default_error_msg[] = "An error occurred.";
 
 
 /* mport_err_code()
