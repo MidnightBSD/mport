@@ -1,8 +1,12 @@
 # mport
 MidnightBSD Package Manager
 
+## Requirements
+Will run on MidnightBSD 1.2 and higher. 
 
-<a href="https://scan.coverity.com/projects/midnightbsd-mport">
-  <img alt="Coverity Scan Build Status"
-       src="https://scan.coverity.com/projects/22521/badge.svg"/>
-</a>
+Depends on:
+* sqlite3
+* libdispatch
+* libarchive
+* bzip2
+* lzma
