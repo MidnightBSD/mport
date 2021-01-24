@@ -1,5 +1,4 @@
-/* $MidnightBSD$
- *
+/*
  * Copyright (c) 2011, 2013, 2015 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
  * All rights reserved.
@@ -70,7 +69,7 @@ int mport_upgrade_master_schema(sqlite3 *, int);
 int mport_get_database_version(sqlite3 *);
 int mport_set_database_version(sqlite3 *);
 
-/* Various database convience functions */
+/* Various database convenience functions */
 int mport_attach_stub_db(sqlite3 *, const char *);
 int mport_detach_stub_db(sqlite3 *);
 int mport_db_do(sqlite3 *, const char *, ...);
@@ -82,6 +81,7 @@ int mport_pkgmeta_read_stub(mportInstance *, mportPackageMeta ***);
 int mport_pkgmeta_logevent(mportInstance *, mportPackageMeta *, const char *);
 
 /* Utils */
+bool mport_starts_with(const char *, const char *);
 char* mport_hash_file(const char *);
 int mport_copy_file(const char *, const char *);
 uid_t mport_get_uid(const char *);

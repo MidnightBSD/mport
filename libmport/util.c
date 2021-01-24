@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__MBSDID("$MidnightBSD$");
 
 #include <sys/types.h>
 #include <sys/sysctl.h>
@@ -118,11 +117,18 @@ mport_verify_hash(const char *filename, const char *hash)
   return 0;
 }
 
+bool
+mport_starts_with(const char *pre, const char *str)
+{
+	return strncmp(pre, str, strlen(pre)) == 0;
+}
+
 /* mport_hash_file(const char * filename)
  *
  * Return a SHA256 hash of a file.  Must free result
  */
-char * mport_hash_file(const char *filename)
+char *
+mport_hash_file(const char *filename)
 {
     return SHA256_File(filename, NULL);
 }
