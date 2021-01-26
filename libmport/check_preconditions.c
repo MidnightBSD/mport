@@ -193,7 +193,8 @@ static int check_depends(mportInstance *mport, mportPackageMeta *pack)
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (mport_db_prepare(db, &lookup, "SELECT version, os_release FROM packages WHERE pkg=? AND status='clean'") !=
+	/* package name on dependencies can contain the flavor prefix. native-binutils but there is no guarnatee we stored it as native-bintuils in master. check for binutils also. */
+	if (mport_db_prepare(db, &lookup, "SELECT version, os_release, flavor FROM packages WHERE (pkg=? or (flavor is not null and flavor != '' and pkg=substr(?, length(flavor) + 2) )) AND status='clean'") !=
 	    MPORT_OK) {
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
@@ -208,7 +209,7 @@ static int check_depends(mportInstance *mport, mportPackageMeta *pack)
 			depend_pkg = sqlite3_column_text(stmt, 0);
 			depend_version = sqlite3_column_text(stmt, 1);
 
-			if (sqlite3_bind_text(lookup, 1, depend_pkg, -1, SQLITE_STATIC) != SQLITE_OK) {
+			if (sqlite3_bind_text(lookup, 1, depend_pkg, -1, SQLITE_STATIC) != SQLITE_OK || sqlite3_bind_text(lookup, 2, depend_pkg, -1, SQLITE_STATIC) != SQLITE_OK) {
 				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 				sqlite3_finalize(lookup);
 				sqlite3_finalize(stmt);

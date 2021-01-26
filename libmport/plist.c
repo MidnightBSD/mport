@@ -177,9 +177,10 @@ parse_file_owner_mode(mportAssetListEntry **entry, char *cmdLine) {
 	char *start;
 	char *op = start = strdup(cmdLine);
 	char *permissions[3] = {NULL, NULL, NULL};
+	char *tok;
 	int i = 0;
 
-	while((char *tok = strsep(&op, "(,)")) != NULL) {
+	while((tok = strsep(&op, "(,)")) != NULL) {
 		if (i == 3)
 			break;
 		permissions[i] = op;
