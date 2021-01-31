@@ -280,6 +280,10 @@ parse_command(const char *s) {
 		return ASSET_SAMPLE_OWNER_MODE;
     if (STRING_EQ(s, "shell"))
         return ASSET_SHELL;
+    if (STRING_EQ(s, "ldconfig-linux"))
+    	return ASSET_LDCONFIG_LINUX;
+    if (STRING_EQ(s, "ldconfig"))
+    	return ASSET_LDCONFIG;
 
     /* special case, starts with ( as in @(root,wheel,0755) */
     if (s[0] == '(')

@@ -273,7 +273,7 @@ create_sample_file(mportInstance *mport, char *cwd, const char *file)
 
 /**
  * Get the list of assets (plist entries) from the stub attached database (package we are installing)
- * filtered on entries that are not pre/post exec.
+ * filtered on entries that are not pre/post exec groups.
  */
 static int
 mport_bundle_read_get_assetlist(mportInstance *mport, mportPackageMeta *pkg, mportAssetList **alist_p, enum phase state)
@@ -297,15 +297,15 @@ mport_bundle_read_get_assetlist(mportInstance *mport, mportPackageMeta *pkg, mpo
 		}
 	} else if (state == ACTUALINSTALL) {
 		if (mport_db_prepare(mport->db, &stmt,
-		                     "SELECT type,data,checksum,owner,grp,mode FROM stub.assets WHERE pkg=%Q and type not in (%d, %d)",
-		                     pkg->name, ASSET_PREEXEC, ASSET_POSTEXEC) != MPORT_OK) {
+		                     "SELECT type,data,checksum,owner,grp,mode FROM stub.assets WHERE pkg=%Q and type not in (%d, %d, %d, %d)",
+		                     pkg->name, ASSET_PREEXEC, ASSET_POSTEXEC, ASSET_LDCONFIG, ASSET_LDCONFIG_LINUX) != MPORT_OK) {
 			sqlite3_finalize(stmt);
 			RETURN_CURRENT_ERROR;
 		}
 	} else if (state == POSTINSTALL) {
 		if (mport_db_prepare(mport->db, &stmt,
-		                     "SELECT type,data,checksum,owner,grp,mode FROM stub.assets WHERE pkg=%Q and type in (%d, %d)",
-		                     pkg->name, ASSET_CWD, ASSET_POSTEXEC) != MPORT_OK) {
+		                     "SELECT type,data,checksum,owner,grp,mode FROM stub.assets WHERE pkg=%Q and type in (%d, %d, %d, %d)",
+		                     pkg->name, ASSET_CWD, ASSET_POSTEXEC, ASSET_LDCONFIG, ASSET_LDCONFIG_LINUX) != MPORT_OK) {
 			sqlite3_finalize(stmt);
 			RETURN_CURRENT_ERROR;
 		}
@@ -886,6 +886,22 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 			case ASSET_POSTEXEC:
 				if (mport_run_asset_exec(mport, e->data, cwd, file) != MPORT_OK)
 					goto ERROR;
+				break;
+			case ASSET_LDCONFIG:
+				if (mport_xsystem(mport, "/usr/sbin/service ldconfig restart > /dev/null") != MPORT_OK) {
+					goto ERROR;
+				}
+				break;
+			case ASSET_LDCONFIG_LINUX:
+				if (e->data == NULL) {
+					if (mport_xsystem(mport, "/compat/linux/sbin/ldconfig") != MPORT_OK) {
+						goto ERROR;
+					}
+				} else {
+					if (mport_xsystem(mport, "%s/sbin/ldconfig", e->data) != MPORT_OK) {
+						goto ERROR;
+					}
+				}
 				break;
 			default:
 				/* do nothing */

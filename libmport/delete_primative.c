@@ -42,6 +42,7 @@
 #include "mport_private.h"
 
 static int run_unexec(mportInstance *, mportPackageMeta *, mportAssetListEntryType);
+static int run_unldconfig(mportInstance *, mportPackageMeta *);
 static int run_pkg_deinstall(mportInstance *, mportPackageMeta *, const char *);
 static int delete_pkg_infra(mportInstance *, mportPackageMeta *);
 static int check_for_upwards_depends(mportInstance *, mportPackageMeta *);
@@ -115,6 +116,9 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force) 
     if (run_unexec(mport, pack, ASSET_PREUNEXEC) != MPORT_OK)
         RETURN_CURRENT_ERROR;
 
+    if (run_unldconfig(mport, pack) != MPORT_OK)
+        RETURN_CURRENT_ERROR;
+
     if (run_pkg_deinstall(mport, pack, "DEINSTALL") != MPORT_OK)
         RETURN_CURRENT_ERROR;
 
@@ -131,7 +135,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force) 
             break;
 
         if (ret != SQLITE_ROW) {
-            /* some error occured */
+            /* some error occurred */
             SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
             sqlite3_finalize(stmt);
             RETURN_CURRENT_ERROR;
@@ -212,6 +216,11 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force) 
                     mport_call_msg_cb(mport, "Could not execute %s: %s", data, mport_err_string());
                 }
                 break;
+			case ASSET_LDCONFIG:
+				if (mport_xsystem(mport, "/usr/sbin/service ldconfig restart > /dev/null") != MPORT_OK) {
+					mport_call_msg_cb(mport, "Could not run ldconfig: %s", mport_err_string());
+				}
+				break;
             case ASSET_DIR:
             case ASSET_DIRRM:
             case ASSET_DIRRMTRY:
@@ -265,6 +274,71 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force) 
     syslog(LOG_NOTICE, "%s-%s deinstalled", pack->name, pack->version);
 
     return MPORT_OK;
+}
+
+static int
+run_unldconfig(mportInstance *mport, mportPackageMeta *pkg) {
+    int ret;
+    char cwd[FILENAME_MAX];
+    sqlite3_stmt *assets = NULL;
+    sqlite3 *db;
+    const char *data;
+    mportAssetListEntryType type;
+
+    db = mport->db;
+
+    /* Process @ldconfig steps */
+    if (mport_db_prepare(db, &assets, "SELECT type, data FROM assets WHERE pkg=%Q and type in (%d, %d)", pkg->name,
+                         ASSET_LDCONFIG, ASSET_LDCONFIG_LINUX) != MPORT_OK)
+        goto UNLDCONFIG_ERROR;
+
+    (void) strlcpy(cwd, pkg->prefix, sizeof(cwd));
+
+    if (mport_chdir(mport, cwd) != MPORT_OK)
+        goto UNLDCONFIG_ERROR;
+
+    while (1) {
+        ret = sqlite3_step(assets);
+
+        if (ret == SQLITE_DONE)
+            break;
+
+        if (ret != SQLITE_ROW) {
+            SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
+            goto UNLDCONFIG_ERROR;
+        }
+        type = (mportAssetListEntryType) sqlite3_column_int(assets, 0);
+        data = sqlite3_column_text(assets, 1);
+
+        switch(type) {
+        	case ASSET_LDCONFIG:
+        		if (mport_xsystem(mport, "/usr/sbin/service ldconfig restart > /dev/null") != MPORT_OK) {
+        			goto UNLDCONFIG_ERROR;
+        		}
+        		break;
+        	case ASSET_LDCONFIG_LINUX:
+        		if (data == NULL) {
+        			if (mport_xsystem(mport, "/compat/linux/sbin/ldconfig") != MPORT_OK) {
+        				goto UNLDCONFIG_ERROR;
+        			}
+        		} else {
+        			if (mport_xsystem(mport, "%s/sbin/ldconfig", data) != MPORT_OK) {
+        				goto UNLDCONFIG_ERROR;
+        			}
+        		}
+        		break;
+        	default:
+        		break;
+        }
+    }
+    sqlite3_finalize(assets);
+    mport_pkgmeta_logevent(mport, pkg, type == ASSET_LDCONFIG ? "ldconfig" : "ldconfig-linux");
+
+    return MPORT_OK;
+
+    UNLDCONFIG_ERROR:
+    sqlite3_finalize(assets);
+    RETURN_CURRENT_ERROR;
 }
 
 static int
