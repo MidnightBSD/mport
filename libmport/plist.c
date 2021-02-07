@@ -177,9 +177,10 @@ parse_file_owner_mode(mportAssetListEntry **entry, char *cmdLine) {
 	char *start;
 	char *op = start = strdup(cmdLine);
 	char *permissions[3] = {NULL, NULL, NULL};
+	char *tok;
 	int i = 0;
 
-	while((char *tok = strsep(&op, "(,)")) != NULL) {
+	while((tok = strsep(&op, "(,)")) != NULL) {
 		if (i == 3)
 			break;
 		permissions[i] = op;
@@ -279,6 +280,10 @@ parse_command(const char *s) {
 		return ASSET_SAMPLE_OWNER_MODE;
     if (STRING_EQ(s, "shell"))
         return ASSET_SHELL;
+    if (STRING_EQ(s, "ldconfig-linux"))
+    	return ASSET_LDCONFIG_LINUX;
+    if (STRING_EQ(s, "ldconfig"))
+    	return ASSET_LDCONFIG;
 
     /* special case, starts with ( as in @(root,wheel,0755) */
     if (s[0] == '(')
