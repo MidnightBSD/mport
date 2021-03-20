@@ -322,7 +322,7 @@ mport_bundle_read_get_assetlist(mportInstance *mport, mportPackageMeta *pkg, mpo
 		    int ret = sqlite3_step(stmt);
 
 		    if (ret == SQLITE_BUSY || ret == SQLITE_LOCKED) {
-			    sleep(1);
+			    sleep(5);
 			    ret = sqlite3_step(stmt);
 		    }
 
@@ -580,18 +580,24 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 					}
 
 					/* Set the file permissions, assumes non NFSv4 */
-					if (mode != NULL || e->type == ASSET_SAMPLE_OWNER_MODE || e->type == ASSET_FILE_OWNER_MODE) {
+					if (mode != NULL || (e->mode != NULL && e->mode[0] != '\0' && (e->type == ASSET_SAMPLE_OWNER_MODE || e->type == ASSET_FILE_OWNER_MODE))) {
 						if (stat(file, &sb)) {
 							SET_ERRORX(MPORT_ERR_FATAL, "Unable to stat file %s", file);
 							goto ERROR;
 						}
-						if ((e->type == ASSET_SAMPLE_OWNER_MODE ||
-						     e->type == ASSET_FILE_OWNER_MODE) && e->mode != NULL && e->mode[0] != '\0') {
+						if ((e->type == ASSET_SAMPLE_OWNER_MODE || e->type == ASSET_FILE_OWNER_MODE)
+								&& e->mode != NULL && e->mode[0] != '\0') {
+#ifdef DEBUG
+							fprintf(stderr, "sample or file owner mode %s\n", e->mode);
+#endif
 							if ((set = setmode(e->mode)) == NULL) {
 								SET_ERROR(MPORT_ERR_FATAL, "Unable to set mode");
 								goto ERROR;
 							}
 						} else {
+#ifdef DEBUG
+							fprintf(stderr, "mode %s\n", e->mode);
+#endif
 							if ((set = setmode(mode)) == NULL) {
 								SET_ERROR(MPORT_ERR_FATAL, "Unable to set mode");
 								goto ERROR;
