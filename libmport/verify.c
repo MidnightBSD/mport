@@ -99,7 +99,7 @@ mport_verify_package(mportInstance *mport, mportPackageMeta *pack)
 				if (S_ISREG(st.st_mode)) {
 					if (checksum == NULL) {
 						mport_call_msg_cb(mport, "Source checksum missing %s", file);
-					} else if (strlen(checksum) == 33) {
+					} else if (strlen(checksum) < 34) {
 						if (MD5File(file, hash) == NULL)
 							mport_call_msg_cb(mport, "Can't MD5 %s: %s", file, strerror(errno));
 

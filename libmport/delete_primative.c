@@ -63,7 +63,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force) 
             RETURN_CURRENT_ERROR;
     }
 
-    mport_call_progress_init_cb(mport, "Deleteing %s-%s", pack->name, pack->version);
+    mport_call_progress_init_cb(mport, "Deleting %s-%s", pack->name, pack->version);
 
     /* stop any services that might exist; this replaces @stopdaemon */
     if (mport_db_prepare(mport->db, &stmt,
@@ -178,7 +178,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force) 
                 if (S_ISREG(st.st_mode)) {
 	                if (checksum == NULL) {
 		                mport_call_msg_cb(mport, "Checksum mismatch: %s", file);
-                    } else if (strlen(checksum) == 33) {
+                    } else if (strlen(checksum) < 34) {
 		                if (MD5File(file, hash) == NULL)
 			                mport_call_msg_cb(mport, "Can't MD5 %s: %s", file, strerror(errno));
 
@@ -200,7 +200,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force) 
                         if (sptr != NULL) {
                             sptr[0] = '\0'; /* hack off .sample */
 
-	                        if (strlen(checksum) == 33) {
+	                        if (strlen(checksum) < 34) {
 		                        if (MD5File(nonSample, sample_hash) == NULL) {
 			                        mport_call_msg_cb(mport, "Could not check file %s, review and remove manually.",
 			                                          nonSample);
