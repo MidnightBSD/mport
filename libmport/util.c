@@ -593,6 +593,7 @@ mport_get_osrelease(void)
         return NULL;
 
     for (int i = 0; i < 10; i++) {
+    	// old versions contained a - in the name  e.g. 0.4-RELEASE
         if (osrelease[i] == '\0' || osrelease[i] == '-')
             break;
 

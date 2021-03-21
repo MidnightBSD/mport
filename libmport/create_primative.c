@@ -34,7 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sqlite3.h>
-#include <md5.h>
+#include <sha256.h>
 #include <archive.h>
 #include <archive_entry.h>
 #include <assert.h>
@@ -123,7 +123,7 @@ insert_assetlist(sqlite3 *db, mportAssetList *assetlist, mportPackageMeta *pack,
 	mportAssetListEntry *e = NULL;
 	sqlite3_stmt *stmnt = NULL;
 	char sql[] = "INSERT INTO assets (pkg, type, data, checksum, owner, grp, mode) VALUES (?,?,?,?,?,?,?)";
-	char md5[33];
+	char hash[65];
 	char file[FILENAME_MAX];
 	char cwd[FILENAME_MAX];
 	struct stat st;
@@ -197,10 +197,10 @@ insert_assetlist(sqlite3 *db, mportAssetList *assetlist, mportPackageMeta *pack,
 			}
 
 			if (S_ISREG(st.st_mode)) {
-				if (MD5File(file, md5) == NULL)
+				if (SHA256_File(file, hash) == NULL)
 					RETURN_ERRORX(MPORT_ERR_FATAL, "File not found: %s", file);
 
-				if (sqlite3_bind_text(stmnt, 4, md5, -1, SQLITE_STATIC) != SQLITE_OK)
+				if (sqlite3_bind_text(stmnt, 4, hash, -1, SQLITE_STATIC) != SQLITE_OK)
 					RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 			} else {
 				sqlite3_bind_null(stmnt, 4);
