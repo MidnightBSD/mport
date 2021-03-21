@@ -188,7 +188,6 @@ insert_assetlist(sqlite3 *db, mportAssetList *assetlist, mportPackageMeta *pack,
 			if (lstat(file, &st) != 0) {
 				// if we have a backup, we can safely ignore some missing files
 				if (extra->is_backup) {
-					mport_call_msg_cb(mport, "File missing on file system for backup package '%s'", file);
 					// hack: mark it as a comment so it gets ignored later
 					e->type = ASSET_COMMENT;
 					goto reset;
