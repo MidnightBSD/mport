@@ -610,8 +610,8 @@ mport_version(void)
 {
     char *version;
     char *osrel = mport_get_osrelease();
-    asprintf(&version, "mport for MidnightBSD %s, Bundle Version %s\n",
-             osrel, MPORT_BUNDLE_VERSION_STR);
+    asprintf(&version, "mport %s for MidnightBSD %s, Bundle Version %s\n",
+             MPORT_VERSION, osrel, MPORT_BUNDLE_VERSION_STR);
     free(osrel);
 
     return version;
