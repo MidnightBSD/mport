@@ -186,6 +186,10 @@ insert_assetlist(sqlite3 *db, mportAssetList *assetlist, mportPackageMeta *pack,
 			}
 
 			if (lstat(file, &st) != 0) {
+				// if we have a backup, we can safely ignore some missing files
+				if (extra->is_backup) {
+					goto reset;
+				}
 				sqlite3_finalize(stmnt);
 				RETURN_ERRORX(MPORT_ERR_FATAL, "Could not stat %s: %s", file, strerror(errno));
 			}
@@ -209,6 +213,7 @@ insert_assetlist(sqlite3 *db, mportAssetList *assetlist, mportPackageMeta *pack,
 			RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 		}
 
+reset:
 		sqlite3_clear_bindings(stmnt);
 		sqlite3_reset(stmnt);
 	}

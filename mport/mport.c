@@ -98,7 +98,7 @@ main(int argc, char *argv[]) {
 		for (i = 2; i < argc; i++) {
 			tempResultCode = install(mport, argv[i]);
 			if (tempResultCode != 0)
-                                resultCode = tempResultCode;
+				resultCode = tempResultCode;
 		}
 		});
 	} else if (!strcmp(argv[1], "delete")) {

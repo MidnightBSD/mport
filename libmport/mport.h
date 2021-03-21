@@ -35,6 +35,7 @@
 #include <sqlite3.h>
 #include <sys/queue.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #include "mport_dispatch.h"
 
@@ -187,6 +188,7 @@ typedef struct {
   char *pkginstall;
   char *pkgdeinstall;
   char *pkgmessage;
+  bool is_backup;
 } mportCreateExtras;  
 
 mportCreateExtras * mport_createextras_new(void);
