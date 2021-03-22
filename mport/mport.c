@@ -128,17 +128,17 @@ main(int argc, char *argv[]) {
 		});
 	} else if (!strcmp(argv[1], "download")) {
 		dispatch_group_async(grp, q, ^{
-		loadIndex(mport);
-		for (i = 2; i < argc; i++) {
-			tempResultCode = mport_download(mport, argv[2]);
-			if (tempResultCode != 0)
-				resultCode = tempResultCode;
-		}
+			loadIndex(mport);
+			for (i = 2; i < argc; i++) {
+				tempResultCode = mport_download(mport, argv[2]);
+				if (tempResultCode != 0)
+					resultCode = tempResultCode;
+			}
 		});
 	} else if (!strcmp(argv[1], "upgrade")) {
 		dispatch_group_async(grp, q, ^{
-		loadIndex(mport);
-		resultCode = upgrade(mport);
+			loadIndex(mport);
+			resultCode = upgrade(mport);
 		});
 	} else if (!strcmp(argv[1], "locks")) {
 		asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
@@ -162,7 +162,7 @@ main(int argc, char *argv[]) {
 			usage();
 		}
 		});
-        } else if (!strcmp(argv[1], "list")) {
+	} else if (!strcmp(argv[1], "list")) {
 		asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
 		if (argc > 2) {
 			if (!strcmp(argv[2], "updates") || 
@@ -235,11 +235,11 @@ main(int argc, char *argv[]) {
 		});
 	} else if (!strcmp(argv[1], "deleteall")) {
 		dispatch_group_async(grp, q, ^{
-		resultCode = deleteAll(mport);
+			resultCode = deleteAll(mport);
 		});
 	} else if (!strcmp(argv[1], "verify")) {
 		dispatch_group_async(grp, q, ^{
-		resultCode = verify(mport);
+			resultCode = verify(mport);
 		});
 	} else if (!strcmp(argv[1], "which")) {
 		dispatch_group_async(grp, q, ^{
