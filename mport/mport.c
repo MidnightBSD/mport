@@ -128,17 +128,17 @@ main(int argc, char *argv[]) {
 		});
 	} else if (!strcmp(argv[1], "download")) {
 		dispatch_group_async(grp, q, ^{
-		loadIndex(mport);
-		for (i = 2; i < argc; i++) {
-			tempResultCode = mport_download(mport, argv[2]);
-			if (tempResultCode != 0)
-				resultCode = tempResultCode;
-		}
+			loadIndex(mport);
+			for (i = 2; i < argc; i++) {
+				tempResultCode = mport_download(mport, argv[2]);
+				if (tempResultCode != 0)
+					resultCode = tempResultCode;
+			}
 		});
 	} else if (!strcmp(argv[1], "upgrade")) {
 		dispatch_group_async(grp, q, ^{
-		loadIndex(mport);
-		resultCode = upgrade(mport);
+			loadIndex(mport);
+			resultCode = upgrade(mport);
 		});
 	} else if (!strcmp(argv[1], "locks")) {
 		asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
@@ -162,7 +162,7 @@ main(int argc, char *argv[]) {
 			usage();
 		}
 		});
-        } else if (!strcmp(argv[1], "list")) {
+	} else if (!strcmp(argv[1], "list")) {
 		asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
 		if (argc > 2) {
 			if (!strcmp(argv[2], "updates") || 
@@ -235,11 +235,11 @@ main(int argc, char *argv[]) {
 		});
 	} else if (!strcmp(argv[1], "deleteall")) {
 		dispatch_group_async(grp, q, ^{
-		resultCode = deleteAll(mport);
+			resultCode = deleteAll(mport);
 		});
 	} else if (!strcmp(argv[1], "verify")) {
 		dispatch_group_async(grp, q, ^{
-		resultCode = verify(mport);
+			resultCode = verify(mport);
 		});
 	} else if (!strcmp(argv[1], "which")) {
 		dispatch_group_async(grp, q, ^{
@@ -505,16 +505,25 @@ install_depends(mportInstance *mport, const char *packageName, const char *versi
 		while (*depends != NULL) {
 			install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version);
 			depends++;
-        	}
+		}
 		if (mport_install(mport, packageName, version, NULL) != MPORT_OK) {
 			warnx("%s", mport_err_string());
 			return mport_err_code();
 		}
 		mport_index_depends_free_vec(depends);
 	} else {
-		/* already installed */
-		mport_pkgmeta_vec_free(packs);
+		/* already installed, double check we are on the latest */
 		mport_index_depends_free_vec(depends);
+
+		if (mport_check_preconditions(mport, packs[0], MPORT_PRECHECK_UPGRADEABLE) == MPORT_OK) {
+			if (update(mport, packageName) != MPORT_OK) {
+				warnx("%s", mport_err_string());
+				mport_pkgmeta_vec_free(packs);
+				return mport_err_code();
+			}
+		}
+
+		mport_pkgmeta_vec_free(packs);
 	}
 
 	return (0);
