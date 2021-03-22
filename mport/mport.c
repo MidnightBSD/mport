@@ -505,16 +505,25 @@ install_depends(mportInstance *mport, const char *packageName, const char *versi
 		while (*depends != NULL) {
 			install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version);
 			depends++;
-        	}
+		}
 		if (mport_install(mport, packageName, version, NULL) != MPORT_OK) {
 			warnx("%s", mport_err_string());
 			return mport_err_code();
 		}
 		mport_index_depends_free_vec(depends);
 	} else {
-		/* already installed */
-		mport_pkgmeta_vec_free(packs);
+		/* already installed, double check we are on the latest */
 		mport_index_depends_free_vec(depends);
+
+		if (mport_check_preconditions(mport, packs[0], MPORT_PRECHECK_UPGRADEABLE) == MPORT_OK) {
+			if (update(mport, packageName) != MPORT_OK) {
+				warnx("%s", mport_err_string());
+				mport_pkgmeta_vec_free(packs);
+				return mport_err_code();
+			}
+		}
+
+		mport_pkgmeta_vec_free(packs);
 	}
 
 	return (0);
