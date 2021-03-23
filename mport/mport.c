@@ -370,9 +370,9 @@ lock(mportInstance *mport, const char *packageName) {
 	mportPackageMeta **packs;
 
 	if (packageName == NULL) {
-                warnx("%s", "Specify package name");
-                return (1);
-        }
+		warnx("%s", "Specify package name");
+		return (1);
+	}
 
 	if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
 		warnx("%s", mport_err_string());
@@ -417,9 +417,9 @@ static int
 stats(mportInstance *mport) {
 	mportStats *s;
 	if (mport_stats(mport, &s) != MPORT_OK) {
-                warnx("%s", mport_err_string());
-                return (1);
-        }
+		warnx("%s", mport_err_string());
+		return (1);
+	}
 
 	printf("Local package database:\n");
 	printf("\tInstalled packages: %d\n", s->pkg_installed);
@@ -450,18 +450,17 @@ info(mportInstance *mport, const char *packageName) {
 
 int
 which(mportInstance *mport, const char *filePath, bool quiet, bool origin) {
-
 	mportPackageMeta *pack = NULL;
 
-        if (filePath == NULL) {
-                warnx("%s", "Specify file path");
-                return (1);
-        }
+	if (filePath == NULL) {
+        warnx("%s", "Specify file path");
+		return (1);
+	}
 
 	if (mport_asset_get_package_from_file_path(mport, filePath, &pack) != MPORT_OK) {
-                warnx("%s", mport_err_string());
-                return (1);
-        }
+		warnx("%s", mport_err_string());
+		return (1);
+	}
 
 	if (pack != NULL && pack->origin != NULL) {
 		if (quiet && origin) {
@@ -475,7 +474,7 @@ which(mportInstance *mport, const char *filePath, bool quiet, bool origin) {
 		}
 	}
 
-        return (0);
+	return (0);
 }
 
 /* recursive function */ 
@@ -546,8 +545,7 @@ install(mportInstance *mport, const char *packageName) {
 		i2 = indexEntry;
 		item = 0;
 		while (*i2 != NULL) {
-			printf("%d. %s-%s\n", item, (*i2)->pkgname,
-				(*i2)->version);
+			printf("%d. %s-%s\n", item, (*i2)->pkgname, (*i2)->version);
 			item++;
 			i2++;
 		}
