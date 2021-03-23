@@ -246,27 +246,27 @@ main(int argc, char *argv[]) {
 		__block int local_argc = argc;
 		__block char *const * local_argv = argv;
 		local_argv++;
-                if (local_argc > 2) {
+		if (local_argc > 2) {
 			int ch, qflag, oflag;
 			qflag = oflag = 0;
-		        while ((ch = getopt(local_argc, local_argv, "qo")) != -1) {
+			while ((ch = getopt(local_argc, local_argv, "qo")) != -1) {
 				switch (ch) {
 			 		case 'q':
-					qflag = 1;
-					break;
+						qflag = 1;
+						break;
 					case 'o':
-	                                oflag = 1;
-        	                        break;
+						oflag = 1;
+						break;
 				}
 			}
 			local_argc -= optind;
 			local_argv += optind;
 
 			which(mport, *local_argv, qflag, oflag);
-                } else {
-                        usage();
-                }
-                });
+		} else {
+			usage();
+        }
+		});
 	} else {
 		mport_instance_free(mport);
 		usage();
@@ -274,9 +274,9 @@ main(int argc, char *argv[]) {
 
 	dispatch_group_wait(grp, DISPATCH_TIME_FOREVER);
 	dispatch_async(mainq, ^{
-                mport_instance_free(mport);
-                exit(resultCode);
-        });
+		mport_instance_free(mport);
+		exit(resultCode);
+	});
 
 	dispatch_main();
 }
@@ -391,7 +391,7 @@ lock(mportInstance *mport, const char *packageName) {
 
 int
 unlock(mportInstance *mport, const char *packageName) {
-        mportPackageMeta **packs;
+	mportPackageMeta **packs;
 
 	if (packageName == NULL) {
 		warnx("%s", "Specify package name");
