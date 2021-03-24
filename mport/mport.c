@@ -129,10 +129,14 @@ main(int argc, char *argv[]) {
 	} else if (!strcmp(argv[1], "download")) {
 		dispatch_group_async(grp, q, ^{
 			loadIndex(mport);
+			char *path;
 			for (i = 2; i < argc; i++) {
-				tempResultCode = mport_download(mport, argv[2]);
-				if (tempResultCode != 0)
+				tempResultCode = mport_download(mport, argv[i], &path);
+				if (tempResultCode != 0) {
 					resultCode = tempResultCode;
+				} else if (path != NULL) {
+					free(path);
+				}
 			}
 		});
 	} else if (!strcmp(argv[1], "upgrade")) {
@@ -586,39 +590,19 @@ delete(const char *packageName) {
 
 int
 update(mportInstance *mport, const char *packageName) {
-	mportIndexEntry **indexEntry;
 	char *path;
 
-	indexEntry = lookupIndex(mport, packageName);
-	if (indexEntry == NULL || *indexEntry == NULL)
-		return (1);
-
-	asprintf(&path, "%s/%s", MPORT_LOCAL_PKG_PATH, (*indexEntry)->bundlefile);
-
-	if (!mport_file_exists(path)) {
-		if (mport_fetch_bundle(mport, (*indexEntry)->bundlefile) != MPORT_OK) {
-			fprintf(stderr, "%s\n", mport_err_string());
-			free(path);
-			return mport_err_code();
-		}
-	}
-
-	if (!mport_verify_hash(path, (*indexEntry)->hash)) {
-		if (unlink(path) == 0)  /* remove file so we can try again */
-			fprintf(stderr, "Package fails hash verification and was removed. Please try again.\n");
-		else
-			fprintf(stderr, "Package fails hash verification Please delete it manually at %s\n", path);
-		free(path);
-		return (1);
-	}
+	int result = mport_download(mport, packageName, &path);
+	if (result != 0)
+		return result;
 
 	if (mport_update_primative(mport, path) != MPORT_OK) {
 		fprintf(stderr, "%s\n", mport_err_string());
 		free(path);
 		return mport_err_code();
 	}
+
 	free(path);
-	mport_index_entry_free_vec(indexEntry);
 
 	return (0);
 }
