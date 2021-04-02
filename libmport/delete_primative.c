@@ -159,14 +159,27 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force) 
         }
 
         switch (type) {
-	    case ASSET_FILE_OWNER_MODE:
-		/* falls through */
-            case ASSET_FILE:
-                /* falls through */
+	        case ASSET_RMEMPTY:
+		        (mport->progress_step_cb)(++current, total, file);
+		        if (lstat(file, &st) != 0) {
+			        mport_call_msg_cb(mport, "Can't stat %s: %s", file, strerror(errno));
+			        break; /* next asset */
+		        }
+
+		        // remove the file if it is empty
+		        if (S_ISREG(st.st_mode) && st.st_size == 0) {
+			        if (unlink(file) != 0)
+				        mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));
+		        }
+	        	break;
+	        case ASSET_FILE_OWNER_MODE:
+			/* falls through */
+			case ASSET_FILE:
+            /* falls through */
             case ASSET_SHELL:
-                /* falls through */
+            /* falls through */
             case ASSET_SAMPLE:
-		/* falls through */
+			/* falls through */
             case ASSET_SAMPLE_OWNER_MODE:
                 (mport->progress_step_cb)(++current, total, file);
 
