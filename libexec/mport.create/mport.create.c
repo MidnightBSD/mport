@@ -56,28 +56,42 @@ int main(int argc, char *argv[])
 				extra->pkg_filename = optarg;
 				break;
 			case 'n':
-				pack->name = optarg;
+				if (optarg != NULL) {
+					pack->name = strdup(optarg);
+				}
 				break;
 			case 'v':
-				pack->version = optarg;
+				if (optarg != NULL) {
+					pack->version = strdup(optarg);
+				}
 				break;
 			case 'c':
-				pack->comment = optarg;
+				if (optarg != NULL) {
+					pack->comment = strdup(optarg);
+				}
 				break;
 			case 'f':
-				pack->flavor = optarg;
+				if (optarg != NULL) {
+					pack->flavor = strdup(optarg);
+				}
 				break;
 			case 'e':
-				pack->cpe = optarg;
+				if (optarg != NULL) {
+					pack->cpe = strdup(optarg);
+				}
 				break;
 			case 'l':
-				pack->lang = optarg;
+				if (optarg != NULL) {
+					pack->lang = strdup(optarg);
+				}
 				break;
 			case 's':
 				extra->sourcedir = optarg;
 				break;
 			case 'd':
-				pack->desc = optarg;
+				if (optarg != NULL) {
+					pack->desc = strdup(optarg);
+				}
 				break;
 			case 'p':
 				if ((fp = fopen(optarg, "r")) == NULL) {
@@ -94,7 +108,9 @@ int main(int argc, char *argv[])
 
 				break;
 			case 'P':
-				pack->prefix = optarg;
+				if (optarg != NULL) {
+					pack->prefix = strdup(optarg);
+				}
 				break;
 			case 'D':
 				mport_parselist(optarg, &(extra->depends));
@@ -103,7 +119,9 @@ int main(int argc, char *argv[])
 				extra->mtree = optarg;
 				break;
 			case 'O':
-				pack->origin = optarg;
+				if (optarg != NULL) {
+					pack->origin = strdup(optarg);
+				}
 				break;
 			case 'C':
 				mport_parselist(optarg, &(extra->conflicts));
@@ -113,7 +131,7 @@ int main(int argc, char *argv[])
 				pack->expiration_date = mktime(&expDate);
 				break;
 			case 'S':
-				if (optarg[0] == '1' || optarg[0] == 'Y' || optarg[0] == 'y')
+				if (optarg[0] == '1' || optarg[0] == 'Y' || optarg[0] == 'y' || optarg[0] == 'T' || optarg[0] == 't')
 					pack->no_provide_shlib = 1;
 				else
 					pack->no_provide_shlib = 0;
@@ -131,7 +149,9 @@ int main(int argc, char *argv[])
 				mport_parselist(optarg, &(pack->categories));
 				break;
 			case 'x':
-				pack->deprecated = optarg;
+				if (optarg != NULL) {
+					pack->deprecated = strdup(optarg);
+				}
 				break;
 			case '?':
 			default:
@@ -151,8 +171,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	exit(0);
-
+	return 0;
 }
 
 
