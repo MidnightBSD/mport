@@ -37,8 +37,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "mport_dispatch.h"
-
 typedef void (*mport_msg_cb)(const char *);
 typedef void (*mport_progress_init_cb)(const char *);
 typedef void (*mport_progress_step_cb)(int, int, const char *);

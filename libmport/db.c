@@ -51,8 +51,8 @@ mport_db_do(sqlite3 *db, const char *fmt, ...)
 {
 	va_list args;
 	char *sql;
-	__block int result = MPORT_OK;
-	__block char *err;
+	int result = MPORT_OK;
+	char *err;
 
 	va_start(args, fmt);
 
@@ -63,7 +63,6 @@ mport_db_do(sqlite3 *db, const char *fmt, ...)
 	if (sql == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate memory for sql statement");
 
-	dispatch_sync(mportSQLSerial, ^{
 		int sqlcode = sqlite3_exec(db, sql, 0, 0, 0);
 		/* if we get an error code, we want to run it again in some cases */
 		if (sqlcode == SQLITE_BUSY || sqlcode == SQLITE_LOCKED) {
@@ -78,7 +77,6 @@ mport_db_do(sqlite3 *db, const char *fmt, ...)
 		}
 
 		sqlite3_free(sql);
-	});
 
 	if (result == MPORT_ERR_FATAL)
 		SET_ERRORX(result, "sql error preparing '%s' : %s", sql, err);
@@ -98,8 +96,8 @@ mport_db_prepare(sqlite3 *db, sqlite3_stmt **stmt, const char *fmt, ...)
 {
 	va_list args;
 	char *sql;
-	__block int result = MPORT_OK;
-	__block char *err;
+	int result = MPORT_OK;
+	char *err;
 
 	va_start(args, fmt);
 	sql = sqlite3_vmprintf(fmt, args);
@@ -108,7 +106,6 @@ mport_db_prepare(sqlite3 *db, sqlite3_stmt **stmt, const char *fmt, ...)
 	if (sql == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate memory for sql statement");
 
-	dispatch_sync(mportSQLSerial, ^{
 		int sqlcode = sqlite3_prepare_v2(db, sql, -1, stmt, NULL);
 		if (sqlcode == SQLITE_BUSY || sqlcode == SQLITE_LOCKED) {
 			sleep(1);
@@ -122,7 +119,6 @@ mport_db_prepare(sqlite3 *db, sqlite3_stmt **stmt, const char *fmt, ...)
 		}
 
 		sqlite3_free(sql);
-	});
 
 	if (result == MPORT_ERR_FATAL)
 		SET_ERRORX(result, "sql error preparing '%s' : %s", sql, err);
@@ -133,9 +129,9 @@ int
 mport_db_count(sqlite3 *db, int *count, const char *fmt, ...) {
 	va_list args;
 	char *sql;
-	__block int result = MPORT_OK;
-	__block char *err;
-	__block int realCount = 0;
+	int result = MPORT_OK;
+	char *err;
+	int realCount = 0;
 
 	va_start(args, fmt);
 	sql = sqlite3_vmprintf(fmt, args);
@@ -144,7 +140,6 @@ mport_db_count(sqlite3 *db, int *count, const char *fmt, ...) {
 	if (sql == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate memory for sql statement");
 
-	dispatch_sync(mportSQLSerial, ^{
 		sqlite3_stmt *stmt;
 		int sqlcode = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
 		if (sqlcode == SQLITE_BUSY || sqlcode == SQLITE_LOCKED) {
@@ -152,24 +147,24 @@ mport_db_count(sqlite3 *db, int *count, const char *fmt, ...) {
 			if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
 				err = (char *) sqlite3_errmsg(db);
 				result = MPORT_ERR_FATAL;
-				return;
+				return result;
 			}
 		} else if (sqlcode != SQLITE_OK) {
 			err = (char *) sqlite3_errmsg(db);
 			result = MPORT_ERR_FATAL;
-			return;
+			return result;
 		}
 
 		sqlite3_free(sql);
 
 		if (sqlite3_step(stmt) != SQLITE_ROW) {
 			sqlite3_finalize(stmt);
-			return;
+			return result;
 		}
 
 		realCount = sqlite3_column_int(stmt, 0);
 		sqlite3_finalize(stmt);
-	});
+
 	*count = realCount;
 
 	if (result == MPORT_ERR_FATAL)
