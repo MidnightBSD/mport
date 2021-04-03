@@ -22,7 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
 
 #include <sys/cdefs.h>
@@ -73,16 +72,12 @@ mport_stats(mportInstance *mport, mportStats **stats)
 		sqlite3_finalize(stmt);
 		err = (char *) sqlite3_errmsg(db);
 		result = MPORT_ERR_FATAL;
+		SET_ERRORX(result, "%s", err);
 		return result;
 	}
 
 	s->pkg_installed = (unsigned int) sqlite3_column_int(stmt, 0);
 	sqlite3_finalize(stmt);
-
-	if (result == MPORT_ERR_FATAL) {
-		SET_ERRORX(result, "%s", err);
-		return result;
-	}
 
 	if (mport_db_prepare(db, &stmt, "SELECT COUNT(*) FROM idx.packages") != MPORT_OK) {
 		sqlite3_finalize(stmt);
@@ -93,13 +88,12 @@ mport_stats(mportInstance *mport, mportStats **stats)
 		sqlite3_finalize(stmt);
 		err = (char *) sqlite3_errmsg(db);
 		result = MPORT_ERR_FATAL;
+		SET_ERRORX(result, "%s", err);
 		return result;
 	}
 
 	s->pkg_available = (unsigned int) sqlite3_column_int(stmt, 0);
 	sqlite3_finalize(stmt);
 
-	if (result == MPORT_ERR_FATAL)
-		SET_ERRORX(result, "%s", err);
 	return result;
 }

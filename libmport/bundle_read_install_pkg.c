@@ -27,8 +27,6 @@
 
 #include <sys/cdefs.h>
 
-__MBSDID("$MidnightBSD$");
-
 #include "mport.h"
 #include "mport_private.h"
 
@@ -41,7 +39,6 @@ __MBSDID("$MidnightBSD$");
 #include <syslog.h>
 #include <stdarg.h>
 #include <archive_entry.h>
-
 
 enum phase {
 	PREINSTALL, ACTUALINSTALL, POSTINSTALL
@@ -656,72 +653,61 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 		}
 
 		/* insert this asset into the master database */
-		int code = MPORT_OK;
-		const char *err;
 		char *filePtr = strdup(file);
 		char *cwdPtr = strdup(cwd);
 
 		char dir[FILENAME_MAX];
 		if (sqlite3_bind_int(insert, 1, (int) e->type) != SQLITE_OK) {
-			code = MPORT_ERR_FATAL;
-			err = sqlite3_errmsg(mport->db);
-			return code;
+			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+			goto ERROR;
 		}
 		if (e->type == ASSET_FILE || e->type == ASSET_SAMPLE || e->type == ASSET_SHELL ||
 		    e->type == ASSET_FILE_OWNER_MODE || e->type == ASSET_SAMPLE_OWNER_MODE) {
 			/* don't put the root in the database! */
 			if (sqlite3_bind_text(insert, 2, filePtr + strlen(mport->root), -1, SQLITE_STATIC) !=
 			    SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 
 			if (sqlite3_bind_text(insert, 3, e->checksum, -1, SQLITE_STATIC) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 
 			if (e->owner != NULL) {
 				if (sqlite3_bind_text(insert, 4, e->owner, -1, SQLITE_STATIC) != SQLITE_OK) {
-					code = MPORT_ERR_FATAL;
-					err = sqlite3_errmsg(mport->db);
-					return code;
+					SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+					goto ERROR;
 				}
 			} else {
 				if (sqlite3_bind_null(insert, 4) != SQLITE_OK) {
-					code = MPORT_ERR_FATAL;
-					err = sqlite3_errmsg(mport->db);
-					return code;
+					SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+					goto ERROR;
 				}
 			}
 
 			if (e->group != NULL) {
 				if (sqlite3_bind_text(insert, 5, e->group, -1, SQLITE_STATIC) != SQLITE_OK) {
-					code = MPORT_ERR_FATAL;
-					err = sqlite3_errmsg(mport->db);
-					return code;
+					SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+					goto ERROR;
 				}
 			} else {
 				if (sqlite3_bind_null(insert, 5) != SQLITE_OK) {
-					code = MPORT_ERR_FATAL;
-					err = sqlite3_errmsg(mport->db);
-					return code;
+					SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+					goto ERROR;
 				}
 			}
 
 			if (e->mode != NULL) {
 				if (sqlite3_bind_text(insert, 6, e->mode, -1, SQLITE_STATIC) != SQLITE_OK) {
-					code = MPORT_ERR_FATAL;
-					err = sqlite3_errmsg(mport->db);
-					return code;
+					SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+					goto ERROR;
 				}
 			} else {
 				if (sqlite3_bind_null(insert, 6) != SQLITE_OK) {
-					code = MPORT_ERR_FATAL;
-					err = sqlite3_errmsg(mport->db);
-					return code;
+					SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+					goto ERROR;
 				}
 			}
 		} else if (e->type == ASSET_DIR || e->type == ASSET_DIRRM || e->type == ASSET_DIRRMTRY) {
@@ -732,70 +718,59 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 				(void) snprintf(dir, FILENAME_MAX, "%s/%s", cwdPtr, e->data);
 
 			if (sqlite3_bind_text(insert, 2, dir, -1, SQLITE_STATIC) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 
 			if (sqlite3_bind_null(insert, 3) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 
 			if (sqlite3_bind_null(insert, 4) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 
 			if (sqlite3_bind_null(insert, 5) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 
 			if (sqlite3_bind_null(insert, 6) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 		} else {
 			if (sqlite3_bind_text(insert, 2, e->data, -1, SQLITE_STATIC) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 
 			if (sqlite3_bind_null(insert, 3) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 
 			if (sqlite3_bind_null(insert, 4) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 
 			if (sqlite3_bind_null(insert, 5) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 
 			if (sqlite3_bind_null(insert, 6) != SQLITE_OK) {
-				code = MPORT_ERR_FATAL;
-				err = sqlite3_errmsg(mport->db);
-				return code;
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+				goto ERROR;
 			}
 		}
 
 		if (sqlite3_step(insert) != SQLITE_DONE) {
-			code = MPORT_ERR_FATAL;
-			err = sqlite3_errmsg(mport->db);
-			return code;
+			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+			goto ERROR;
 		}
 
 		sqlite3_clear_bindings(insert);
@@ -803,10 +778,6 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 
 		free(filePtr);
 		free(cwdPtr);
-		if (code != MPORT_OK) {
-			SET_ERROR(code, err);
-			goto ERROR;
-		}
 	}
 
 	if (mport_db_do(mport->db, "COMMIT") != MPORT_OK) {

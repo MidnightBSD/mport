@@ -35,6 +35,7 @@
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
+#include <unistd.h>
 
 MPORT_PUBLIC_API int
 mport_clean_database(mportInstance *mport)
@@ -121,4 +122,3 @@ mport_clean_oldpackages(mportInstance *mport)
 
 	return error_code;
 }
-
