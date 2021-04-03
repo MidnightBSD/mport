@@ -50,6 +50,10 @@ int main(int argc, char *argv[])
 	FILE *fp;
 	struct tm expDate;
 
+	if (pack == NULL || extra == NULL || assetlist == NULL) {
+		errx(1, "Failed to allocate memory");
+	}
+
 	while ((ch = getopt(argc, argv, "C:D:E:M:O:P:S:c:d:e:f:i:j:l:m:n:o:p:r:s:t:v:x:")) != -1) {
 		switch (ch) {
 			case 'o':
