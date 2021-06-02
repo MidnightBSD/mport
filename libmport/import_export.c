@@ -47,7 +47,7 @@ mport_import(mportInstance *mport,  char  *path)
 	if (path == NULL)
 		console = true;
 	
-	if (!console && mport_file_exists(path)) {
+	if (!console && !mport_file_exists(path)) {
 			RETURN_ERROR(MPORT_ERR_FATAL, "File exists at export path");
 	}
 
@@ -58,8 +58,14 @@ mport_import(mportInstance *mport,  char  *path)
 	}
 
 	while (!feof(file)) {
-
 		fgets(name, 1024, file);
+		for (int i = 0; i < 1024; i++) {
+        	if (name[i] == '\n') {
+				name[i] = '\0';
+				break;
+			}
+		}
+		
 		mport_call_msg_cb(mport, "Installing %s", name);
 		mport_install(mport, name,  NULL, NULL);
 	}
