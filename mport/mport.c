@@ -135,9 +135,9 @@ main(int argc, char *argv[]) {
                 free(flag);
                 free(buf);
 	} else if (!strcmp(argv[1], "import")) {
-
+			loadIndex(mport);
+			resultCode = mport_import(mport, argv[2]);
 	} else if (!strcmp(argv[1], "export")) {
-		if (argc > 2)
 			resultCode = mport_export(mport, argv[2]);
 	} else if (!strcmp(argv[1], "lock")) {
 		if (argc > 2) {
