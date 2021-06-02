@@ -78,12 +78,11 @@ main(int argc, char *argv[]) {
 
 	mport = mport_instance_new();
 
-		if (mport_instance_init(mport, NULL) != MPORT_OK) {
+	if (mport_instance_init(mport, NULL) != MPORT_OK) {
 			errx(1, "%s", mport_err_string());
-		}
+	}
 
 	if (!strcmp(argv[1], "install")) {
-
 		if (argc == 2) {
 			mport_instance_free(mport);
 			usage();
@@ -135,6 +134,11 @@ main(int argc, char *argv[]) {
 		resultCode = execl(buf, "mport.list", flag, (char *)0);
                 free(flag);
                 free(buf);
+	} else if (!strcmp(argv[1], "import")) {
+
+	} else if (!strcmp(argv[1], "export")) {
+		if (argc > 2)
+			resultCode = mport_export(mport, argv[2]);
 	} else if (!strcmp(argv[1], "lock")) {
 		if (argc > 2) {
 			lock(mport, argv[2]);
@@ -254,6 +258,8 @@ usage(void) {
 		"       mport delete [package name]\n"
 		"       mport deleteall\n"
 		"       mport download [package name]\n"
+	    "       mport export [filename]\n"
+	    "       mport import [filename]\n"
 		"       mport index\n"
 		"       mport info [package name]\n"
 		"       mport install [package name]\n"

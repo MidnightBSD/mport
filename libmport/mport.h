@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2013, 2014 Lucas Holt
+ * Copyright (c) 2013, 2014, 2021 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -264,5 +264,9 @@ typedef struct {
 int mport_stats(mportInstance *, mportStats **);
 int mport_stats_free(mportStats *);
 mportStats * mport_stats_new(void);
+
+/* Import/Export */
+int mport_import(mportInstance*,  char *);
+int mport_export(mportInstance*, char *);
 
 #endif /* ! defined _MPORT_H */
