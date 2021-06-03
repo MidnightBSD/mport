@@ -58,7 +58,12 @@ mport_import(mportInstance *mport,  char  *path)
 	}
 
 	while (!feof(file)) {
-		fgets(name, 1024, file);
+		if (console) {
+			fgets(stdin, 1024, file);
+		} else {
+			fgets(name, 1024, file); 
+		}
+		
 		for (int i = 0; i < 1024; i++) {
         	if (name[i] == '\n') {
 				name[i] = '\0';
@@ -83,7 +88,7 @@ mport_export(mportInstance *mport, char *path)
 	mportPackageMeta **packs;
 	mportPackageMeta **packs_orig;
 	
-	FILE *file;
+	FILE *file = NULL;
 	bool console = false;
 
 	if (path == NULL)
