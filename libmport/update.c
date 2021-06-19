@@ -34,10 +34,31 @@
 MPORT_PUBLIC_API int
 mport_update(mportInstance *mport, const char *packageName) {
 	char *path;
+	mportDependsEntry **depends;
+	mportIndexEntry **indexEntry;
+
+	if (packageName == NULL) {
+		return (1);
+	}
 
 	int result = mport_download(mport, packageName, &path);
 	if (result != 0)
 		return result;
+
+	/* in the event the package is not found in the index, it could be user generated and we still want to update it if
+	   present */
+	if (mport_index_lookup_pkgname(mport, packageName, &indexEntry) != MPORT_OK ||
+			indexEntry == NULL || *indexEntry == NULL) {
+		mport_call_msg_cb(mport, "Package %s not found in the index", packageName);
+	} else {
+		/* get the dependency list and start updating/installing missing entries */
+		mport_index_depends_list(mport, packageName, (*indexEntry)->version, &depends);
+
+		while (*depends != NULL) {
+			mport_install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version);
+			depends++;
+		}
+	}
 
 	if (mport_update_primative(mport, path) != MPORT_OK) {
 		mport_call_msg_cb(mport, "%s\n", mport_err_string());
