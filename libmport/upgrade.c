@@ -38,8 +38,6 @@
 #include <errno.h>
 #include <stddef.h>
 
-static int updateDown(mportInstance *, mportPackageMeta *);
-
 MPORT_PUBLIC_API int
 mport_upgrade(mportInstance *mport) {
 	mportPackageMeta **packs;
@@ -58,7 +56,7 @@ mport_upgrade(mportInstance *mport) {
 
 	while (*packs != NULL) {
 		if (mport_index_check(mport, *packs)) {
-			updated += updateDown(mport, *packs);
+			updated += mport_update_down(mport, *packs);
 		}
 		packs++;
 		total++;
@@ -70,7 +68,7 @@ mport_upgrade(mportInstance *mport) {
 }
 
 int
-updateDown(mportInstance *mport, mportPackageMeta *pack) {
+mport_update_down(mportInstance *mport, mportPackageMeta *pack) {
 	mportPackageMeta **depends;
 	int ret = 0;
 
@@ -87,7 +85,7 @@ updateDown(mportInstance *mport, mportPackageMeta *pack) {
 				ret = 0;
 		} else {
 			while (*depends != NULL) {
-				ret += updateDown(mport, (*depends));
+				ret += mport_update_down(mport, (*depends));
 				if (mport_index_check(mport, *depends)) {
 					mport_call_msg_cb(mport, "Updating depends %s\n", (*depends)->name);
 					if (mport_update(mport, (*depends)->name) != 0) {
