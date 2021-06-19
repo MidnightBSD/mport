@@ -49,13 +49,10 @@ static int configGet(mportInstance *, const char *);
 static int configSet(mportInstance *, const char *, const char *);
 static int delete(const char *);
 static int deleteAll(mportInstance *);
-static int update(mportInstance *, const char *);
-static int upgrade(mportInstance *);
 static int info(mportInstance *, const char *);
 static int search(mportInstance *, char **);
 static int stats(mportInstance *mport);
 static int clean(mportInstance *);
-static int indexCheck(mportInstance *, mportPackageMeta *);
 static int updateDown(mportInstance *, mportPackageMeta *);
 static int verify(mportInstance *);
 static int lock(mportInstance *, const char *);
@@ -110,7 +107,7 @@ main(int argc, char *argv[]) {
 		}
 		loadIndex(mport);
 		for (i = 2; i < argc; i++) {
-			tempResultCode = update(mport, argv[2]);
+			tempResultCode = mport_update(mport, argv[2]);
 			if (tempResultCode != 0)
 				resultCode = tempResultCode;
 		}
@@ -127,7 +124,7 @@ main(int argc, char *argv[]) {
 			}
 	} else if (!strcmp(argv[1], "upgrade")) {
 			loadIndex(mport);
-			resultCode = upgrade(mport);
+			resultCode = mport_upgrade(mport);
 	} else if (!strcmp(argv[1], "locks")) {
 		asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
 		flag = strdup("-l");
@@ -479,7 +476,7 @@ install_depends(mportInstance *mport, const char *packageName, const char *versi
 		mport_index_depends_free_vec(depends);
 
 		if (mport_check_preconditions(mport, packs[0], MPORT_PRECHECK_UPGRADEABLE) == MPORT_OK) {
-			if (update(mport, packageName) != MPORT_OK) {
+			if (mport_update(mport, packageName) != MPORT_OK) {
 				warnx("%s", mport_err_string());
 				mport_pkgmeta_vec_free(packs);
 				return mport_err_code();
@@ -546,53 +543,6 @@ delete(const char *packageName) {
 	free(buf);
 
 	return (resultCode);
-}
-
-int
-update(mportInstance *mport, const char *packageName) {
-	char *path;
-
-	int result = mport_download(mport, packageName, &path);
-	if (result != 0)
-		return result;
-
-	if (mport_update_primative(mport, path) != MPORT_OK) {
-		fprintf(stderr, "%s\n", mport_err_string());
-		free(path);
-		return mport_err_code();
-	}
-
-	free(path);
-
-	return (0);
-}
-
-int
-upgrade(mportInstance *mport) {
-	mportPackageMeta **packs;
-	int total = 0;
-	int updated = 0;
-
-	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
-		warnx("%s", mport_err_string());
-		return (1);
-	}
-
-	if (packs == NULL) {
-		warnx("No packages installed.\n");
-		return (1);
-	}
-
-	while (*packs != NULL) {
-		if (indexCheck(mport, *packs)) {
-			updated += updateDown(mport, *packs);
-		}
-		packs++;
-		total++;
-	}
-	mport_pkgmeta_vec_free(packs);
-	printf("Packages updated: %d\nTotal: %d\n", updated, total);
-	return (0);
 }
 
 int configGet(mportInstance *mport, const char *settingName) {
@@ -677,73 +627,6 @@ verify(mportInstance *mport) {
 	printf("Packages verified: %d\n", total);
 	
 	return (0);
-}
-
-int
-indexCheck(mportInstance *mport, mportPackageMeta *pack) {
-	mportIndexEntry **indexEntries;
-	int ret = 0;
-
-	if (mport_index_lookup_pkgname(mport, pack->name, &indexEntries) != MPORT_OK) {
-		fprintf(stderr, "Error Looking up package name %s: %d %s\n", pack->name,  mport_err_code(), mport_err_string());
-		return (0);
-	}
-
-	if (indexEntries != NULL) {
-		while (*indexEntries != NULL) {
-			int osflag = mport_check_preconditions(mport, pack, MPORT_PRECHECK_OS); 
-			if ((*indexEntries)->version != NULL && (mport_version_cmp(pack->version, (*indexEntries)->version) < 0 || 
-			    (mport_version_cmp(pack->version, (*indexEntries)->version) == 0 && osflag == MPORT_OK))) {
-				ret = 1;
-				break;
-			}
-			indexEntries++;
-		}
-		mport_index_entry_free_vec(indexEntries);
-	}
-
-	return (ret);
-}
-
-int
-updateDown(mportInstance *mport, mportPackageMeta *pack) {
-	mportPackageMeta **depends;
-	int ret = 0;
-
-	if (mport_pkgmeta_get_downdepends(mport, pack, &depends) == MPORT_OK) {
-		if (depends == NULL) {
-			if (indexCheck(mport, pack)) {
-				fprintf(stderr, "Updating %s\n", pack->name); 
-				if (update(mport, pack->name) !=0) {
-					fprintf(stderr, "Error updating %s\n", pack->name);
-					ret = 0;
-				} else
-					ret = 1;
-			} else
-				ret = 0;
-		} else {
-			while (*depends != NULL) {
-				ret += updateDown(mport, (*depends));
-				if (indexCheck(mport, *depends)) {
-					fprintf(stderr, "Updating depends %s\n", (*depends)->name);
-					if (update(mport, (*depends)->name) != 0) {
-						fprintf(stderr, "Error updating %s\n", (*depends)->name);
-					} else
-						ret++;
-				}
-				depends++;
-			}
-			if (indexCheck(mport, pack)) {
-				if (update(mport, pack->name) != 0) {
-					fprintf(stderr, "Error updating %s\n", pack->name);
-				} else
-					ret++;
-			}
-		}
-		mport_pkgmeta_vec_free(depends);
-	}
-
-	return (ret);
 }
 
 int
