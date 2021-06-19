@@ -42,7 +42,6 @@
 static void usage(void);
 static void loadIndex(mportInstance *);
 static mportIndexEntry ** lookupIndex(mportInstance *, const char *);
-static int install_depends(mportInstance *, const char *, const char *);
 static int install(mportInstance *, const char *);
 static int cpeList(mportInstance *);
 static int configGet(mportInstance *, const char *);
@@ -438,57 +437,6 @@ which(mportInstance *mport, const char *filePath, bool quiet, bool origin) {
 	return (0);
 }
 
-/* recursive function */ 
-int
-install_depends(mportInstance *mport, const char *packageName, const char *version) {
-	mportPackageMeta **packs;
-	mportDependsEntry **depends;
-
-	if (packageName == NULL || version == NULL)
-		return (1);
-
-	mport_index_depends_list(mport, packageName, version, &depends);
-
-	if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
-		warnx("%s", mport_err_string());
-		return mport_err_code();
-	}
-
-	if (packs == NULL && depends == NULL) {
-		/* Package is not installed and there are no dependencies */
-		if (mport_install(mport, packageName, version, NULL) != MPORT_OK) {
-			warnx("%s", mport_err_string());
-			return mport_err_code();
-		}
-	} else if (packs == NULL) {
-		/* Package is not installed */
-		while (*depends != NULL) {
-			install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version);
-			depends++;
-		}
-		if (mport_install(mport, packageName, version, NULL) != MPORT_OK) {
-			warnx("%s", mport_err_string());
-			return mport_err_code();
-		}
-		mport_index_depends_free_vec(depends);
-	} else {
-		/* already installed, double check we are on the latest */
-		mport_index_depends_free_vec(depends);
-
-		if (mport_check_preconditions(mport, packs[0], MPORT_PRECHECK_UPGRADEABLE) == MPORT_OK) {
-			if (mport_update(mport, packageName) != MPORT_OK) {
-				warnx("%s", mport_err_string());
-				mport_pkgmeta_vec_free(packs);
-				return mport_err_code();
-			}
-		}
-
-		mport_pkgmeta_vec_free(packs);
-	}
-
-	return (0);
-}
-
 int
 install(mportInstance *mport, const char *packageName) {
 	mportIndexEntry **indexEntry;
@@ -522,7 +470,7 @@ install(mportInstance *mport, const char *packageName) {
 		}
 	}
 
-	resultCode = install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version);
+	resultCode = mport_install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version);
 
 	mport_index_entry_free_vec(indexEntry);
 
