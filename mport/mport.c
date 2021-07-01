@@ -52,7 +52,6 @@ static int info(mportInstance *, const char *);
 static int search(mportInstance *, char **);
 static int stats(mportInstance *mport);
 static int clean(mportInstance *);
-static int updateDown(mportInstance *, mportPackageMeta *);
 static int verify(mportInstance *);
 static int lock(mportInstance *, const char *);
 static int unlock(mportInstance *, const char *);
