@@ -142,12 +142,14 @@ mport_install_depends(mportInstance *mport, const char *packageName, const char 
 		while (*depends != NULL) {
 			if (mport_install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version) != MPORT_OK) {
      			mport_call_msg_cb(mport, "%s", mport_err_string());
+				mport_index_depends_free_vec(depends);
 				return mport_err_code();
 			}
 			depends++;
 		}
 		if (mport_install(mport, packageName, version, NULL) != MPORT_OK) {
 			mport_call_msg_cb(mport, "%s", mport_err_string());
+			mport_index_depends_free_vec(depends);
 			return mport_err_code();
 		}
 		mport_index_depends_free_vec(depends);
