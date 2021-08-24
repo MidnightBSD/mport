@@ -33,6 +33,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <stddef.h>
@@ -79,7 +80,7 @@ mport_import(mportInstance *mport,  char  *path)
 		fclose(file);
 	}
 	
-	return MPORT_OK;
+	return (MPORT_OK);
 }
 
 MPORT_PUBLIC_API int 
@@ -127,5 +128,5 @@ mport_export(mportInstance *mport, char *path)
 		
 	mport_pkgmeta_vec_free(packs_orig);
 		
-	return MPORT_OK;
+	return (MPORT_OK);
 }

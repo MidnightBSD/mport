@@ -81,8 +81,9 @@ mport_index_depends_list(mportInstance *mport, const char *pkgname, const char *
 	e = (mportDependsEntry **)calloc(count + 1, sizeof(mportDependsEntry *));
 	*entry_vec = e;
   
-	if (count == 0) 
-		return MPORT_OK;
+	if (count == 0)  {
+		return (MPORT_OK);
+	}
   
 	if (mport_db_prepare(mport->db, &stmt,
 	    "SELECT pkg, version, d_pkg, d_version FROM idx.depends WHERE pkg= %Q and version=%Q", pkgname, version) != MPORT_OK) {
@@ -133,13 +134,16 @@ DONE:
 MPORT_PUBLIC_API void
 mport_index_depends_free_vec(mportDependsEntry **e)
 {
-	int i;
 
 	if (e == NULL)
 		return;
   
-	for (i=0; e[i] != NULL; i++) 
+	for (int i = 0; e[i] != NULL; i++) {
 		mport_index_depends_free(e[i]);
+		e[i] = NULL;
+	}
+
+	free(e);
 }
 
 
