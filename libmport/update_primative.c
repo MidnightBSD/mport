@@ -24,8 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
 #include "mport.h"
 #include "mport_private.h"
 #include <string.h>
@@ -92,7 +90,7 @@ set_prefix_to_installed(mportInstance *mport, mportPackageMeta *pkg)
 
     switch (sqlite3_step(stmt)) {
         case SQLITE_ROW:
-            prefix = sqlite3_column_text(stmt, 0);
+            prefix = (const char *) sqlite3_column_text(stmt, 0);
 
             if (strcmp(prefix, pkg->prefix) != 0) {
                 free(pkg->prefix);

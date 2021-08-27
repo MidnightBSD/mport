@@ -25,10 +25,6 @@
  */
 
 
-#include <sys/cdefs.h>
-
-__MBSDID("$MidnightBSD$");
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -105,8 +101,6 @@ mport_asset_get_assetlist(mportInstance *mport, mportPackageMeta *pack, mportAss
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
 	*alist_p = alist;
-
-	// pkg text NOT NULL, type int NOT NULL, data text, checksum text, owner text, grp text, mode text)
 
 	if (mport_db_prepare(mport->db, &stmt, "SELECT type,data,checksum,owner,grp,mode FROM assets WHERE pkg=%Q",
 	                     pack->name) != MPORT_OK) {

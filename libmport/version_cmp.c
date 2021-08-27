@@ -24,8 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -86,8 +84,8 @@ mport_version_cmp_sqlite(sqlite3_context *context, int argc, sqlite3_value **arg
 
     assert(argc == 2);
 
-    a = strdup(sqlite3_value_text(argv[0]));
-    b = strdup(sqlite3_value_text(argv[1]));
+    a = strdup((const char *) sqlite3_value_text(argv[0]));
+    b = strdup((const char *) sqlite3_value_text(argv[1]));
 
     assert(a != NULL);
     assert(b != NULL);

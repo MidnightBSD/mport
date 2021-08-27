@@ -24,8 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
 #include "mport.h"
 #include "mport_private.h"
 #include <stdlib.h>
@@ -55,8 +53,8 @@ mport_install(mportInstance *mport, const char *pkgname, const char *version, co
    * and say the order from the index puts p5-Class-DBI-AbstractSearch 
    * first.
    * 
-   * p5-Class-DBI-AbstractSearch is installed, and its depends installed.  
-   * However, p5-Class-DBI is a depend of p5-Class-DBI-AbstractSearch, so 
+   * p5-Class-DBI-AbstractSearch is installed, and its dependencies installed.
+   * However, p5-Class-DBI is a dependency of p5-Class-DBI-AbstractSearch, so
    * when it comes time to install p5-Class-DBI, we can't - because it is
    * already installed.
    *
@@ -98,12 +96,13 @@ mport_install(mportInstance *mport, const char *pkgname, const char *version, co
   }
 
   if (mport_verify_hash(filename, e[e_loc]->hash) == 0) {
-  	free(filename);
   	mport_index_entry_free_vec(e);
 
   	if (unlink(filename) == 0) {
+	    free(filename);
   		RETURN_ERROR(MPORT_ERR_FATAL, "Package failed hash verification and was removed.\n");
   	} else {
+	    free(filename);
   		RETURN_ERROR(MPORT_ERR_FATAL, "Package failed hash verification, but could not be removed.\n");
   	}
   }

@@ -68,8 +68,8 @@ mport_verify_package(mportInstance *mport, mportPackageMeta *pack)
 		}
 
 		type = (mportAssetListEntryType) sqlite3_column_int(stmt, 0);
-		data = sqlite3_column_text(stmt, 1);
-		checksum = sqlite3_column_text(stmt, 2);
+		data = (const char *) sqlite3_column_text(stmt, 1);
+		checksum = (const char *) sqlite3_column_text(stmt, 2);
 
 		char file[FILENAME_MAX];
 		/* XXX TMP */

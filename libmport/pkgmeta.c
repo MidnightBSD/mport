@@ -461,35 +461,35 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 	const char *tmp = 0;
 
 	/* Copy pkg to pack->name */
-	if ((tmp = sqlite3_column_text(stmt, 0)) == NULL)
+	if ((tmp = (const char *) sqlite3_column_text(stmt, 0)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 
 	if ((pack->name = strdup(tmp)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
 	/* Copy version to pack->version */
-	if ((tmp = sqlite3_column_text(stmt, 1)) == NULL)
+	if ((tmp = (const char *) sqlite3_column_text(stmt, 1)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 
 	if ((pack->version = strdup(tmp)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
 	/* Copy origin to pack->origin */
-	if ((tmp = sqlite3_column_text(stmt, 2)) == NULL)
+	if ((tmp = (const char *) sqlite3_column_text(stmt, 2)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 
 	if ((pack->origin = strdup(tmp)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
 	/* Copy lang to pack->lang */
-	if ((tmp = sqlite3_column_text(stmt, 3)) == NULL)
+	if ((tmp = (const char *) sqlite3_column_text(stmt, 3)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 
 	if ((pack->lang = strdup(tmp)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
 	/* Copy prefix to pack->prefix */
-	if ((tmp = sqlite3_column_text(stmt, 4)) == NULL)
+	if ((tmp = (const char *) sqlite3_column_text(stmt, 4)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 
 	if ((pack->prefix = strdup(tmp)) == NULL)
@@ -497,7 +497,7 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 
 
 	/* Copy comment to pack->comment */
-	if ((tmp = sqlite3_column_text(stmt, 5)) == NULL) {
+	if ((tmp = (const char *) sqlite3_column_text(stmt, 5)) == NULL) {
 		if ((pack->comment = strdup("")) == NULL)
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 	} else {
@@ -506,7 +506,7 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 	}
 
 	/* os_release */
-	if ((tmp = sqlite3_column_text(stmt, 6)) == NULL) {
+	if ((tmp = (const char *) sqlite3_column_text(stmt, 6)) == NULL) {
 		if ((pack->os_release = strdup(MPORT_OSVERSION)) == NULL)
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 	} else {
@@ -517,7 +517,7 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 	pack->locked = sqlite3_column_int(stmt, 8);
 
 	/* CPE */
-	if ((tmp = sqlite3_column_text(stmt, 7)) == NULL) {
+	if ((tmp = (const char *) sqlite3_column_text(stmt, 7)) == NULL) {
 		if ((pack->cpe = strdup("")) == NULL)
                         RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 	} else {
@@ -526,7 +526,7 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 	}
 
 	/* deprecated */
-	if ((tmp = sqlite3_column_text(stmt, 9)) == NULL) {
+	if ((tmp = (const char *) sqlite3_column_text(stmt, 9)) == NULL) {
 		if ((pack->deprecated = strdup("")) == NULL)
                         RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 	} else {
@@ -549,7 +549,7 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 	}
 
 	/* flavor */
-	if ((tmp = sqlite3_column_text(stmt, 12)) == NULL) {
+	if ((tmp = (const char *) sqlite3_column_text(stmt, 12)) == NULL) {
 		return MPORT_OK; /* last field so we can exit here */
 	}
 	if ((pack->flavor = strdup(tmp)) == NULL)

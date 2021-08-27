@@ -25,8 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
 #include <sqlite3.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -136,7 +134,7 @@ mport_db_count(sqlite3 *db, int *count, const char *fmt, ...)
 	char *sql;
 	int result = MPORT_OK;
 	char *err;
-	int realCount = 0;
+	int realCount;
 
 	va_start(args, fmt);
 	sql = sqlite3_vmprintf(fmt, args);
