@@ -157,29 +157,33 @@ mport_index_get(mportInstance *mport)
 
 MPORT_PUBLIC_API int
 mport_index_check(mportInstance *mport, mportPackageMeta *pack) {
-	mportIndexEntry **indexEntries;
+	mportIndexEntry **indexEntries, **indexEntries_orig;
 	int ret = 0;
 
 	if (mport == NULL) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
 	}
 
-	if (mport_index_lookup_pkgname(mport, pack->name, &indexEntries) != MPORT_OK) {
+	if (pack == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "pack not defined");
+
+	if (mport_index_lookup_pkgname(mport, pack->name, &indexEntries_orig) != MPORT_OK) {
 		SET_ERRORX(MPORT_ERR_WARN, "Error Looking up package name %s", pack->name); /* TODO: is this needed. */
 		return (0);
 	}
 
-	if (indexEntries != NULL) {
+	if (indexEntries_orig != NULL) {
+		indexEntries = indexEntries_orig;
 		while (*indexEntries != NULL) {
 			int osflag = mport_check_preconditions(mport, pack, MPORT_PRECHECK_OS);
-			if ((*indexEntries)->version != NULL && (mport_version_cmp(pack->version, (*indexEntries)->version) < 0 ||
+			if ((*indexEntries)->version != NULL && pack->version != NULL && (mport_version_cmp(pack->version, (*indexEntries)->version) < 0 ||
 			                                         (mport_version_cmp(pack->version, (*indexEntries)->version) == 0 && osflag == MPORT_OK))) {
 				ret = 1;
 				break;
 			}
 			indexEntries++;
 		}
-		mport_index_entry_free_vec(indexEntries);
+		mport_index_entry_free_vec(indexEntries_orig);
 	}
 
 	return (ret);
