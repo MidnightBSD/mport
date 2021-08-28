@@ -48,7 +48,7 @@ typedef struct data_struct_s
 	bool updated;
 } data_struct_t;
 
-static int add_entry(map_t *map, char *pkgname);
+static int add_entry(map_t map, char *pkgname);
 
 MPORT_PUBLIC_API int
 mport_upgrade(mportInstance *mport) {
@@ -67,24 +67,28 @@ mport_upgrade(mportInstance *mport) {
 		return (MPORT_ERR_FATAL);
 	}
 
+fprintf(stderr, "pre hashmap");
 	map = hashmap_new();
 
 	packs = packs_orig;
 	while (*packs != NULL) {
 		if (mport_index_check(mport, *packs)) {
-			updated += mport_update_down(mport, *packs, &map);
+			updated += mport_update_down(mport, *packs, map);
 		}
 		packs++;
 		total++;
 	}
 
+fprintf(stderr, "miller time\n");
 	packs = packs_orig;
-	while (*packs != NULL) {
+/*	while (*packs != NULL) {
 		hashmap_remove(map, (*packs)->name);
 	}
+*/
 
 	mport_pkgmeta_vec_free(packs_orig);
 
+fprintf(stderr, "free me bitch\n");
 	hashmap_free(map);
 
 	mport_call_msg_cb(mport, "Packages updated: %d\nTotal: %d\n", updated, total);
@@ -92,20 +96,24 @@ mport_upgrade(mportInstance *mport) {
 }
 
 int
-add_entry(map_t *map, char *pkgname) {
+add_entry(map_t map, char *pkgname) {
 	data_struct_t* value = malloc(sizeof(data_struct_t));
 	snprintf(value->key_string, KEY_MAX_LENGTH, "%s", pkgname);
 	value->updated = true;
-	return hashmap_put(*map, value->key_string, value);
+
+fprintf(stderr, "put a pkgname %s\n", pkgname);
+	return hashmap_put(map, pkgname, value);
 }
 
 int
-mport_update_down(mportInstance *mport, mportPackageMeta *pack, map_t *map) {
+mport_update_down(mportInstance *mport, mportPackageMeta *pack, map_t map) {
 	mportPackageMeta **depends;
 	int ret = 0;
 
+fprintf(stderr, "exists time %s\n", pack->name);
 	if (hashmap_exists(map, pack->name))
 		return (ret);
+fprintf(stderr, "post exists\n");
 
 	if (mport_pkgmeta_get_downdepends(mport, pack, &depends) == MPORT_OK) {
 		if (depends == NULL) {
@@ -122,8 +130,9 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, map_t *map) {
 				ret = 0;
 		} else {
 			while (*depends != NULL) {
+fprintf(stderr, "doing stuff\n");
 				ret += mport_update_down(mport, (*depends), map);
-				if (mport_index_check(mport, *depends) && !hashmap_exists(map, pack->name)) {
+				if (mport_index_check(mport, *depends) && !hashmap_exists(map, (*depends)->name)) {
 					mport_call_msg_cb(mport, "Updating depends %s\n", (*depends)->name);
 					if (mport_update(mport, (*depends)->name) != 0) {
 						mport_call_msg_cb(mport, "Error updating %s\n", (*depends)->name);
@@ -144,6 +153,7 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, map_t *map) {
 			}
 		}
 		mport_pkgmeta_vec_free(depends);
+		depends = NULL;
 	}
 
 	return (ret);
