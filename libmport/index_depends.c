@@ -24,6 +24,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+
 #include "mport.h"
 #include "mport_private.h"
 
@@ -36,7 +38,7 @@
 
 
 /*
- * Looks up dependencies list via pkgname and version from the index and fills with a vector of depends entries
+ * Looks up depends list via pkgname and version from the index and fills a vector of depends entries
  * with the result.
  *
  * The calling code is responsible for freeing the memory allocated.  See
@@ -67,9 +69,11 @@ mport_index_depends_list(mportInstance *mport, const char *pkgname, const char *
 		ret = SET_ERROR(MPORT_ERR_FATAL,
 		    "No rows returned from a 'SELECT COUNT(*)' query.");
 		goto DONE;
+		break;
 	default:
 		ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 		goto DONE;
+		break;
 	}
   
 	sqlite3_finalize(stmt);
@@ -96,10 +100,10 @@ mport_index_depends_list(mportInstance *mport, const char *pkgname, const char *
 				goto DONE;
 			}
       
-			e[i]->pkgname    = strdup((const char *) sqlite3_column_text(stmt, 0));
-			e[i]->version    = strdup((const char *) sqlite3_column_text(stmt, 1));
-			e[i]->d_pkgname  = strdup((const char *) sqlite3_column_text(stmt, 2));
-			e[i]->d_version  = strdup((const char *) sqlite3_column_text(stmt, 3));
+			e[i]->pkgname    = strdup(sqlite3_column_text(stmt, 0));
+			e[i]->version    = strdup(sqlite3_column_text(stmt, 1));
+			e[i]->d_pkgname  = strdup(sqlite3_column_text(stmt, 2));
+			e[i]->d_version  = strdup(sqlite3_column_text(stmt, 3));
       
 			if (e[i]->pkgname == NULL ||
 			    e[i]->version == NULL ||

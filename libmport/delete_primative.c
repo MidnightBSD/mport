@@ -192,21 +192,22 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force) 
 	                if (checksum == NULL) {
 		                mport_call_msg_cb(mport, "Checksum mismatch: %s", file);
                     } else if (strlen(checksum) < 34) {
-		                if (MD5File(file, hash) == NULL) {
+		                if (MD5File(file, hash) == NULL)
 			                mport_call_msg_cb(mport, "Can't MD5 %s: %s", file, strerror(errno));
-		                } else if (hash == NULL || strcmp(hash, checksum) != 0) {
+
+		                if (hash == NULL || strcmp(hash, checksum) != 0)
 			                mport_call_msg_cb(mport, "Checksum mismatch: %s", file);
-		                }
 	                }  else {
 		                if (SHA256_File(file, hash) == NULL)
 			                mport_call_msg_cb(mport, "Can't SHA256 %s: %s", file, strerror(errno));
-		                else if (hash == NULL || strcmp(hash, checksum) != 0)
+
+		                if (hash == NULL || strcmp(hash, checksum) != 0)
 			                mport_call_msg_cb(mport, "Checksum mismatch: %s", file);
 	                }
 
                     if (type == ASSET_SAMPLE || type == ASSET_SAMPLE_OWNER_MODE) {
                         char sample_hash[65];
-                        char nonSample[FILENAME_MAX] = {'\0'};
+                        char nonSample[FILENAME_MAX];
                         strlcpy(nonSample, file, FILENAME_MAX);
                         char *sptr = strcasestr(nonSample, ".sample");
                         if (sptr != NULL) {
