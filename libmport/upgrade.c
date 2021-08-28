@@ -24,8 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
 #include "mport.h"
 #include "mport_private.h"
 #include "hashmap.h"
@@ -81,10 +79,9 @@ mport_upgrade(mportInstance *mport) {
 	}
 
 	packs = packs_orig;
-/*	while (*packs != NULL) {
+	while (*packs != NULL) {
 		hashmap_remove(map, (*packs)->name);
 	}
-*/
 
 	mport_pkgmeta_vec_free(packs_orig);
 
