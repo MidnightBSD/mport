@@ -69,7 +69,6 @@ mport_upgrade(mportInstance *mport) {
 		return (MPORT_ERR_FATAL);
 	}
 
-fprintf(stderr, "pre hashmap");
 	map = hashmap_new();
 
 	packs = packs_orig;
@@ -81,7 +80,6 @@ fprintf(stderr, "pre hashmap");
 		total++;
 	}
 
-fprintf(stderr, "miller time\n");
 	packs = packs_orig;
 /*	while (*packs != NULL) {
 		hashmap_remove(map, (*packs)->name);
@@ -90,7 +88,6 @@ fprintf(stderr, "miller time\n");
 
 	mport_pkgmeta_vec_free(packs_orig);
 
-fprintf(stderr, "free me bitch\n");
 	hashmap_free(map);
 
 	mport_call_msg_cb(mport, "Packages updated: %d\nTotal: %d\n", updated, total);
@@ -104,7 +101,6 @@ add_entry(map_t map, char *pkgname) {
 	value->key_string[KEY_MAX_LENGTH-1] = '\0';
 	value->updated = true;
 
-fprintf(stderr, "put a pkgname %s\n", pkgname);
 	return hashmap_put(map, pkgname, value);
 }
 
@@ -113,10 +109,8 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, map_t map) {
 	mportPackageMeta **depends, **depends_orig;
 	int ret = 0;
 
-fprintf(stderr, "exists time %s\n", pack->name);
 	if (hashmap_exists(map, pack->name))
 		return (ret);
-fprintf(stderr, "post exists\n");
 
 	if (mport_pkgmeta_get_downdepends(mport, pack, &depends_orig) == MPORT_OK) {
 		if (depends_orig == NULL) {
@@ -134,7 +128,6 @@ fprintf(stderr, "post exists\n");
 		} else {
 			depends = depends_orig;
 			while (*depends != NULL) {
-fprintf(stderr, "doing stuff\n");
 				ret += mport_update_down(mport, (*depends), map);
 				if (mport_index_check(mport, *depends) && !hashmap_exists(map, (*depends)->name)) {
 					mport_call_msg_cb(mport, "Updating depends %s\n", (*depends)->name);
