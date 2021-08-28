@@ -78,6 +78,7 @@ mport_upgrade(mportInstance *mport) {
 		total++;
 	}
 
+	/* TODO: this won't get rid of all the map entries */
 	packs = packs_orig;
 	while (*packs != NULL) {
 		hashmap_remove(map, (*packs)->name);
@@ -88,9 +89,15 @@ mport_upgrade(mportInstance *mport) {
 	hashmap_free(map);
 
 	mport_call_msg_cb(mport, "Packages updated: %d\nTotal: %d\n", updated, total);
-	return (0);
+	return (MPORT_OK);
 }
 
+/**
+ * Add package name to a map to track what we've already worked on.
+ * @param map
+ * @param pkgname
+ * @return hashmap library status code (not MPORT codes)
+ */
 int
 add_entry(map_t map, char *pkgname) {
 	data_struct_t* value = malloc(sizeof(data_struct_t));
@@ -104,6 +111,16 @@ add_entry(map_t map, char *pkgname) {
 	return hashmap_put(map, pkgname, value);
 }
 
+/**
+ * update all dependencies starting at pack.
+ *
+ * Recursive.
+ *
+ * @param mport
+ * @param pack
+ * @param map
+ * @return number of packages modified at this level
+ */
 int
 mport_update_down(mportInstance *mport, mportPackageMeta *pack, map_t map) {
 	mportPackageMeta **depends, **depends_orig;
@@ -116,7 +133,7 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, map_t map) {
 		if (depends_orig == NULL) {
 			if (mport_index_check(mport, pack) && !hashmap_exists(map, pack->name)) {
 				mport_call_msg_cb(mport, "Updating %s\n", pack->name);
-				if (mport_update(mport, pack->name) != 0) {
+				if (mport_update(mport, pack->name) != MPORT_OK) {
 					mport_call_msg_cb(mport, "Error updating %s\n", pack->name);
 					ret = 0;
 				} else {
@@ -131,7 +148,7 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, map_t map) {
 				ret += mport_update_down(mport, (*depends), map);
 				if (mport_index_check(mport, *depends) && !hashmap_exists(map, (*depends)->name)) {
 					mport_call_msg_cb(mport, "Updating depends %s\n", (*depends)->name);
-					if (mport_update(mport, (*depends)->name) != 0) {
+					if (mport_update(mport, (*depends)->name) != MPORT_OK) {
 						mport_call_msg_cb(mport, "Error updating %s\n", (*depends)->name);
 					} else {
 						ret++;
@@ -141,7 +158,7 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, map_t map) {
 				depends++;
 			}
 			if (mport_index_check(mport, pack) && !hashmap_exists(map, pack->name)) {
-				if (mport_update(mport, pack->name) != 0) {
+				if (mport_update(mport, pack->name) != MPORT_OK) {
 					mport_call_msg_cb(mport, "Error updating %s\n", pack->name);
 				} else {
 					ret++;
