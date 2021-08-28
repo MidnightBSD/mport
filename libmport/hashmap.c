@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define INITIAL_SIZE (256)
 #define MAX_CHAIN_LENGTH (8)
@@ -320,6 +321,34 @@ int hashmap_get(map_t in, char* key, any_t *arg){
 
 	/* Not found */
 	return MAP_MISSING;
+}
+
+bool hashmap_exists(map_t in, char* key) {
+	int curr;
+	int i;
+	hashmap_map* m;
+
+	/* Cast the hashmap */
+	m = (hashmap_map *) in;
+
+	/* Find data location */
+	curr = hashmap_hash_int(m, key);
+
+	/* Linear probing, if necessary */
+	for(i = 0; i<MAX_CHAIN_LENGTH; i++){
+
+		int in_use = m->data[curr].in_use;
+		if (in_use == 1){
+			if (strcmp(m->data[curr].key,key)==0){
+				return true;
+			}
+		}
+
+		curr = (curr + 1) % m->table_size;
+	}
+
+	/* Not found */
+	return false;
 }
 
 /*

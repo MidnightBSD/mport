@@ -39,6 +39,7 @@
 #include <osreldate.h>
 #include <sqlite3.h>
 #include "bzlib.h"
+#include "hashmap.h"
 
 #define MPORT_PUBLIC_API 
 
@@ -136,7 +137,7 @@ int mport_bundle_read_install_pkg(mportInstance *, mportBundleRead *, mportPacka
 int mport_bundle_read_update_pkg(mportInstance *, mportBundleRead *, mportPackageMeta *);
 
 int mport_install_depends(mportInstance *, const char *, const char *);
-int mport_update_down(mportInstance *, mportPackageMeta *);
+int mport_update_down(mportInstance *, mportPackageMeta *, map_t *map);
 
 /* version compare functions */
 void mport_version_cmp_sqlite(sqlite3_context *, int, sqlite3_value **);
