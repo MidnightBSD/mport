@@ -101,6 +101,7 @@ int
 add_entry(map_t map, char *pkgname) {
 	data_struct_t* value = malloc(sizeof(data_struct_t));
 	snprintf(value->key_string, KEY_MAX_LENGTH, "%s", pkgname);
+	value->key_string[KEY_MAX_LENGTH-1] = '\0';
 	value->updated = true;
 
 fprintf(stderr, "put a pkgname %s\n", pkgname);
@@ -109,7 +110,7 @@ fprintf(stderr, "put a pkgname %s\n", pkgname);
 
 int
 mport_update_down(mportInstance *mport, mportPackageMeta *pack, map_t map) {
-	mportPackageMeta **depends;
+	mportPackageMeta **depends, **depends_orig;
 	int ret = 0;
 
 fprintf(stderr, "exists time %s\n", pack->name);
@@ -117,8 +118,8 @@ fprintf(stderr, "exists time %s\n", pack->name);
 		return (ret);
 fprintf(stderr, "post exists\n");
 
-	if (mport_pkgmeta_get_downdepends(mport, pack, &depends) == MPORT_OK) {
-		if (depends == NULL) {
+	if (mport_pkgmeta_get_downdepends(mport, pack, &depends_orig) == MPORT_OK) {
+		if (depends_orig == NULL) {
 			if (mport_index_check(mport, pack) && !hashmap_exists(map, pack->name)) {
 				mport_call_msg_cb(mport, "Updating %s\n", pack->name);
 				if (mport_update(mport, pack->name) != 0) {
@@ -131,6 +132,7 @@ fprintf(stderr, "post exists\n");
 			} else
 				ret = 0;
 		} else {
+			depends = depends_orig;
 			while (*depends != NULL) {
 fprintf(stderr, "doing stuff\n");
 				ret += mport_update_down(mport, (*depends), map);
@@ -154,8 +156,9 @@ fprintf(stderr, "doing stuff\n");
 				}
 			}
 		}
-		mport_pkgmeta_vec_free(depends);
+		mport_pkgmeta_vec_free(depends_orig);
 		depends = NULL;
+		depends_orig = NULL;
 	}
 
 	return (ret);
