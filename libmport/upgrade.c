@@ -97,6 +97,9 @@ mport_upgrade(mportInstance *mport) {
 int
 add_entry(map_t map, char *pkgname) {
 	data_struct_t* value = malloc(sizeof(data_struct_t));
+	if (value == NULL)
+		return MAP_OMEM;
+
 	snprintf(value->key_string, KEY_MAX_LENGTH, "%s", pkgname);
 	value->key_string[KEY_MAX_LENGTH-1] = '\0';
 	value->updated = true;
