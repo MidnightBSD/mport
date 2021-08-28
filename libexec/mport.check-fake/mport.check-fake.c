@@ -245,18 +245,11 @@ grep_file(const char *filename, const char *destdir)
 		
 		if (regexec(&regex, line, 0, NULL, 0) == 0) {
 			DIAG("===> Match line: %s", line);
-			if (nline != NULL) {
-				free(nline);
-				nline = NULL;
-			}
+			free(nline);
 			ret = 1;
 			break;
 		}
-
-		if (nline != NULL) {
-			free(nline);
-			nline = NULL;
-		}
+		free(nline);
 	}
 	
 	if (ferror(file) != 0)
