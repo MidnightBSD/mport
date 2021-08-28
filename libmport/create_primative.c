@@ -91,8 +91,7 @@ mport_create_primative(mportAssetList *assetlist, mportPackageMeta *pack, mportC
 		goto CLEANUP;
 	}
 
-	if ((error_code = archive_files(assetlist, pack, extra, tmpdir)) != MPORT_OK)
-		goto CLEANUP;
+	error_code = archive_files(assetlist, pack, extra, tmpdir); /* cleanup will run next which is the desired action */
 
 	CLEANUP:
 	clean_up(tmpdir);
