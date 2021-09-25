@@ -41,3 +41,9 @@ Update a specific package (and it's dependencies)
 
 `mport update xorg`
 
+### Installing from package file
+
+Example installing a vim package that is already built locally
+
+`/usr/libexec/mport.install /usr/mports/Packages/amd64/All/vim-8.2.3394.mport` 
+
