@@ -18,3 +18,26 @@ Versions prior to 2.1.0 also depended on
 
 In addition to the man page, you can also look at the BSD Magazine article on mport in the Feb 2012 issue.
 https://ia902902.us.archive.org/6/items/bsdmagazine/BSD_02_2012.pdf
+
+### Quick and Dirty
+
+Installing a package named xorg:
+
+`mport install xorg`
+
+Deleting the xorg meta package:
+
+`mport delete xorg`
+
+Fetching the latest index
+
+`mport index`
+
+Upgrading all packages
+
+`mport upgrade`
+
+Update a specific package (and it's dependencies)
+
+`mport update xorg`
+
