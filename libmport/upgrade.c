@@ -42,10 +42,12 @@
 #define KEY_MAX_LENGTH (256)
 #define KEY_COUNT (1024*1024)
 
+enum upgrade_status { SKIP, NEED_UPGRADE, FETCHED, UPGRADED };
+
 typedef struct data_struct_s
 {
 	char key_string[KEY_MAX_LENGTH];
-	bool updated;
+	enum upgrade_state status;
 } data_struct_t;
 
 static int add_entry(map_t map, char *pkgname);
@@ -68,6 +70,17 @@ mport_upgrade(mportInstance *mport) {
 	}
 
 	map = hashmap_new();
+
+	packs = packs_orig;
+	while (*packs != NULL) {
+		if (mport_index_check(mport, *packs)) {
+			add_entry(map, (*packs)->name, NEED_UPGRADE);
+			mport_download(mport, (*packs)->name)
+		} else {
+			add_entry(map, (*packs)->name, SKIP);
+		}
+		packs++;
+	}
 
 	packs = packs_orig;
 	while (*packs != NULL) {
@@ -99,14 +112,14 @@ mport_upgrade(mportInstance *mport) {
  * @return hashmap library status code (not MPORT codes)
  */
 int
-add_entry(map_t map, char *pkgname) {
+add_entry(map_t map, char *pkgname, enum upgrade_status status) {
 	data_struct_t* value = malloc(sizeof(data_struct_t));
 	if (value == NULL)
 		return MAP_OMEM;
 
 	snprintf(value->key_string, KEY_MAX_LENGTH, "%s", pkgname);
 	value->key_string[KEY_MAX_LENGTH-1] = '\0';
-	value->updated = true;
+	value->status = status;
 
 	return hashmap_put(map, pkgname, value);
 }
