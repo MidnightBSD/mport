@@ -179,6 +179,21 @@ char * mport_info(mportInstance *mport, const char *packageName);
 
 /* Package creation */
 
+typedef enum {
+    PKG_MESSAGE_ALWAYS = 0,
+    PKG_MESSAGE_INSTALL,
+    PKG_MESSAGE_REMOVE,
+    PKG_MESSAGE_UPGRADE,
+} pkg_message_t;
+
+typedef struct package_message {
+    char			*str;
+    char			*minimum_version;
+    char			*maximum_version;
+    pkg_message_t		 type;
+    struct package_message *next, *prev;
+} mportPackageMessage;
+
 typedef struct {
   char *pkg_filename;
   char *sourcedir;
