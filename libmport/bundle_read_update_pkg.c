@@ -24,9 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__MBSDID("$MidnightBSD$");
-
 #include "mport.h"
 #include "mport_private.h"
 #include <unistd.h>

@@ -5,10 +5,11 @@
  *
  * Modified by Pete Warden to fix a serious performance problem, support strings as keys
  * and removed thread synchronization - http://petewarden.typepad.com
- * $MidnightBSD$
  */
 #ifndef __HASHMAP_H__
 #define __HASHMAP_H__
+
+#include <stdbool.h>
 
 #define MAP_MISSING -3  /* No such element */
 #define MAP_FULL -2 	/* Hashmap is full */
@@ -57,6 +58,11 @@ int hashmap_put(map_t in, char* key, any_t value);
  * Get an element from the hashmap. Return MAP_OK or MAP_MISSING.
  */
 int hashmap_get(map_t in, char* key, any_t *arg);
+
+/*
+ * Get an element from the hashmap. Return MAP_OK or MAP_MISSING.
+ */
+bool hashmap_exists(map_t in, char* key);
 
 /*
  * Remove an element from the hashmap. Return MAP_OK or MAP_MISSING.
