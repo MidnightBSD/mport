@@ -11,7 +11,7 @@ SRCS=	asset.c bundle_write.c bundle_read.c plist.c create_primative.c db.c \
    		stats.c update.c upgrade.c verify.c lock.c mkdir.c hashmap.c import_export.c
 INCS=	mport.h
 
-CFLAGS+=	-I${.CURDIR}
+CFLAGS+=	-I${.CURDIR} -I/usr/include/private/ucl
 SHLIB_MAJOR=	2
 MAN=	mport.3
 
@@ -19,8 +19,8 @@ WARNS=	3
 
 MK_PROFILE=no
 
-LIBADD=	md archive bz2 lzma z fetch sqlite3 pthread
+LIBADD=	md archive bz2 lzma z fetch sqlite3 ucl pthread
 
-LDFLAGS+=	-lmd -larchive -lbz2 -llzma -lz -lfetch -lsqlite3 -lpthread
+LDFLAGS+=	-lmd -larchive -lbz2 -llzma -lz -lfetch -lsqlite3 -lpthread -lprivateucl
 
 .include <bsd.lib.mk>

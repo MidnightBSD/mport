@@ -58,8 +58,7 @@ int mport_bundle_read_update_pkg(mportInstance *mport, mportBundleRead *bundle, 
   }
 
   if (
-        (mport_delete_primative(mport, pkg, 1) != MPORT_OK)
-                          ||
+        (mport_delete_primative(mport, pkg, 1) != MPORT_OK) ||
         (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)
   ) 
   {
@@ -162,7 +161,7 @@ static int build_create_extras_copy_metafiles(const mportPackageMeta *pkg, mport
     RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
    
   if (mport_file_exists(file)) {
-    if ((extra->pkgmessage = strdup(file)) == NULL) 
+    if ((extra->pkgmessage = strdup(file)) == NULL)
       RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
   }
 
