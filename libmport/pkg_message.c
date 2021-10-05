@@ -42,7 +42,7 @@
 #include <ucl.h>
 
 int
-mport_display_pkg_msg(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg)
+mport_display_pkg_msg(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg, pkg_message_t type)
 {
     mportPackageMessage packageMessage;
     packageMessage.type = PKG_MESSAGE_ALWAYS;
@@ -50,7 +50,7 @@ mport_display_pkg_msg(mportInstance *mport, mportBundleRead *bundle, mportPackag
         RETURN_CURRENT_ERROR;
     }
 
-    if (packageMessage.type == PKG_MESSAGE_INSTALL || packageMessage.type == PKG_MESSAGE_ALWAYS) {
+    if (packageMessage.type == pkg_message_t || packageMessage.type == PKG_MESSAGE_ALWAYS) {
         if (packageMessage.str != NULL && packageMessage.str[0] != '\0')
             mport_call_msg_cb(mport, "%s", packageMessage.str);
     }

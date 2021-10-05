@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__MBSDID("$MidnightBSD$");
 
 #include "mport.h"
 #include "mport_private.h"
@@ -45,7 +44,7 @@ int mport_bundle_read_update_pkg(mportInstance *mport, mportBundleRead *bundle, 
   char tmpfile2[] = "/tmp/mport.XXXXXXXX";
   int fd;
 
-  mport_pkgmeta_logevent(mport, pkg, "Begining update");
+  mport_pkgmeta_logevent(mport, pkg, "Beginning update");
 
   if ((fd = mkstemp(tmpfile2)) == -1) {
     RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't make tmp file: %s", strerror(errno));
@@ -59,7 +58,7 @@ int mport_bundle_read_update_pkg(mportInstance *mport, mportBundleRead *bundle, 
 
   if (
         (mport_delete_primative(mport, pkg, 1) != MPORT_OK) ||
-        (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)
+        (mport_bundle_read_install_pkg(mport, bundle, pkg, PKG_MESSAGE_UPGRADE) != MPORT_OK)
   ) 
   {
     if (install_backup_bundle(mport, tmpfile2) == MPORT_OK) {

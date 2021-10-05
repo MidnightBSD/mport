@@ -32,6 +32,7 @@
 
 #include <sys/stat.h>
 #include <libgen.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -49,7 +50,7 @@ static int do_pre_install(mportInstance *, mportBundleRead *, mportPackageMeta *
 
 static int do_actual_install(mportInstance *, mportBundleRead *, mportPackageMeta *);
 
-static int do_post_install(mportInstance *, mportBundleRead *, mportPackageMeta *);
+static int do_post_install(mportInstance *, mportBundleRead *, mportPackageMeta *, boolean);
 
 static int run_postexec(mportInstance *, mportPackageMeta *);
 
@@ -76,10 +77,10 @@ static int mport_bundle_read_get_assetlist(mportInstance *mport, mportPackageMet
 
 
 /**
- * This is a wrapper for all bund read install operations
+ * This is a wrapper for all bundle read install operations
  */
 int
-mport_bundle_read_install_pkg(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg)
+mport_bundle_read_install_pkg(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg, boolean update)
 {
 	if (do_pre_install(mport, bundle, pkg) != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
@@ -89,7 +90,7 @@ mport_bundle_read_install_pkg(mportInstance *mport, mportBundleRead *bundle, mpo
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (do_post_install(mport, bundle, pkg) != MPORT_OK) {
+	if (do_post_install(mport, bundle, pkg, update ? PKG_MESSAGE_UPGRADE : PKG_MESSAGE_INSTALL) != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
 
@@ -825,7 +826,7 @@ mark_complete(mportInstance *mport, mportPackageMeta *pkg)
 
 
 static int
-do_post_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg)
+do_post_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg, boolean update)
 {
 	char to[FILENAME_MAX], from[FILENAME_MAX]; /* keep these for COPY_METAFILE */
 
