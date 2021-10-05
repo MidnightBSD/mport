@@ -66,7 +66,6 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		    (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name, pkg->version,
 			                  mport_err_string());
-			/* TODO: WHY WAS THIS HERE mport_set_err(MPORT_OK, NULL); */
 			error = true;
 			break; /* do not keep going if we have a package failure! */
 		}

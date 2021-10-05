@@ -81,6 +81,13 @@ int mport_db_count(sqlite3 *, int *, const char *, ...);
 int mport_pkgmeta_read_stub(mportInstance *, mportPackageMeta ***);
 int mport_pkgmeta_logevent(mportInstance *, mportPackageMeta *, const char *);
 
+/*
+ * pkg message display functions
+ */
+int mport_display_pkg_msg(mportInstance *, mportBundleRead *, mportPackageMeta *);
+int mport_load_pkg_msg(mportInstance *, mportBundleRead *, mportPackageMeta *, mportPackageMessage *);
+mportPackageMessage * mport_pkg_message_from_ucl(mportInstance *, const ucl_object_t *, mportPackageMessage *);
+
 /* Utils */
 bool mport_starts_with(const char *, const char *);
 char* mport_hash_file(const char *);
