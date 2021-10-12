@@ -31,7 +31,7 @@
 #include <string.h>
 
 MPORT_PUBLIC_API int
-mport_install_primative(mportInstance *mport, const char *filename, const char *prefix, int automatic)
+mport_install_primative(mportInstance *mport, const char *filename, const char *prefix, mportAutomatic automatic)
 {
 	mportBundleRead *bundle;
 	mportPackageMeta **pkgs, *pkg;

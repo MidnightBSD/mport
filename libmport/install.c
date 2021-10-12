@@ -31,7 +31,7 @@
 #include <unistd.h>
 
 MPORT_PUBLIC_API int
-mport_install(mportInstance *mport, const char *pkgname, const char *version, const char *prefix, int automatic)
+mport_install(mportInstance *mport, const char *pkgname, const char *version, const char *prefix, mportAutomatic automatic)
 {
   mportIndexEntry **e;
   char *filename;
@@ -117,7 +117,7 @@ mport_install(mportInstance *mport, const char *pkgname, const char *version, co
 
 /* recursive function */
 int
-mport_install_depends(mportInstance *mport, const char *packageName, const char *version, int automatic) {
+mport_install_depends(mportInstance *mport, const char *packageName, const char *version, mportAutomatic automatic) {
 	mportPackageMeta **packs;
 	mportDependsEntry **depends;
 	mportDependsEntry **depends_orig;
@@ -143,7 +143,7 @@ mport_install_depends(mportInstance *mport, const char *packageName, const char 
 	} else if (packs == NULL) {
 		/* Package is not installed */
 		while (*depends != NULL) {
-			if (mport_install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version, 1) != MPORT_OK) {
+			if (mport_install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version, MPORT_AUTOMATIC) != MPORT_OK) {
      			mport_call_msg_cb(mport, "%s", mport_err_string());
      			mport_index_depends_free_vec(depends_orig);
 				return mport_err_code();

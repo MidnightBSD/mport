@@ -54,7 +54,7 @@ mport_update(mportInstance *mport, const char *packageName) {
 
 		depends = depends_orig;
 		while (*depends != NULL) {
-			if (mport_install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version, 1) != MPORT_OK) {
+			if (mport_install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version, MPORT_AUTOMATIC) != MPORT_OK) {
 				mport_call_msg_cb(mport, "%s", mport_err_string());
 				mport_index_depends_free_vec(depends);
 				return mport_err_code();

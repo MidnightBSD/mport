@@ -135,7 +135,7 @@ int mport_bundle_read_extract_next_file(mportBundleRead *, struct archive_entry 
 int mport_bundle_read_install_pkg(mportInstance *, mportBundleRead *, mportPackageMeta *);
 int mport_bundle_read_update_pkg(mportInstance *, mportBundleRead *, mportPackageMeta *);
 
-int mport_install_depends(mportInstance *, const char *, const char *, int);
+int mport_install_depends(mportInstance *, const char *, const char *, mportAutomatic);
 int mport_update_down(mportInstance *, mportPackageMeta *);
 
 /* version compare functions */

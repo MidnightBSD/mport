@@ -471,7 +471,7 @@ install(mportInstance *mport, const char *packageName) {
 		}
 	}
 
-	resultCode = mport_install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version, 0);
+	resultCode = mport_install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version, MPORT_EXPLICIT);
 
 	mport_index_entry_free_vec(indexEntry);
 
