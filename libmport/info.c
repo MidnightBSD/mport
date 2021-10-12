@@ -112,10 +112,10 @@ mport_info(mportInstance *mport, const char *packageName)
 
 	asprintf(&info_text,
 		 "%s-%s\n"
-			 "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses         : %s\nOrigin          : %s\n"
+			 "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
 			 "Flavor          : %s\nOS              : %s\n"
-	                 "CPE             : %s\nLocked          : %s\nAutomatic:%s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\n"
-			 "Comment: %s\nOptions: %s\nDescription:\n%s\n",
+	                 "CPE             : %s\nLocked          : %s\nAutomatic          : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\n"
+			 "Comment         : %s\nOptions         : %s\nDescription         :\n%s\n",
 		 (*indexEntry)->pkgname, (*indexEntry)->version,
 		 (*indexEntry)->pkgname,
 		 status,
