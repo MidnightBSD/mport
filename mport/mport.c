@@ -147,22 +147,28 @@ main(int argc, char *argv[]) {
 			usage();
 		}
 	} else if (!strcmp(argv[1], "list")) {
-		asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
-		if (argc > 2) {
-			if (!strcmp(argv[2], "updates") || 
-			    !strcmp(argv[2], "up")) {
-				flag = strdup("-u");
-			} else {
-				mport_instance_free(mport);
-				usage();
-			}
-		} else {
-			flag = strdup("-v");
-		}
-		resultCode = execl(buf, "mport.list", flag, (char *)0);
-		free(flag);
-		free(buf);
-	} else if (!strcmp(argv[1], "info")) {
+        asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
+        if (argc > 2) {
+            if (!strcmp(argv[2], "updates") ||
+                !strcmp(argv[2], "up")) {
+                flag = strdup("-u");
+            } else {
+                mport_instance_free(mport);
+                usage();
+            }
+        } else {
+            flag = strdup("-v");
+        }
+        resultCode = execl(buf, "mport.list", flag, (char *) 0);
+        free(flag);
+        free(buf);
+    } else if (!strcmp(argv[1], "prime-list")) {
+        asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
+        flag = strdup("-p");
+        resultCode = execl(buf, "mport.list", flag, (char *) 0);
+        free(flag);
+        free(buf);
+    } else if (!strcmp(argv[1], "info")) {
 		loadIndex(mport);
 		resultCode = info(mport, argv[2]);
 	} else if (!strcmp(argv[1], "index")) {
@@ -261,6 +267,7 @@ usage(void) {
 		"       mport list [updates]\n"
 		"       mport lock [package name]\n"
 		"       mport locks\n"
+        "       mport prime-list\n"
 		"       mport search [query ...]\n"
 		"       mport stats\n"
 		"       mport unlock [package name]\n"
