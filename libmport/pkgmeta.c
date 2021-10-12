@@ -371,7 +371,7 @@ mport_pkgmeta_get_updepends(mportInstance *mport, mportPackageMeta *pkg, mportPa
   }
 
   if (mport_db_prepare(mport->db, &stmt, 
-      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor packages.automatic FROM packages,depends WHERE packages.pkg=depends.pkg AND depends.depend_pkgname=%Q",
+      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic FROM packages,depends WHERE packages.pkg=depends.pkg AND depends.depend_pkgname=%Q",
                        pkg->name) != MPORT_OK) {
     sqlite3_finalize(stmt);
     RETURN_CURRENT_ERROR;
