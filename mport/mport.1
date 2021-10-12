@@ -37,7 +37,10 @@
 .Cm cpe
 .Nm
 .Cm list
-.Ar updates
+.Nm
+.Cm list updates
+.Nm
+.Cm list prime
 .Nm
 .Cm info
 .Op Ar name
@@ -81,6 +84,10 @@ database.
 List all CPE information for each installed package
 .It Cm list
 List all currently installed packages
+.It Cm list updates
+List currently installed packages with updates available
+.It Cm list prime
+List all packages explicitly installed rather than as a dependency
 .It Cm info
 Print detailed information about a package
 .It Cm delete

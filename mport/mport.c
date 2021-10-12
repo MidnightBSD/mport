@@ -152,6 +152,8 @@ main(int argc, char *argv[]) {
             if (!strcmp(argv[2], "updates") ||
                 !strcmp(argv[2], "up")) {
                 flag = strdup("-u");
+	    } else if (!strcmp(argv[2], "prime")) {
+		flag = strdup("-p");
             } else {
                 mport_instance_free(mport);
                 usage();
@@ -159,12 +161,6 @@ main(int argc, char *argv[]) {
         } else {
             flag = strdup("-v");
         }
-        resultCode = execl(buf, "mport.list", flag, (char *) 0);
-        free(flag);
-        free(buf);
-    } else if (!strcmp(argv[1], "prime-list")) {
-        asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
-        flag = strdup("-p");
         resultCode = execl(buf, "mport.list", flag, (char *) 0);
         free(flag);
         free(buf);
@@ -264,10 +260,9 @@ usage(void) {
 		"       mport index\n"
 		"       mport info [package name]\n"
 		"       mport install [package name]\n"
-		"       mport list [updates]\n"
+		"       mport list [updates|prime]\n"
 		"       mport lock [package name]\n"
 		"       mport locks\n"
-		"       mport prime-list\n"
 		"       mport search [query ...]\n"
 		"       mport stats\n"
 		"       mport unlock [package name]\n"
