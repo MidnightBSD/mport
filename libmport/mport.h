@@ -216,7 +216,7 @@ int mport_create_primative(mportAssetList *, mportPackageMeta *, mportCreateExtr
 int mport_merge_primative(const char **, const char *);
 
 /* Package installation */
-int mport_install(mportInstance *, const char *, const char *, const char *);
+int mport_install(mportInstance *, const char *, const char *, const char *, int);
 int mport_install_primative(mportInstance *, const char *, const char *, int);
 
 /* package updating */
