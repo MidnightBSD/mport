@@ -127,6 +127,7 @@ typedef struct {
     time_t expiration_date;
     int no_provide_shlib;
     char *flavor;
+    int automatic; /* Automatically installed dependency */
 } mportPackageMeta;
 
 int mport_asset_get_assetlist(mportInstance *, mportPackageMeta *, mportAssetList **);
@@ -216,7 +217,7 @@ int mport_merge_primative(const char **, const char *);
 
 /* Package installation */
 int mport_install(mportInstance *, const char *, const char *, const char *);
-int mport_install_primative(mportInstance *, const char *, const char *);
+int mport_install_primative(mportInstance *, const char *, const char *, int);
 
 /* package updating */
 int mport_update(mportInstance *, const char *);

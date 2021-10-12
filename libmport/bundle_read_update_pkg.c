@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2021 Lucas Holt
  * Copyright (c) 2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -25,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__MBSDID("$MidnightBSD$");
 
 #include "mport.h"
 #include "mport_private.h"
@@ -103,7 +103,7 @@ static int install_backup_bundle(mportInstance *mport, char *filename)
   /* at some point we might want to look into making this more forceful, but
    * this will do for the moment.  Wrap in a function for this future. */
   
-  return mport_install_primative(mport, filename, NULL);
+  return mport_install_primative(mport, filename, NULL, 0);
 }
 
 

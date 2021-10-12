@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2021 Lucas Holt
  * Copyright (c) 2007 Chris Reinhardt
  * All rights reserved.
  *
@@ -70,7 +71,7 @@ main(int argc, char *argv[])
 
 	for (int i = 0; i < argc; i++) {
 
-		if (mport_install_primative(mport, argv[i], prefix) != MPORT_OK) {
+		if (mport_install_primative(mport, argv[i], prefix, 0) != MPORT_OK) {
 			warnx("install failed: %s", mport_err_string());
 			mport_instance_free(mport);
 			exit(1);

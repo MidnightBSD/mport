@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2010-2018 Lucas Holt
+ * Copyright (c) 2010-2018, 2021 Lucas Holt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -469,7 +469,7 @@ install(mportInstance *mport, const char *packageName) {
 		}
 	}
 
-	resultCode = mport_install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version);
+	resultCode = mport_install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version, 0);
 
 	mport_index_entry_free_vec(indexEntry);
 
