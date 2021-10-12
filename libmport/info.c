@@ -126,7 +126,7 @@ mport_info(mportInstance *mport, const char *packageName)
 		 os_release,
 		 cpe,
 		 locked ? "yes" : "no",
-         prime == MPORT_EXPLICIT ? "yes" : "no",
+         automatic == MPORT_EXPLICIT ? "yes" : "no",
 		 no_shlib_provided ? "yes" : "no",
 		 deprecated,
 		 expirationDate == 0 ? "" : ctime(&expirationDate),
