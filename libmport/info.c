@@ -47,6 +47,7 @@ mport_info(mportInstance *mport, const char *packageName)
 	time_t expirationDate;
     char *options;
     char *desc;
+    mportAutomatic automatic;
 
 	if (mport == NULL) {
 		SET_ERROR(MPORT_ERR_FATAL, "mport not initialized");
@@ -81,6 +82,7 @@ mport_info(mportInstance *mport, const char *packageName)
 		expirationDate = 0;
         options = strdup("");
         desc = strdup("");
+        automatic = MPORT_EXPLICIT;
 	} else {
 		status = (*packs)->version;
 		origin = (*packs)->origin;
@@ -103,15 +105,16 @@ mport_info(mportInstance *mport, const char *packageName)
         }
         desc = (*packs)->desc;
         if (desc == NULL) {
-            options = strdup("");
+            desc = strdup("");
         }
+        automatic = (*packs)->automatic;
 	}
 
 	asprintf(&info_text,
 		 "%s-%s\n"
 			 "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses         : %s\nOrigin          : %s\n"
 			 "Flavor          : %s\nOS              : %s\n"
-	                 "CPE             : %s\nLocked          : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\n"
+	                 "CPE             : %s\nLocked          : %s\nAutomatic:%s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\n"
 			 "Comment: %s\nOptions: %s\nDescription:\n%s\n",
 		 (*indexEntry)->pkgname, (*indexEntry)->version,
 		 (*indexEntry)->pkgname,
@@ -123,6 +126,7 @@ mport_info(mportInstance *mport, const char *packageName)
 		 os_release,
 		 cpe,
 		 locked ? "yes" : "no",
+         automatic == MPORT_AUTOMATIC ? "yes" : "no",
 		 no_shlib_provided ? "yes" : "no",
 		 deprecated,
 		 expirationDate == 0 ? "" : ctime(&expirationDate),
