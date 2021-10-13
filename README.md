@@ -14,6 +14,9 @@ Versions prior to 2.1.0 also depended on
 * libdispatch
 * Blocksruntime
 
+## Backward compatibility
+There was a breaking change in 2.1.6 in libmport with respect to mport_install and mport_install_primative use
+
 ## Using mport
 
 In addition to the man page, you can also look at the BSD Magazine article on mport in the Feb 2012 issue.
