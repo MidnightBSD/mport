@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__MBSDID("$MidnightBSD$");
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -52,6 +51,7 @@ main(int argc, char *argv[])
 	bool origin = false;
 	bool update = false;
 	bool locks = false;
+    bool prime = false;
 	char *comment;
 	char *os_release;
 	char name_version[30];
@@ -59,7 +59,7 @@ main(int argc, char *argv[])
 	if (argc > 3)
 		usage();
     
-	while ((ch = getopt(argc, argv, "loqvu")) != -1) {
+	while ((ch = getopt(argc, argv, "lopqvu")) != -1) {
 		switch (ch) {
 			case 'l':
 				locks = true;
@@ -67,6 +67,9 @@ main(int argc, char *argv[])
 			case 'o':
 				origin = true;
 				break;
+            case 'p':
+                prime = true;
+                break;
 			case 'q':
 				quiet = true;
 				break;
@@ -126,11 +129,14 @@ main(int argc, char *argv[])
 			while (*indexEntries != NULL) {
 				if (((*indexEntries)->version != NULL && mport_version_cmp((*packs)->version, (*indexEntries)->version) < 0) 
 					|| ((*packs)->version != NULL && mport_version_cmp((*packs)->os_release, os_release) < 0)) {
-					if (verbose) {
-						(void) printf("%-15s %8s (%s)  <  %-s\n", (*packs)->name, (*packs)->version, (*packs)->os_release, (*indexEntries)->version);
-					} else {
-						(void) printf("%-15s %8s  <  %-8s\n", (*packs)->name, (*packs)->version, (*indexEntries)->version);
-					}
+
+                        if (verbose) {
+                            (void) printf("%-15s %8s (%s)  <  %-s\n", (*packs)->name, (*packs)->version,
+                                          (*packs)->os_release, (*indexEntries)->version);
+                        } else {
+                            (void) printf("%-15s %8s  <  %-8s\n", (*packs)->name, (*packs)->version,
+                                          (*indexEntries)->version);
+                        }
 				}
 				indexEntries++;
 			}
@@ -144,6 +150,8 @@ main(int argc, char *argv[])
 			(void) printf("%-30s\t%6s\t%s\n", name_version, (*packs)->os_release, comment);
 			free(comment);
 		}
+        else if (prime && (*packs)->automatic == 0)
+            (void) printf("%s\n", (*packs)->name);
 		else if (quiet && !origin)
 			(void) printf("%s\n", (*packs)->name);
 		else if (quiet && origin)

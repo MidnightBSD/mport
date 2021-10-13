@@ -26,12 +26,12 @@
 
 #include "mport.h"
 #include "mport_private.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <err.h>
 #include <unistd.h>
-
 
 MPORT_PUBLIC_API char *
 mport_info(mportInstance *mport, const char *packageName)
@@ -45,6 +45,9 @@ mport_info(mportInstance *mport, const char *packageName)
 	int no_shlib_provided = 0;
 	char *info_text = NULL;
 	time_t expirationDate;
+    char *options;
+    char *desc;
+    mportAutomatic automatic;
 
 	if (mport == NULL) {
 		SET_ERROR(MPORT_ERR_FATAL, "mport not initialized");
@@ -77,6 +80,9 @@ mport_info(mportInstance *mport, const char *packageName)
 		flavor = strdup("N/A");
 		deprecated = strdup("N/A");
 		expirationDate = 0;
+        options = strdup("");
+        desc = strdup("");
+        automatic = MPORT_EXPLICIT;
 	} else {
 		status = (*packs)->version;
 		origin = (*packs)->origin;
@@ -93,14 +99,23 @@ mport_info(mportInstance *mport, const char *packageName)
 			deprecated = strdup("no");
 		}
 		expirationDate = (*packs)->expiration_date;
+        options = (*packs)->options;
+        if (options == NULL) {
+            options = strdup("");
+        }
+        desc = (*packs)->desc;
+        if (desc == NULL) {
+            desc = strdup("");
+        }
+        automatic = (*packs)->automatic;
 	}
 
 	asprintf(&info_text,
 		 "%s-%s\n"
-			 "Name            : %s\nVersion         : %s\nLatest          : %s\nLicense         : %s\nOrigin          : %s\n"
+			 "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
 			 "Flavor          : %s\nOS              : %s\n"
-	                 "CPE             : %s\nLocked          : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\n"
-			 "\n%s\n",
+	                 "CPE             : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\n"
+			 "Comment         : %s\nOptions         : %s\nDescription     :\n%s\n",
 		 (*indexEntry)->pkgname, (*indexEntry)->version,
 		 (*indexEntry)->pkgname,
 		 status,
@@ -111,10 +126,13 @@ mport_info(mportInstance *mport, const char *packageName)
 		 os_release,
 		 cpe,
 		 locked ? "yes" : "no",
+         automatic == MPORT_EXPLICIT ? "yes" : "no",
 		 no_shlib_provided ? "yes" : "no",
 		 deprecated,
 		 expirationDate == 0 ? "" : ctime(&expirationDate),
-		 (*indexEntry)->comment);
+		 (*indexEntry)->comment,
+         options,
+         desc);
 
 	if (packs == NULL) {
 		free(status);
@@ -123,6 +141,8 @@ mport_info(mportInstance *mport, const char *packageName)
 		free(cpe);
 		free(flavor);
 		free(deprecated);
+        free(options);
+        free(desc);
 	} else {
 		mport_pkgmeta_vec_free(packs);
 	}

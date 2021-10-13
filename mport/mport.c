@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2010-2018 Lucas Holt
+ * Copyright (c) 2010-2018, 2021 Lucas Holt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -147,22 +147,24 @@ main(int argc, char *argv[]) {
 			usage();
 		}
 	} else if (!strcmp(argv[1], "list")) {
-		asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
-		if (argc > 2) {
-			if (!strcmp(argv[2], "updates") || 
-			    !strcmp(argv[2], "up")) {
-				flag = strdup("-u");
-			} else {
-				mport_instance_free(mport);
-				usage();
-			}
-		} else {
-			flag = strdup("-v");
-		}
-		resultCode = execl(buf, "mport.list", flag, (char *)0);
-		free(flag);
-		free(buf);
-	} else if (!strcmp(argv[1], "info")) {
+        asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
+        if (argc > 2) {
+            if (!strcmp(argv[2], "updates") ||
+                !strcmp(argv[2], "up")) {
+                flag = strdup("-u");
+	    } else if (!strcmp(argv[2], "prime")) {
+		flag = strdup("-p");
+            } else {
+                mport_instance_free(mport);
+                usage();
+            }
+        } else {
+            flag = strdup("-v");
+        }
+        resultCode = execl(buf, "mport.list", flag, (char *) 0);
+        free(flag);
+        free(buf);
+    } else if (!strcmp(argv[1], "info")) {
 		loadIndex(mport);
 		resultCode = info(mport, argv[2]);
 	} else if (!strcmp(argv[1], "index")) {
@@ -203,6 +205,8 @@ main(int argc, char *argv[]) {
 			resultCode = cpeList(mport);
 	} else if (!strcmp(argv[1], "deleteall")) {
 			resultCode = deleteAll(mport);
+    } else if (!strcmp(argv[1], "autoremove")) {
+        resultCode = mport_autoremove(mport);
 	} else if (!strcmp(argv[1], "verify")) {
 			resultCode = verify(mport);
 	} else if (!strcmp(argv[1], "which")) {
@@ -246,6 +250,7 @@ usage(void) {
 
 	fprintf(stderr, 
 		"usage: mport <command> args:\n"
+		"       mport autoremove  (experimental, use with caution!)\n"
 		"       mport clean\n"
 		"       mport config get [setting name]\n"
 		"       mport config set [setting name] [setting val]\n"
@@ -253,12 +258,12 @@ usage(void) {
 		"       mport delete [package name]\n"
 		"       mport deleteall\n"
 		"       mport download [package name]\n"
-	    "       mport export [filename]\n"
-	    "       mport import [filename]\n"
+		"       mport export [filename]\n"
+		"       mport import [filename]\n"
 		"       mport index\n"
 		"       mport info [package name]\n"
 		"       mport install [package name]\n"
-		"       mport list [updates]\n"
+		"       mport list [updates|prime]\n"
 		"       mport lock [package name]\n"
 		"       mport locks\n"
 		"       mport search [query ...]\n"
@@ -469,7 +474,7 @@ install(mportInstance *mport, const char *packageName) {
 		}
 	}
 
-	resultCode = mport_install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version);
+	resultCode = mport_install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version, MPORT_EXPLICIT);
 
 	mport_index_entry_free_vec(indexEntry);
 

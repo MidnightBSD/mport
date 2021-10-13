@@ -109,6 +109,12 @@ mportAssetList* mport_assetlist_new(void);
 void mport_assetlist_free(mportAssetList *);
 int mport_parse_plistfile(FILE *, mportAssetList *);
 
+enum _Automatic{
+    MPORT_EXPLICIT, /* explicitly installed */
+    MPORT_AUTOMATIC /* Automatically installed dependency */
+};
+typedef enum _Automatic mportAutomatic;
+
 /* Package Meta-data structure */
 typedef struct {
     char *name;
@@ -127,6 +133,7 @@ typedef struct {
     time_t expiration_date;
     int no_provide_shlib;
     char *flavor;
+    mportAutomatic automatic;
 } mportPackageMeta;
 
 int mport_asset_get_assetlist(mportInstance *, mportPackageMeta *, mportAssetList **);
@@ -215,8 +222,8 @@ int mport_create_primative(mportAssetList *, mportPackageMeta *, mportCreateExtr
 int mport_merge_primative(const char **, const char *);
 
 /* Package installation */
-int mport_install(mportInstance *, const char *, const char *, const char *);
-int mport_install_primative(mportInstance *, const char *, const char *);
+int mport_install(mportInstance *, const char *, const char *, const char *, mportAutomatic);
+int mport_install_primative(mportInstance *, const char *, const char *, mportAutomatic);
 
 /* package updating */
 int mport_update(mportInstance *, const char *);
@@ -227,6 +234,8 @@ int mport_upgrade(mportInstance *);
 
 /* Package deletion */
 int mport_delete_primative(mportInstance *, mportPackageMeta *, int);
+
+int mport_autoremove(mportInstance *);
 
 /* package verify */
 int mport_verify_package(mportInstance *, mportPackageMeta *);
