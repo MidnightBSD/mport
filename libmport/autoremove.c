@@ -31,8 +31,8 @@
 
 MPORT_PUBLIC_API int
 mport_autoremove(mportInstance *mport) {
-    mportPackageMeta **packs;
-    mportPackageMeta **depends, **start;
+    mportPackageMeta **packs, **packs_start;
+    mportPackageMeta **depends;
 
     if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
         RETURN_CURRENT_ERROR;
@@ -41,6 +41,7 @@ mport_autoremove(mportInstance *mport) {
     if (packs == NULL)
         return MPORT_OK;
 
+    packs_start = packs;
     while (*packs != NULL) {
         if ((*packs)->automatic == MPORT_EXPLICIT) {
             packs++;
@@ -48,9 +49,10 @@ mport_autoremove(mportInstance *mport) {
         }
 
         if (mport_pkgmeta_get_updepends(mport, *packs, &depends) != MPORT_OK) {
-           continue;
+            mport_call_msg_cb(mport, "Unable to evaluate package %s: %s", (*packs)->name, mport_err_string());
+            packs++;
+            continue;
         }
-        depends = start;
 
         bool found = false;
         int i = 0;
@@ -70,16 +72,20 @@ mport_autoremove(mportInstance *mport) {
 
         i = 0;
         while (depends[i] != NULL) {
+            mport_call_msg_cb(mport, "Auto-removing %s", depends[i]->name);
             if (mport_delete_primative(mport, depends[i], true) != MPORT_OK) {
+                mport_call_msg_cb(mport, "Unable to autoremove %s: %s", depends[i]->name, mport_err_string());
                 i++;
-                continue; // TODO: logging
+                continue;
             }
 
             i++;
         }
+        mport_pkgmeta_vec_free(depends);
 
         packs++;
     }
+    mport_pkgmeta_vec_free(packs_start);
 
     return MPORT_OK;
 }

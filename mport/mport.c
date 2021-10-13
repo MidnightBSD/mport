@@ -205,6 +205,8 @@ main(int argc, char *argv[]) {
 			resultCode = cpeList(mport);
 	} else if (!strcmp(argv[1], "deleteall")) {
 			resultCode = deleteAll(mport);
+    } else if (!strcmp(argv[1], "autoremove")) {
+        resultCode = mport_autoremove(mport);
 	} else if (!strcmp(argv[1], "verify")) {
 			resultCode = verify(mport);
 	} else if (!strcmp(argv[1], "which")) {
@@ -248,7 +250,8 @@ usage(void) {
 
 	fprintf(stderr, 
 		"usage: mport <command> args:\n"
-		"       mport clean\n"
+        "       mport autoremove\n"
+        "       mport clean\n"
 		"       mport config get [setting name]\n"
 		"       mport config set [setting name] [setting val]\n"
 		"       mport cpe\n"
