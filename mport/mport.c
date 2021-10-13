@@ -250,8 +250,8 @@ usage(void) {
 
 	fprintf(stderr, 
 		"usage: mport <command> args:\n"
-        "       mport autoremove\n"
-        "       mport clean\n"
+		"       mport autoremove  (experimental, use with caution!)\n"
+		"       mport clean\n"
 		"       mport config get [setting name]\n"
 		"       mport config set [setting name] [setting val]\n"
 		"       mport cpe\n"
