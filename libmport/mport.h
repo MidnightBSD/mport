@@ -235,6 +235,8 @@ int mport_upgrade(mportInstance *);
 /* Package deletion */
 int mport_delete_primative(mportInstance *, mportPackageMeta *, int);
 
+int mport_autoremove(mportInstance *);
+
 /* package verify */
 int mport_verify_package(mportInstance *, mportPackageMeta *);
 
