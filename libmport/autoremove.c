@@ -32,7 +32,7 @@
 MPORT_PUBLIC_API int
 mport_autoremove(mportInstance *mport) {
     mportPackageMeta **packs, **packs_start;
-    mportPackageMeta **depends;
+    mportPackageMeta **depends, **depends_start;
 
     if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
         RETURN_CURRENT_ERROR;
@@ -54,15 +54,19 @@ mport_autoremove(mportInstance *mport) {
             continue;
         }
 
+        if (depends == NULL) {
+            packs++;
+            continue;
+        }
+
+        depends_start = depends;
         bool found = false;
-        int i = 0;
-        while (depends[i] != NULL) {
-            if (depends[i]->automatic == MPORT_EXPLICIT)
-            {
+        while (*depends != NULL) {
+            if ((*depends)->automatic == MPORT_EXPLICIT) {
                 found = true;
                 break;
             }
-            i++;
+            depends++;
         }
 
         if (found) {
@@ -70,18 +74,17 @@ mport_autoremove(mportInstance *mport) {
             continue;
         }
 
-        i = 0;
-        while (depends[i] != NULL) {
-            mport_call_msg_cb(mport, "Auto-removing %s", depends[i]->name);
-            if (mport_delete_primative(mport, depends[i], true) != MPORT_OK) {
-                mport_call_msg_cb(mport, "Unable to autoremove %s: %s", depends[i]->name, mport_err_string());
-                i++;
+        depends = depends_start;
+        while ((*depends) != NULL) {
+            mport_call_msg_cb(mport, "Auto-removing %s", (*depends)->name);
+            if (mport_delete_primative(mport, *depends, true) != MPORT_OK) {
+                mport_call_msg_cb(mport, "Unable to autoremove %s: %s", (*depends)->name, mport_err_string());
                 continue;
             }
 
-            i++;
+            depends++;
         }
-        mport_pkgmeta_vec_free(depends);
+        mport_pkgmeta_vec_free(depends_start);
 
         packs++;
     }

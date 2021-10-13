@@ -371,7 +371,7 @@ mport_pkgmeta_get_updepends(mportInstance *mport, mportPackageMeta *pkg, mportPa
   }
 
   if (mport_db_prepare(mport->db, &stmt, 
-      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic FROM packages,depends WHERE packages.pkg=depends.pkg AND depends.depend_pkgname=%Q",
+      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.os_release, packages.cpe, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic FROM packages,depends WHERE packages.pkg=depends.pkg AND depends.depend_pkgname=%Q",
                        pkg->name) != MPORT_OK) {
     sqlite3_finalize(stmt);
     RETURN_CURRENT_ERROR;
@@ -452,7 +452,7 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 {
 	const char *tmp = 0;
 
-	/* Copy pkg to pack->name */
+    /* Copy pkg to pack->name */
 	if ((tmp = sqlite3_column_text(stmt, 0)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 
@@ -532,7 +532,7 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 	}
 
 	if (sqlite3_column_type(stmt, 11) == SQLITE_INTEGER) {
-		pack->no_provide_shlib =  sqlite3_column_int(stmt, 11);
+		pack->no_provide_shlib = sqlite3_column_int(stmt, 11);
 	} else {
 		pack->no_provide_shlib = 0;
 	}
@@ -546,7 +546,7 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 
     /* Automatic dependency install */
     if (sqlite3_column_type(stmt, 13) == SQLITE_INTEGER) {
-        pack->automatic =  sqlite3_column_int(stmt, 13);
+        pack->automatic = sqlite3_column_int(stmt, 13);
     } else {
         pack->automatic = 0;
     }
