@@ -227,7 +227,7 @@ mport_pkgmeta_search_master(mportInstance *mport, mportPackageMeta ***ref, const
     }
 
     if (mport_db_prepare(db, &stmt,
-                         "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, locked, deprecated, expiration_date, no_provide_shlib, flavor, automatic FROM packages WHERE %s",
+                         "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, locked, deprecated, expiration_date, no_provide_shlib, flavor, automatic, install_date FROM packages WHERE %s",
                          where) != MPORT_OK) {
         sqlite3_finalize(stmt);
         RETURN_CURRENT_ERROR;
@@ -325,7 +325,7 @@ mport_pkgmeta_get_downdepends(mportInstance *mport, mportPackageMeta *pkg, mport
   }
 
   if (mport_db_prepare(mport->db, &stmt, 
-      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.os_release, packages.cpe, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic FROM packages,depends WHERE packages.pkg=depends.depend_pkgname AND depends.pkg=%Q",
+      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.os_release, packages.cpe, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic, packages.install_date FROM packages,depends WHERE packages.pkg=depends.depend_pkgname AND depends.pkg=%Q",
       pkg->name) != MPORT_OK) {
     sqlite3_finalize(stmt);
     RETURN_CURRENT_ERROR;
@@ -371,7 +371,7 @@ mport_pkgmeta_get_updepends(mportInstance *mport, mportPackageMeta *pkg, mportPa
   }
 
   if (mport_db_prepare(mport->db, &stmt, 
-      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.os_release, packages.cpe, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic FROM packages,depends WHERE packages.pkg=depends.pkg AND depends.depend_pkgname=%Q",
+      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.os_release, packages.cpe, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic, packages.install_date FROM packages,depends WHERE packages.pkg=depends.pkg AND depends.depend_pkgname=%Q",
                        pkg->name) != MPORT_OK) {
     sqlite3_finalize(stmt);
     RETURN_CURRENT_ERROR;
@@ -549,6 +549,12 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
         pack->automatic = sqlite3_column_int(stmt, 13);
     } else {
         pack->automatic = 0;
+    }
+
+    if (sqlite3_column_type(stmt, 14) == SQLITE_INTEGER) {
+        pack->install_date = sqlite3_column_int(stmt, 14);
+    } else {
+	pack->install_date = 0;
     }
 
 	return MPORT_OK;

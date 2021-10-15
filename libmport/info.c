@@ -115,7 +115,7 @@ mport_info(mportInstance *mport, const char *packageName) {
 	         "%s-%s\n"
 	         "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
 	         "Flavor          : %s\nOS              : %s\n"
-	         "CPE             : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date   : %s\n"
+	         "CPE             : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date    : %s"
 	         "Comment         : %s\nOptions         : %s\nDescription     :\n%s\n",
 	         (*indexEntry)->pkgname, (*indexEntry)->version,
 	         (*indexEntry)->pkgname,
@@ -131,7 +131,7 @@ mport_info(mportInstance *mport, const char *packageName) {
 	         no_shlib_provided ? "yes" : "no",
 	         deprecated,
 	         expirationDate == 0 ? "" : ctime(&expirationDate),
-	         installDate == 0 ? "" : ctime(&installDate),
+	         installDate == 0 ? "\n" : ctime(&installDate),
 	         (*indexEntry)->comment,
 	         options,
 	         desc);
