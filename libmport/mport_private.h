@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2013, 2015 Lucas Holt
+ * Copyright (c) 2011, 2013, 2015, 2021 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -42,7 +42,7 @@
 
 #define MPORT_PUBLIC_API 
 
-#define MPORT_MASTER_VERSION 8
+#define MPORT_MASTER_VERSION 9
 #define MPORT_BUNDLE_VERSION 5
 #define MPORT_BUNDLE_VERSION_STR "5"
 #define MPORT_VERSION "2.1.6"
@@ -98,7 +98,7 @@ void mport_free_vec(void *);
 int mport_decompress_bzip2(const char *, const char *);
 int mport_shell_register(const char *);
 int mport_shell_unregister(const char *);
-
+time_t mport_get_time(void);
 
 /* Mport Bundle (a file containing packages) */
 typedef struct {

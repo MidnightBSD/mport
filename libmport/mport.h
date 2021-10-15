@@ -134,6 +134,7 @@ typedef struct {
     int no_provide_shlib;
     char *flavor;
     mportAutomatic automatic;
+	time_t install_date;
 } mportPackageMeta;
 
 int mport_asset_get_assetlist(mportInstance *, mportPackageMeta *, mportAssetList **);

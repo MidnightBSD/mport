@@ -34,8 +34,7 @@
 #include <unistd.h>
 
 MPORT_PUBLIC_API char *
-mport_info(mportInstance *mport, const char *packageName)
-{
+mport_info(mportInstance *mport, const char *packageName) {
 	mportIndexEntry **indexEntry;
 	mportPackageMeta **packs;
 	char *status, *origin, *flavor, *deprecated;
@@ -44,10 +43,10 @@ mport_info(mportInstance *mport, const char *packageName)
 	int locked = 0;
 	int no_shlib_provided = 0;
 	char *info_text = NULL;
-	time_t expirationDate;
-    char *options;
-    char *desc;
-    mportAutomatic automatic;
+	time_t expirationDate, installDate;
+	char *options;
+	char *desc;
+	mportAutomatic automatic;
 
 	if (mport == NULL) {
 		SET_ERROR(MPORT_ERR_FATAL, "mport not initialized");
@@ -80,9 +79,10 @@ mport_info(mportInstance *mport, const char *packageName)
 		flavor = strdup("N/A");
 		deprecated = strdup("N/A");
 		expirationDate = 0;
-        options = strdup("");
-        desc = strdup("");
-        automatic = MPORT_EXPLICIT;
+		options = strdup("");
+		desc = strdup("");
+		automatic = MPORT_EXPLICIT;
+		installDate = 0;
 	} else {
 		status = (*packs)->version;
 		origin = (*packs)->origin;
@@ -94,45 +94,47 @@ mport_info(mportInstance *mport, const char *packageName)
 		if (flavor == NULL) {
 			flavor = strdup("");
 		}
-		deprecated  = (*packs)->deprecated;
+		deprecated = (*packs)->deprecated;
 		if (deprecated == NULL || deprecated[0] == '\0') {
 			deprecated = strdup("no");
 		}
 		expirationDate = (*packs)->expiration_date;
-        options = (*packs)->options;
-        if (options == NULL) {
-            options = strdup("");
-        }
-        desc = (*packs)->desc;
-        if (desc == NULL) {
-            desc = strdup("");
-        }
-        automatic = (*packs)->automatic;
+		options = (*packs)->options;
+		if (options == NULL) {
+			options = strdup("");
+		}
+		desc = (*packs)->desc;
+		if (desc == NULL) {
+			desc = strdup("");
+		}
+		automatic = (*packs)->automatic;
+		installDate = (*packs)->install_date;
 	}
 
 	asprintf(&info_text,
-		 "%s-%s\n"
-			 "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
-			 "Flavor          : %s\nOS              : %s\n"
-	                 "CPE             : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\n"
-			 "Comment         : %s\nOptions         : %s\nDescription     :\n%s\n",
-		 (*indexEntry)->pkgname, (*indexEntry)->version,
-		 (*indexEntry)->pkgname,
-		 status,
-		 (*indexEntry)->version,
-		 (*indexEntry)->license,
-		 origin,
-		 flavor,
-		 os_release,
-		 cpe,
-		 locked ? "yes" : "no",
-         automatic == MPORT_EXPLICIT ? "yes" : "no",
-		 no_shlib_provided ? "yes" : "no",
-		 deprecated,
-		 expirationDate == 0 ? "" : ctime(&expirationDate),
-		 (*indexEntry)->comment,
-         options,
-         desc);
+	         "%s-%s\n"
+	         "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
+	         "Flavor          : %s\nOS              : %s\n"
+	         "CPE             : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date : %s\n"
+	         "Comment         : %s\nOptions         : %s\nDescription     :\n%s\n",
+	         (*indexEntry)->pkgname, (*indexEntry)->version,
+	         (*indexEntry)->pkgname,
+	         status,
+	         (*indexEntry)->version,
+	         (*indexEntry)->license,
+	         origin,
+	         flavor,
+	         os_release,
+	         cpe,
+	         locked ? "yes" : "no",
+	         automatic == MPORT_EXPLICIT ? "yes" : "no",
+	         no_shlib_provided ? "yes" : "no",
+	         deprecated,
+	         expirationDate == 0 ? "" : ctime(&expirationDate),
+	         installDate == 0 ? "" : ctime(&installDate),
+	         (*indexEntry)->comment,
+	         options,
+	         desc);
 
 	if (packs == NULL) {
 		free(status);
@@ -141,8 +143,8 @@ mport_info(mportInstance *mport, const char *packageName)
 		free(cpe);
 		free(flavor);
 		free(deprecated);
-        free(options);
-        free(desc);
+		free(options);
+		free(desc);
 	} else {
 		mport_pkgmeta_vec_free(packs);
 	}

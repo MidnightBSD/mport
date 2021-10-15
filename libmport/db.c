@@ -43,6 +43,8 @@ static int mport_upgrade_master_schema_6to7(sqlite3 *);
 
 static int mport_upgrade_master_schema_7to8(sqlite3 *);
 
+static int mport_upgrade_master_schema_8to9(sqlite3 *);
+
 /* mport_db_do(sqlite3 *db, const char *sql, ...)
  * 
  * A wrapper for executing a single sql query.  Takes a sqlite3 struct
@@ -260,6 +262,8 @@ mport_upgrade_master_schema(sqlite3 *db, int databaseVersion)
 			mport_upgrade_master_schema_2to3(db);
 			mport_upgrade_master_schema_4to6(db);
 			mport_upgrade_master_schema_6to7(db);
+			mport_upgrade_master_schema_7to8(db);
+			mport_upgrade_master_schema_8to9(db);
 			mport_set_database_version(db);
 			break;
 		case 2:
@@ -274,13 +278,17 @@ mport_upgrade_master_schema(sqlite3 *db, int databaseVersion)
 			mport_upgrade_master_schema_4to6(db);
 			/* falls through */
 		case 6:
+			/* falls through */
 			mport_upgrade_master_schema_6to7(db);
 		case 7:
+			/* falls through */
             mport_upgrade_master_schema_7to8(db);
-            mport_set_database_version(db);
-            break;
         case 8:
-            break;
+	        /* falls through */
+	        mport_upgrade_master_schema_8to9(db);
+			mport_set_database_version(db);
+		case 9:
+			break;
 		default:
 			RETURN_ERROR(MPORT_ERR_FATAL, "Invalid master database version");
 	}
@@ -353,12 +361,22 @@ mport_upgrade_master_schema_7to8(sqlite3 *db)
     return (MPORT_OK);
 }
 
+static int
+mport_upgrade_master_schema_8to9(sqlite3 *db)
+{
+	RUN_SQL(db, "ALTER TABLE packages ADD COLUMN install_date int64 NOT NULL default '0'");
+
+	RUN_SQL(db, "update packages set install_date = 0");
+
+	return (MPORT_OK);
+}
+
 int
 mport_generate_master_schema(sqlite3 *db)
 {
 
 	RUN_SQL(db,
-	        "CREATE TABLE IF NOT EXISTS packages (pkg text NOT NULL, version text NOT NULL, origin text NOT NULL, prefix text NOT NULL, lang text, options text, status text default 'dirty', comment text, os_release text NOT NULL default '1.0', cpe text, locked int NOT NULL default '0', deprecated text default '', expiration_date int64 NOT NULL default '0', no_provide_shlib int default '0', flavor text default '', automatic int default '9')");
+	        "CREATE TABLE IF NOT EXISTS packages (pkg text NOT NULL, version text NOT NULL, origin text NOT NULL, prefix text NOT NULL, lang text, options text, status text default 'dirty', comment text, os_release text NOT NULL default '1.0', cpe text, locked int NOT NULL default '0', deprecated text default '', expiration_date int64 NOT NULL default '0', no_provide_shlib int default '0', flavor text default '', automatic int default '0', install_date int64 NOT NULL default '0')");
 	RUN_SQL(db, "CREATE UNIQUE INDEX IF NOT EXISTS packages_pkg ON packages (pkg)");
 	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS packages_origin ON packages (origin)");
 

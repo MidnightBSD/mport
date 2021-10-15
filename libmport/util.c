@@ -617,3 +617,15 @@ mport_version(void)
 
     return version;
 }
+
+time_t
+mport_get_time(void)
+{
+	struct timespec now;
+
+	if (clock_gettime(CLOCK_REALTIME, &now) != 0) {
+		RETURN_ERROR(MPORT_ERR_FATAL, strerror(errno));
+	}
+
+	return now.tv_sec;
+}
