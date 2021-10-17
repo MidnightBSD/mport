@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
 
 	if (mport_instance_init(mport, NULL) != MPORT_OK) {
 		warnx("%s", mport_err_string());
-		moprt_instance_free(mport);
+		mport_instance_free(mport);
 		exit(EXIT_FAILURE);
 	}
 
