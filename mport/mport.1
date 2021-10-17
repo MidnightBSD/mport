@@ -31,6 +31,11 @@
 .Nd "mport utility"
 .Sh SYNOPSIS
 .Nm
+.Op Fl v
+.Op Fl c Ao chroot path Ac
+.Ao command Ac
+.Pp
+.Nm
 .Cm autoremove
 .Nm
 .Cm clean
@@ -75,8 +80,21 @@ The
 .Nm
 command installs or removes mport packages, and displays information on
 installed packages.
-.Pp
-Here is the list of standard commands:
+.Sh OPTIONS
+The following options are supported by
+.Nm :
+.Bl -tag -width indent
+.It Fl v, Cm --version
+Display the current version of 
+.Nm .
+.It Fl c Ao chroot path Ac , Cm --chroot Ao chroot path Ac
+.Nm
+will chroot in the
+.Ao chroot path Ac
+environment.
+.Sh COMMANDS
+The following commands are supported by
+.Nm :
 .Bl -tag -width ".Cm install"
 .It Cm autoremove
 Experimental! Removes all packages installed as dependencies that are no longer needed
