@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2021 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -54,7 +55,7 @@ static int check_if_older_os(mportInstance *, mportPackageMeta *);
  */
 int mport_check_preconditions(mportInstance *mport, mportPackageMeta *pack, long flags)
 {
-	if (flags & MPORT_PRECHECK_INSTALLED && check_if_installed(mport-, pack) != MPORT_OK)
+	if (flags & MPORT_PRECHECK_INSTALLED && check_if_installed(mport, pack) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 	if (flags & MPORT_PRECHECK_UPGRADEABLE && check_if_older_installed(mport, pack) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
