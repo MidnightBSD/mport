@@ -91,7 +91,7 @@ static int check_if_installed(mportInstance *mport, mportPackageMeta *pack)
 			char *full_name;
 			asprintf(&full_name, "%s-%s", pack->flavor, pack->name);
 			if (full_name != NULL) {
-				if (mport_db_prepare(db, &stmt, "SELECT version, os_release FROM packages WHERE pkg=%Q", full_name) !=
+				if (mport_db_prepare(mport->db, &stmt, "SELECT version, os_release FROM packages WHERE pkg=%Q", full_name) !=
 				    MPORT_OK) {
 					sqlite3_finalize(stmt);
 					RETURN_CURRENT_ERROR;
@@ -110,7 +110,7 @@ static int check_if_installed(mportInstance *mport, mportPackageMeta *pack)
 			/* Row was found */
 			inst_version = sqlite3_column_text(stmt, 0);
 			os_release = sqlite3_column_text(stmt, 1);
-			system_os_release = (char *) mport_get_osrelease(mport);
+			system_os_release = (char *) mport_get_osrelease_setting(mport);
 			if (system_os_release == NULL) {
 				system_os_release = (char *) mport_get_osrelease();
 			}
@@ -127,7 +127,7 @@ static int check_if_installed(mportInstance *mport, mportPackageMeta *pack)
 			RETURN_CURRENT_ERROR;
 		default:
 			/* Some sort of sqlite error */
-			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
+			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 			sqlite3_finalize(stmt);
 			RETURN_CURRENT_ERROR;
 	}
@@ -164,7 +164,7 @@ static int check_conflicts(mportInstance *mport, mportPackageMeta *pack)
 			/* No conflicts */
 			break;
 		} else {
-			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
+			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 			sqlite3_finalize(stmt);
 			RETURN_CURRENT_ERROR;
 		}
