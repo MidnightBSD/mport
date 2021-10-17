@@ -110,10 +110,7 @@ static int check_if_installed(mportInstance *mport, mportPackageMeta *pack)
 			/* Row was found */
 			inst_version = sqlite3_column_text(stmt, 0);
 			os_release = sqlite3_column_text(stmt, 1);
-			system_os_release = (char *) mport_get_osrelease_setting(mport);
-			if (system_os_release == NULL) {
-				system_os_release = (char *) mport_get_osrelease();
-			}
+			system_os_release = (char *) mport_get_osrelease(mport);
 
 			/* Different os release version should not be considered the same package */
 			if (strcmp(os_release, system_os_release) != 0) {
@@ -198,10 +195,7 @@ static int check_depends(mportInstance *mport, mportPackageMeta *pack)
 		RETURN_CURRENT_ERROR;
 	}
 
-	system_os_release = (char *) mport_get_osrelease_setting(mport);
-	if (system_os_release == NULL) {
-		system_os_release = (char *) mport_get_osrelease();
-	}
+	system_os_release = (char *) mport_get_osrelease(mport);
 
 	while (1) {
 		ret = sqlite3_step(stmt);
@@ -302,10 +296,7 @@ check_if_older_installed(mportInstance *mport, mportPackageMeta *pkg)
 	int ret;
 	const char *os_release;
 
-	os_release = mport_get_osrelease_setting(mport);
-	if (os_release == NULL) {
-		os_release = mport_get_osrelease();
-	}
+	os_release = mport_get_osrelease(mport);
 
 	if (mport_db_prepare(mport->db, &stmt,
 	                     "SELECT os_release FROM packages WHERE pkg=%Q and ((mport_version_cmp(version, %Q) < 0 and os_release=%Q) or os_release != %Q)",
@@ -337,10 +328,7 @@ check_if_older_os(mportInstance *mport, mportPackageMeta *pkg)
 	int ret;
 	const char *os_release;
 
-	os_release = mport_get_osrelease_setting(mport);
-	if (os_release == NULL) {
-		os_release = mport_get_osrelease();
-	}
+	os_release = mport_get_osrelease(mport);
 
 	if (mport_db_prepare(mport->db, &stmt,
 	                     "SELECT os_release FROM packages WHERE pkg=%Q and mport_version_cmp(os_release, %Q) < 0",

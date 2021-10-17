@@ -87,15 +87,12 @@ main(int argc, char *argv[])
 	} 
 	
 	mport = mport_instance_new();
-	os_release = mport_get_osrelease_setting(mport);
-	if (os_release == NULL) {
-		os_release = mport_get_osrelease();
-	}
-
 	if (mport_instance_init(mport, NULL) != MPORT_OK) {
 		warnx("%s", mport_err_string());
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
+
+	os_release = mport_get_osrelease(mport);
 
 	if (update && mport_index_load(mport) != MPORT_OK) {
                 warnx("Unable to load updates index, %s", mport_err_string());
@@ -105,7 +102,7 @@ main(int argc, char *argv[])
 	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
 		warnx("%s", mport_err_string());
 		mport_instance_free(mport);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	
 	if (packs == NULL) {

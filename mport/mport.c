@@ -42,7 +42,7 @@
 
 static void usage(void);
 
-static void show_version(void);
+static void show_version(mportInstance *);
 
 static void loadIndex(mportInstance *);
 
@@ -119,11 +119,6 @@ main(int argc, char *argv[]) {
 	argc -= optind;
 	argv += optind;
 
-	if (version == 1) {
-		show_version();
-		exit(EXIT_SUCCESS);
-	}
-
 	if (chroot_path != NULL) {
 		if (chroot(chroot_path) == -1) {
 			err(EXIT_FAILURE, "chroot failed");
@@ -134,6 +129,12 @@ main(int argc, char *argv[]) {
 
 	if (mport_instance_init(mport, NULL) != MPORT_OK) {
 		errx(1, "%s", mport_err_string());
+	}
+
+	if (version == 1) {
+		show_version(mport);
+		mport_instance_free(mport);
+		exit(EXIT_SUCCESS);
 	}
 
 	if (!strcmp(argv[1], "install")) {
@@ -303,7 +304,8 @@ main(int argc, char *argv[]) {
 
 void
 usage(void) {
-	show_version();
+	show_version(NULL);
+	fprintf(stderr, "OS version is the installed system version and does not reflect config customization.\n")
 
 	fprintf(stderr,
 	        "usage: mport <command> args:\n"
@@ -335,8 +337,8 @@ usage(void) {
 }
 
 void
-show_version(void) {
-	char *version = mport_version();
+show_version(mportInstance *mport) {
+	char *version = mport_version(mport);
 	fprintf(stderr, "%s", version);
 	free(version);
 }

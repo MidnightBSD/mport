@@ -217,7 +217,7 @@ typedef struct {
 mportCreateExtras * mport_createextras_new(void);
 void mport_createextras_free(mportCreateExtras *);
 
-int mport_create_primative(mportAssetList *, mportPackageMeta *, mportCreateExtras *);
+int mport_create_primative(mportInstance *, mportAssetList *, mportPackageMeta *, mportCreateExtras *);
 
 /* Merge primative */
 int mport_merge_primative(const char **, const char *);
@@ -269,9 +269,8 @@ int mport_setting_set(mportInstance *, const char *, const char *);
 void mport_parselist(char *, char ***);
 int mport_verify_hash(const char *, const char *);
 int mport_file_exists(const char *);
-char * mport_version(void);
-char * mport_get_osrelease(void);
-char * mport_get_osrelease_setting(mportInstance *);
+char * mport_version(mportInstance *);
+char * mport_get_osrelease(mportInstance *);
 
 /* Locks */
 enum _LockState {

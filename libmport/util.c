@@ -580,9 +580,14 @@ mport_decompress_bzip2(const char *input, const char *output)
 }
 
 MPORT_PUBLIC_API char *
-mport_get_osrelease(void)
+mport_get_osrelease(mportInstance *mport)
 {
-	char *version;
+	char *version = NULL;
+
+	// honor settings first
+	if (mport != NULL) {
+		version = mport_setting_get(mport, MPORT_SETTING_TARGET_OS);
+	}
 
 	// try midnightbsd-version
 	if (version == NULL) {
@@ -594,17 +599,6 @@ mport_get_osrelease(void)
 		version = mport_get_osrelease_kern();
 	}
 
-
-	return version;
-}
-
-MPORT_PUBLIC_API char *
-mport_get_osrelease_setting(mportInstance *mport)
-{
-	char *version;
-
-	// honor settings first
-	version = mport_setting_get(mport, MPORT_SETTING_TARGET_OS);
 
 	return version;
 }
@@ -709,10 +703,10 @@ mport_get_osrelease_userland(void) {
 
 
 MPORT_PUBLIC_API char *
-mport_version(void)
+mport_version(mportInstance *mport)
 {
     char *version;
-    char *osrel = mport_get_osrelease();
+    char *osrel = mport_get_osrelease(mport);
     asprintf(&version, "mport %s for MidnightBSD %s, Bundle Version %s\n",
              MPORT_VERSION, osrel, MPORT_BUNDLE_VERSION_STR);
     free(osrel);

@@ -228,7 +228,7 @@ mport_generate_stub_schema(sqlite3 *db)
 	char *ptr;
 	char *sql;
 
-	ptr = mport_get_osrelease();
+	ptr = mport_get_osrelease(mport);
 	if (ptr == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "OS Release could not be determined");
 	asprintf(&sql, "INSERT INTO meta VALUES (\"os_release\", \"%s\")", ptr);

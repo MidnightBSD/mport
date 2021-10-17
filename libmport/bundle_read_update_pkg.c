@@ -89,7 +89,7 @@ static int make_backup_bundle(mportInstance *mport, mportPackageMeta *pkg, char 
 
   extra->is_backup = true;
 
-  ret = mport_create_primative(alist, pkg, extra);
+  ret = mport_create_primative(mport, alist, pkg, extra);
 
   mport_assetlist_free(alist);
   mport_createextras_free(extra);
