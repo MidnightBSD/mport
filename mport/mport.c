@@ -116,8 +116,8 @@ main(int argc, char *argv[]) {
 				break;
 		}
 	}
-	argc -= optind;
-	argv += optind;
+//	argc -= optind;
+//	argv += optind;
 
 	if (chroot_path != NULL) {
 		if (chroot(chroot_path) == -1) {
