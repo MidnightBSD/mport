@@ -48,7 +48,7 @@
 #define MPORT_VERSION "2.1.9"
 
 #define MPORT_SETTING_MIRROR_REGION "mirror_region"
-#deifne MPORT_SETTING_TARGET_OS "target_os"
+#define MPORT_SETTING_TARGET_OS "target_os"
 
 /* callback syntactic sugar */
 void mport_call_msg_cb(mportInstance *, const char *, ...);
