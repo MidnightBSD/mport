@@ -55,12 +55,16 @@ main(int argc, char *argv[])
 	char *comment;
 	char *os_release;
 	char name_version[30];
+	const char *chroot_path = NULL;
 	
 	if (argc > 3)
 		usage();
     
-	while ((ch = getopt(argc, argv, "lopqvu")) != -1) {
+	while ((ch = getopt(argc, argv, "c:lopqvu")) != -1) {
 		switch (ch) {
+			case 'c':
+				chroot_path = optarg;
+				break;
 			case 'l':
 				locks = true;
 				break;
@@ -84,7 +88,13 @@ main(int argc, char *argv[])
 				usage();
 				break; 
 		}
-	} 
+	}
+
+	if (chroot_path != NULL) {
+		if (chroot(chroot_path) == -1) {
+			err(EXIT_FAILURE, "chroot failed");
+		}
+	}
 	
 	mport = mport_instance_new();
 	if (mport_instance_init(mport, NULL) != MPORT_OK) {
