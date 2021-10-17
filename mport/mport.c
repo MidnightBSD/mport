@@ -305,7 +305,6 @@ main(int argc, char *argv[]) {
 void
 usage(void) {
 	show_version(NULL);
-	fprintf(stderr, "OS version is the installed system version and does not reflect config customization.\n");
 
 	fprintf(stderr,
 	        "usage: mport <command> args:\n"
@@ -340,6 +339,8 @@ void
 show_version(mportInstance *mport) {
 	char *version = mport_version(mport);
 	fprintf(stderr, "%s", version);
+	if (mport == NULL)
+		fprintf(stderr, "(Host OS version, not configured)\n\n");
 	free(version);
 }
 
