@@ -64,7 +64,7 @@ int mport_check_preconditions(mportInstance *, mportPackageMeta *, long);
 
 /* schema */
 int mport_generate_master_schema(sqlite3 *);
-int mport_generate_stub_schema(sqlite3 *);
+int mport_generate_stub_schema(mportInstance *, sqlite3 *);
 int mport_upgrade_master_schema(sqlite3 *, int);
 
 /* instance */

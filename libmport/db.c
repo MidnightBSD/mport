@@ -223,7 +223,7 @@ mport_detach_stub_db(sqlite3 *db)
     RETURN_CURRENT_ERROR
 
 int
-mport_generate_stub_schema(sqlite3 *db)
+mport_generate_stub_schema(mportInstance *mport, sqlite3 *db)
 {
 	char *ptr;
 	char *sql;

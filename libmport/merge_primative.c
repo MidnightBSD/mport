@@ -130,7 +130,7 @@ MPORT_PUBLIC_API int mport_merge_primative(const char **filenames, const char *o
  * When this function is done, db points to a readonly sqlite object representing
  * the merged db.
  */
-static int build_stub_db(sqlite3 **db,  const char *tmpdir,  const char *dbfile,  const char **filenames, struct table_entry **table) 
+static int build_stub_db(mportInstance *mport, sqlite3 **db,  const char *tmpdir,  const char *dbfile,  const char **filenames, struct table_entry **table)
 {
   char *tmpdbfile;
   const char *name;
@@ -144,7 +144,7 @@ static int build_stub_db(sqlite3 **db,  const char *tmpdir,  const char *dbfile,
   if (sqlite3_open(dbfile, db) != SQLITE_OK)
     RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(*db));
   
-  if (mport_generate_stub_schema(*db) != MPORT_OK)
+  if (mport_generate_stub_schema(mport, *db) != MPORT_OK)
     RETURN_CURRENT_ERROR;
     
   for (file = *filenames; file != NULL; file = *(++filenames)) {

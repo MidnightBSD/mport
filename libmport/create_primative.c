@@ -41,7 +41,7 @@
 #include "mport.h"
 #include "mport_private.h"
 
-static int create_stub_db(sqlite3 **, const char *);
+static int create_stub_db(mportInstance *, sqlite3 **, const char *);
 
 static int insert_assetlist(sqlite3 *, mportAssetList *, mportPackageMeta *, mportCreateExtras *);
 
@@ -76,7 +76,7 @@ mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPac
 		goto CLEANUP;
 	}
 
-	if ((error_code = create_stub_db(&db, tmpdir)) != MPORT_OK)
+	if ((error_code = create_stub_db(mport, &db, tmpdir)) != MPORT_OK)
 		goto CLEANUP;
 
 	if ((error_code = insert_assetlist(db, assetlist, pack, extra)) != MPORT_OK)
@@ -100,7 +100,7 @@ mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPac
 
 
 static int
-create_stub_db(sqlite3 **db, const char *tmpdir)
+create_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir)
 {
 	int error_code = MPORT_OK;
 
@@ -115,7 +115,7 @@ create_stub_db(sqlite3 **db, const char *tmpdir)
 		return error_code;
 
 	/* create tables */
-	return mport_generate_stub_schema(*db);
+	return mport_generate_stub_schema(mport, *db);
 }
 
 static int
