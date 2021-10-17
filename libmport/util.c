@@ -583,10 +583,20 @@ MPORT_PUBLIC_API char *
 mport_get_osrelease(void)
 {
 	char *version;
-	version = mport_get_osrelease_userland();
+
+	// honor settings first
+	version = mport_setting_get(mport, MPORT_SETTING_TARGET_OS);
+
+	// settings was undefined, try midnightbsd-version
+	if (version == NULL) {
+		version = mport_get_osrelease_userland();
+	}
+
+	// fall back to kernel version
 	if (version == NULL) {
 		version = mport_get_osrelease_kern();
 	}
+
 
 	return version;
 }
