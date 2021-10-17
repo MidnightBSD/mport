@@ -271,6 +271,7 @@ int mport_verify_hash(const char *, const char *);
 int mport_file_exists(const char *);
 char * mport_version(void);
 char * mport_get_osrelease(void);
+char * mport_get_osrelease_setting(mportInstance *);
 
 /* Locks */
 enum _LockState {

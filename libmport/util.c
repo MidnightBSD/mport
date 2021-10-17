@@ -584,10 +584,7 @@ mport_get_osrelease(void)
 {
 	char *version;
 
-	// honor settings first
-	version = mport_setting_get(mport, MPORT_SETTING_TARGET_OS);
-
-	// settings was undefined, try midnightbsd-version
+	// try midnightbsd-version
 	if (version == NULL) {
 		version = mport_get_osrelease_userland();
 	}
@@ -597,6 +594,17 @@ mport_get_osrelease(void)
 		version = mport_get_osrelease_kern();
 	}
 
+
+	return version;
+}
+
+MPORT_PUBLIC_API char *
+mport_get_osrelease_setting(mportInstance *mport)
+{
+	char *version;
+
+	// honor settings first
+	version = mport_setting_get(mport, MPORT_SETTING_TARGET_OS);
 
 	return version;
 }
