@@ -32,38 +32,48 @@
 #include <sysexits.h>
 #include <string.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <mport.h>
 
 
 static void usage(void);
 
-int main(int argc, char *argv[]) 
-{
-  int ch, i;
-  const char *outfile = NULL;
-  const char **inputfiles;
-  mportInstance *mport;
+int main(int argc, char *argv[]) {
+	int ch, i;
+	const char *outfile = NULL;
+	const char **inputfiles;
+	mportInstance *mport;
+	const char *chroot_path = NULL;
 
-  if (argc == 1)
-    usage();
-    
-  while ((ch = getopt(argc, argv, "o:")) != -1) {
-    switch (ch) {
-      case 'o':
-        outfile = optarg;
-        break;
-      case '?':
-      default:
-        usage();
-        break; 
-    }
-  } 
+	if (argc == 1)
+		usage();
 
-  argc -= optind;
-  argv += optind;
+	while ((ch = getopt(argc, argv, "c:o:")) != -1) {
+		switch (ch) {
+			case 'c':
+				chroot_path = optarg;
+				break;
+			case 'o':
+				outfile = optarg;
+				break;
+			case '?':
+			default:
+				usage();
+				break;
+		}
+	}
 
-  if (outfile == NULL)
-    usage();
+	argc -= optind;
+	argv += optind;
+
+	if (outfile == NULL)
+		usage();
+
+	if (chroot_path != NULL) {
+		if (chroot(chroot_path) == -1) {
+			err(EXIT_FAILURE, "chroot failed");
+		}
+	}
 
 	mport = mport_instance_new();
 	if (mport_instance_init(mport, NULL) != MPORT_OK) {
@@ -71,28 +81,27 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-  if ((inputfiles = (const char **)malloc((argc + 1) * sizeof(char **))) == NULL)
-    err(EX_OSERR, "Couldn't allocate input array");
-  
-  for (i = 0; i < argc; i++) { 
-    if ((inputfiles[i] = strdup(argv[i])) == NULL)
-      err(EX_OSERR, "Couldn't allocate input filename");
-  }
-  
-  inputfiles[i] = NULL;
+	if ((inputfiles = (const char **) malloc((argc + 1) * sizeof(char **))) == NULL)
+		err(EX_OSERR, "Couldn't allocate input array");
 
-  if (mport_merge_primative(mport, (const char **)inputfiles, outfile) != MPORT_OK) 
-    errx(EX_SOFTWARE, "Could not merge package files: %s", mport_err_string());
-   
-  free(inputfiles); 
-    
-  return 0; 
+	for (i = 0; i < argc; i++) {
+		if ((inputfiles[i] = strdup(argv[i])) == NULL)
+			err(EX_OSERR, "Couldn't allocate input filename");
+	}
+
+	inputfiles[i] = NULL;
+
+	if (mport_merge_primative(mport, (const char **) inputfiles, outfile) != MPORT_OK)
+		errx(EX_SOFTWARE, "Could not merge package files: %s", mport_err_string());
+
+	free(inputfiles);
+
+	return 0;
 }
 
 
 static void
-usage(void) 
-{
-	fprintf(stderr, "Usage: mport.merge -o <outputfilename> <pkgfile1> <pkgfile2> ...\n");
+usage(void) {
+	fprintf(stderr, "Usage: mport.merge -c <chroot path> -o <outputfilename> <pkgfile1> <pkgfile2> ...\n");
 	exit(2);
 }

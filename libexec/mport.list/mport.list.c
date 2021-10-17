@@ -33,6 +33,7 @@
 #include <err.h>
 #include <string.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <mport.h>
 
 static void usage(void);
@@ -214,8 +215,8 @@ str_remove( const char *str, const char ch )
 static void 
 usage(void) 
 {
-	
-	fprintf(stderr, "Usage: mport.list [-q | -v | -u]\n");
+
+	fprintf(stderr, "Usage: mport.list [-q | -v | -u | -c <chroot path>]\n");
 
 	exit(2);
 }

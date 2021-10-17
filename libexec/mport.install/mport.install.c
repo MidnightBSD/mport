@@ -32,6 +32,7 @@
 #include <err.h>
 #include <string.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <mport.h>
 
 static void usage(void);
@@ -43,9 +44,13 @@ main(int argc, char *argv[])
 	char *prefix = NULL;
 	mportInstance *mport;
 	int error_code = 0;
+	const char *chroot_path = NULL;
 
-	while ((ch = getopt(argc, argv, "p:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:p:")) != -1) {
 		switch (ch) {
+			case 'c':
+				chroot_path = optarg;
+				break;
 			case 'p':
 				prefix = optarg;
 				break;
@@ -62,11 +67,17 @@ main(int argc, char *argv[])
 	if (argc == 0)
 		usage();
 
+	if (chroot_path != NULL) {
+		if (chroot(chroot_path) == -1) {
+			err(EXIT_FAILURE, "chroot failed");
+		}
+	}
+
 	mport = mport_instance_new();
 
 	if (mport_instance_init(mport, NULL) != MPORT_OK) {
 		warnx("Init failed: %s", mport_err_string());
-		return 1;
+		return EXIT_FAILURE;
 	}
 
 	for (int i = 0; i < argc; i++) {
@@ -74,20 +85,19 @@ main(int argc, char *argv[])
 		if (mport_install_primative(mport, argv[i], prefix, MPORT_EXPLICIT) != MPORT_OK) {
 			warnx("install failed: %s", mport_err_string());
 			mport_instance_free(mport);
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 	}
 
 
 	mport_instance_free(mport);
 	exit(error_code);
-
 }
 
 static
 void usage(void)
 {
 
-	fprintf(stderr, "Usage: mport.install [-p prefix] pkgfile1 pkgfile2 ...\n");
+	fprintf(stderr, "Usage: mport.install [-p prefix] [-c <chroot path>] pkgfile1 pkgfile2 ...\n");
 	exit(1);
 }
