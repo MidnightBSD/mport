@@ -12,7 +12,7 @@ SRCS=	asset.c bundle_write.c bundle_read.c plist.c create_primative.c db.c \
    		autoremove.c
 INCS=	mport.h
 
-CFLAGS+=	-I${.CURDIR} -I/usr/include/private/ucl
+CFLAGS+=	-I${.CURDIR} -I/usr/include/private/ucl -DDEBUG
 SHLIB_MAJOR=	2
 MAN=	mport.3
 

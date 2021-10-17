@@ -66,7 +66,7 @@ static uint32_t SuperFastHash(const char *);
  * dependencies are correct, and that the packages are in an optimal order for installation.
  */ 
 MPORT_PUBLIC_API int
-mport_merge_primative(const char **filenames, const char *outfile)
+mport_merge_primative(mportInstance *mport, const char **filenames, const char *outfile)
 {
   sqlite3 *db;
   mportBundleWrite *bundle;
@@ -87,7 +87,7 @@ mport_merge_primative(const char **filenames, const char *outfile)
   DIAG("Building stub")
 
   /* this function merges the stub databases into one db. */      
-  if (build_stub_db(&db, tmpdir, dbfile, filenames, table) != MPORT_OK)
+  if (build_stub_db(mport, &db, tmpdir, dbfile, filenames, table) != MPORT_OK)
     RETURN_CURRENT_ERROR;
   
   DIAG("Stub complete: %s", dbfile)

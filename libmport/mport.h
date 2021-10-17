@@ -220,7 +220,7 @@ void mport_createextras_free(mportCreateExtras *);
 int mport_create_primative(mportInstance *, mportAssetList *, mportPackageMeta *, mportCreateExtras *);
 
 /* Merge primative */
-int mport_merge_primative(const char **, const char *);
+int mport_merge_primative(mportInstance *mport, const char **, const char *);
 
 /* Package installation */
 int mport_install(mportInstance *, const char *, const char *, const char *, mportAutomatic);

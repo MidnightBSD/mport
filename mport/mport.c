@@ -305,7 +305,7 @@ main(int argc, char *argv[]) {
 void
 usage(void) {
 	show_version(NULL);
-	fprintf(stderr, "OS version is the installed system version and does not reflect config customization.\n")
+	fprintf(stderr, "OS version is the installed system version and does not reflect config customization.\n");
 
 	fprintf(stderr,
 	        "usage: mport <command> args:\n"
