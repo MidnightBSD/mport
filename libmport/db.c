@@ -211,6 +211,11 @@ mport_attach_stub_db(sqlite3 *db, const char *dir)
 int
 mport_detach_stub_db(sqlite3 *db)
 {
+
+	if (db == NULL) {
+		RETURN_ERROR(MPORT_ERR_WARN, "Null sqlite3 database handle for stub database");
+	}
+
 	if (mport_db_do(db, "DETACH stub") != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
