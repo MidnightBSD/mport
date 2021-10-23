@@ -1066,7 +1066,7 @@ pkg_message_from_ucl(mportInstance *mport, const ucl_object_t *obj, mportPackage
 
         enhanced = ucl_object_find_key(obj, "type");
         if (enhanced != NULL && ucl_object_type(enhanced) == UCL_STRING) {
-			char *type = ucl_object_tostring(enhanced);
+			const char *type = ucl_object_tostring(enhanced);
 			if (type != NULL) {
 				if (strcmp(type, "install") == 0) {
 					msg->type = PKG_MESSAGE_INSTALL;		
