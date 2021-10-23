@@ -1063,6 +1063,23 @@ pkg_message_from_ucl(mportInstance *mport, const ucl_object_t *obj, mportPackage
         if (enhanced != NULL && ucl_object_type(enhanced) == UCL_STRING) {
             msg->minimum_version = strdup(ucl_object_tostring(enhanced));
         }
+
+        enhanced = ucl_object_find_key(obj, "type");
+        if (enhanced != NULL && ucl_object_type(enhanced) == UCL_STRING) {
+			char *type = ucl_object_tostring(enhanced);
+			if (type != NULL) {
+				if (strcmp(type, "install") == 0) {
+					msg->type = PKG_MESSAGE_INSTALL;		
+				} else if (strcmp(type, "upgrade") == 0) {
+					msg->type = PKG_MESSAGE_UPGRADE;		
+				} else if (strcmp(type, "remove") == 0) {
+					msg->type = PKG_MESSAGE_REMOVE;	
+				} else {
+					msg->type = PKG_MESSAGE_ALWAYS;
+				}
+        	}
+		}
+
     }
 
     return msg;

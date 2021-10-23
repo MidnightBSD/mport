@@ -554,7 +554,7 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
     if (sqlite3_column_type(stmt, 14) == SQLITE_INTEGER) {
         pack->install_date = sqlite3_column_int(stmt, 14);
     } else {
-	pack->install_date = 0;
+		pack->install_date = 0;
     }
 
 	return MPORT_OK;

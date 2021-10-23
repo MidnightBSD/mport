@@ -36,7 +36,9 @@
 #define DIAG(...) 
 #endif
 
+#if defined(__MidnightBSD__)
 #include <osreldate.h>
+#endif
 #include <sqlite3.h>
 #include "bzlib.h"
 
