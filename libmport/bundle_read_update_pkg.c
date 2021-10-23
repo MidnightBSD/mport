@@ -57,6 +57,7 @@ int mport_bundle_read_update_pkg(mportInstance *mport, mportBundleRead *bundle, 
     RETURN_CURRENT_ERROR;
   }
 
+  pkg->action = MPORT_ACTION_UPDATE;
   if (
         (mport_delete_primative(mport, pkg, 1) != MPORT_OK) ||
         (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)

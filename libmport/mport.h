@@ -115,6 +115,16 @@ enum _Automatic{
 };
 typedef enum _Automatic mportAutomatic;
 
+
+enum _Action{
+    MPORT_ACTION_INSTALL,
+    MPORT_ACTION_UPGRADE,
+    MPORT_ACTION_UPDATE,
+    MPORT_ACTION_DELETE,
+    MPORT_ACTION_UNKNOWN
+};
+typedef enum _Action mportAction;
+
 /* Package Meta-data structure */
 typedef struct {
     char *name;
@@ -135,6 +145,7 @@ typedef struct {
     char *flavor;
     mportAutomatic automatic;
 	time_t install_date;
+    mportAction action; // not populated from package table
 } mportPackageMeta;
 
 int mport_asset_get_assetlist(mportInstance *, mportPackageMeta *, mportAssetList **);

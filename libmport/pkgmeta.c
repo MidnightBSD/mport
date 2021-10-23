@@ -53,6 +53,8 @@ mport_pkgmeta_new(void)
 	pack->flavor = malloc(1 * sizeof(char));
 	pack->flavor[0] = '\0';
 
+    pack->action = MPORT_ACTION_UNKNOWN;
+
 	return pack;
 }
 

@@ -967,16 +967,33 @@ static int
 display_pkg_msg(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg)
 {
     mportPackageMessage packageMessage;
+    pkg_message_t expectedType;
+
     packageMessage.type = PKG_MESSAGE_ALWAYS;
     if (load_pkg_msg(mport, bundle, pkg, &packageMessage) != MPORT_OK) {
         RETURN_CURRENT_ERROR;
     }
 
-    if (packageMessage.type == PKG_MESSAGE_INSTALL || packageMessage.type == PKG_MESSAGE_ALWAYS) {
+    switch (pkg->action) {
+        case MPORT_ACTION_INSTALL:
+            expectedType = PKG_MESSAGE_INSTALL;
+            break;
+        case MPORT_ACTION_UPDATE:
+        case MPORT_ACTION_UPGRADE:
+            expectedType = PKG_MESSAGE_UPGRADE;
+            break;
+        case MPORT_ACTION_DELETE:
+            expectedType = PKG_MESSAGE_REMOVE;
+            break;
+        default:
+            expectedType = PKG_MESSAGE_INSTALL;
+    }
+
+    if (packageMessage.type == expectedType || packageMessage.type == PKG_MESSAGE_ALWAYS) {
         if (packageMessage.str != NULL && packageMessage.str[0] != '\0')
             mport_call_msg_cb(mport, "%s", packageMessage.str);
     }
-
+s
     free(packageMessage.str);
 
 	return MPORT_OK;
@@ -1079,7 +1096,6 @@ pkg_message_from_ucl(mportInstance *mport, const ucl_object_t *obj, mportPackage
 				}
         	}
 		}
-
     }
 
     return msg;
