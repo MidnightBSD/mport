@@ -288,10 +288,14 @@ parse_command(const char *s) {
     	return ASSET_LDCONFIG;
     if (STRING_EQ(s, "rmempty"))
     	return ASSET_RMEMPTY;
+    if (STRING_EQ(s, "glib-schemas")) {
+        return ASSET_GLIB_SCHEMAS;
+    }
 
     /* special case, starts with ( as in @(root,wheel,0755) */
-    if (s[0] == '(')
+    if (s[0] == '(') {
 		return ASSET_FILE_OWNER_MODE;
+    }
 
     return ASSET_INVALID;
 }
