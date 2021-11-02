@@ -420,7 +420,8 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg) {
 
         switch(type) {
             case ASSET_GLIB_SCHEMAS:
-				if (mport_xsystem(mport, "/usr/local/bin/glib-compile-schemas %s/share/glib-2.0/schemas > /dev/null || true", data == NULL ? pkg->prefix : data) != MPORT_OK) {
+				if (mport_file_exists("/usr/local/bin/glib-compile-schemas") && 
+                    mport_xsystem(mport, "/usr/local/bin/glib-compile-schemas %s/share/glib-2.0/schemas > /dev/null || true", data == NULL ? pkg->prefix : data) != MPORT_OK) {
 					goto SPECIAL_ERROR;
 				}
 				break;
@@ -432,6 +433,12 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg) {
                 if (strcmp("/boot/modules", data) != 0 && mport_rmdir(data, 1) != MPORT_OK) {
                     mport_call_msg_cb(mport, "Could not remove directory '%s': %s", data, mport_err_string());
                 }
+                break;
+            case ASSET_DESKTOP_FILE_UTILS:
+				if (mport_file_exists("/usr/local/bin/update-desktop-database") && mport_xsystem(mport, "/usr/local/bin/update-desktop-database -q > /dev/null || true") != MPORT_OK) {
+					goto SPECIAL_ERROR;
+				}
+				break;
         	default:
         		break;
         }

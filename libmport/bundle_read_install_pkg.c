@@ -905,12 +905,18 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 				}
 				break;
 			case ASSET_GLIB_SCHEMAS:
-				if (mport_xsystem(mport, "/usr/local/bin/glib-compile-schemas %s/share/glib-2.0/schemas > /dev/null || true", e->data == NULL ? pkg->prefix : e->data) != MPORT_OK) {
+				if (mport_file_exists("/usr/local/bin/glib-compile-schemas") && 
+					mport_xsystem(mport, "/usr/local/bin/glib-compile-schemas %s/share/glib-2.0/schemas > /dev/null || true", e->data == NULL ? pkg->prefix : e->data) != MPORT_OK) {
 					goto ERROR;
 				}
 				break;
 			case ASSET_KLD:
 				if (mport_xsystem(mport, "/usr/sbin/kldxref %s", file) != MPORT_OK) {
+					goto ERROR;
+				}
+				break;
+			case ASSET_DESKTOP_FILE_UTILS:
+				if (mport_file_exists("/usr/local/bin/update-desktop-database") && mport_xsystem(mport, "/usr/local/bin/update-desktop-database -q > /dev/null || true") != MPORT_OK) {
 					goto ERROR;
 				}
 				break;

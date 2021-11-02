@@ -297,6 +297,9 @@ parse_command(const char *s) {
     if (STRING_EQ(s, "kld")) {
         return ASSET_KLD;
     }
+    if (STRING_EQ(s, "desktop-file-utils")) {
+        return ASSET_DESKTOP_FILE_UTILS;
+    }
 
     /* special case, starts with ( as in @(root,wheel,0755) */
     if (s[0] == '(') {
