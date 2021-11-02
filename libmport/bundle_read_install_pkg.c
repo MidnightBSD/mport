@@ -909,6 +909,11 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 					goto ERROR;
 				}
 				break;
+			case ASSET_KLD:
+				if (mport_xsystem(mport, "/usr/sbin/kldxref %s", file) != MPORT_OK) {
+					goto ERROR;
+				}
+				break;
 			default:
 				/* do nothing */
 				break;
