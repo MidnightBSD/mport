@@ -583,14 +583,14 @@ lookup_alias(mportInstance *mport, const char *query, char **result)
 MPORT_PUBLIC_API void
 mport_index_entry_free_vec(mportIndexEntry **e)
 {
-	mportIndexEntry *e_orig = e;
+	mportIndexEntry **e_orig = e;
 
 	if (e == NULL) {
 		return;
 	}
 
-	while (e != NULL) {
-		mport_index_entry_free(e);
+	while (*e != NULL) {
+		mport_index_entry_free(*e);
 		e++;
 	}
 

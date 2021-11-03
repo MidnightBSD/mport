@@ -130,13 +130,14 @@ DONE:
 MPORT_PUBLIC_API void
 mport_index_depends_free_vec(mportDependsEntry **depends)
 {
-	mportDependsEntry *depends_orig = depends;
+	mportDependsEntry **depends_orig = depends;
 
-	if (depends == NULL)
+	if (depends == NULL) {
 		return;
+	}
   
-    while (depends != NULL) {
-		mport_index_depends_free(depends);
+	while (*depends != NULL) {
+		mport_index_depends_free(*depends);
 		depends++;
 	}
 
@@ -150,8 +151,9 @@ mport_index_depends_free_vec(mportDependsEntry **depends)
 MPORT_PUBLIC_API void
 mport_index_depends_free(mportDependsEntry *e) 
 {
-	if (e == NULL)
+	if (e == NULL) {
 		return;
+	}
 
 	free(e->pkgname);
 	free(e->d_pkgname);
