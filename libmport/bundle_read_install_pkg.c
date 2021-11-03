@@ -1009,7 +1009,7 @@ display_pkg_msg(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta 
         if (packageMessage.str != NULL && packageMessage.str[0] != '\0')
             mport_call_msg_cb(mport, "%s", packageMessage.str);
     }
-s
+
     free(packageMessage.str);
 
 	return MPORT_OK;
