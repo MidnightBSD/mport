@@ -146,7 +146,7 @@ typedef struct {
     mportAutomatic automatic;
 	time_t install_date;
     mportAction action; // not populated from package table
-} mportPackageMeta;
+} __attribute__ ((aligned (16)))  mportPackageMeta;
 
 int mport_asset_get_assetlist(mportInstance *, mportPackageMeta *, mportAssetList **);
 int mport_asset_get_package_from_file_path(mportInstance *, const char *, mportPackageMeta **);
