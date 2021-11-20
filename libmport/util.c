@@ -599,7 +599,6 @@ mport_get_osrelease(mportInstance *mport)
 		version = mport_get_osrelease_kern();
 	}
 
-
 	return version;
 }
 
@@ -637,7 +636,7 @@ mport_get_osrelease_userland(void) {
 	int cout_pipe[2];
 	int cerr_pipe[2];
 	int bytes_read;
-	char *version;
+	char *version = NULL;
 	posix_spawn_file_actions_t action;
 
 	if (pipe(cout_pipe) || pipe(cerr_pipe))
@@ -652,8 +651,8 @@ mport_get_osrelease_userland(void) {
 	posix_spawn_file_actions_addclose(&action, cout_pipe[1]);
 	posix_spawn_file_actions_addclose(&action, cerr_pipe[1]);
 
-	char *command[] = {"midnightbsd-version", "-u"};
-	char *argsmem[] = {"sh", "-c"};
+	char *command[] = {"/bin/midnightbsd-version", "-u"};
+	char *argsmem[] = {"/bin/sh", "-c"};
 	char *args[] = {&argsmem[0][0], &argsmem[1][0], &command[0][0], &command[0][1], NULL};
 
 	pid_t pid;
@@ -666,15 +665,15 @@ mport_get_osrelease_userland(void) {
 
 	close(cout_pipe[1]), close(cerr_pipe[1]); // close child-side of pipes
 
-	char *buffer[1024];
+	char buffer[1024];
 	struct pollfd plist[2];
 	plist[0] = (struct pollfd) {cout_pipe[0], POLLIN, 0};
 	plist[1] = (struct pollfd) {cerr_pipe[0], POLLIN, 0};
 
-        version = calloc(10, sizeof(char));
-        if (version == NULL)
-                return NULL;
-
+	version = calloc(10, sizeof(char));
+	if (version == NULL) {
+		return NULL;
+	}
 
 	for (int rval; (rval = poll(&plist[0], 2, -1)) > 0;) {
 		if (plist[0].revents & POLLIN) {
@@ -694,7 +693,6 @@ mport_get_osrelease_userland(void) {
 #endif
 
 	posix_spawn_file_actions_destroy(&action);
-
 
 	version[3] = '\0'; /* force major version only for now */
 
