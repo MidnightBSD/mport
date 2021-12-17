@@ -53,6 +53,7 @@ mport/mport
 *.su
 *.idb
 *.pdb
+*.core
 
 # built man pages
 *.gz
