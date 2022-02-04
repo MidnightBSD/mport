@@ -285,6 +285,6 @@ mport_bundle_read_prep_for_install(mportInstance *mport, mportBundleRead *bundle
 			RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 	}
 
-	return MPORT_OK;
+	return (MPORT_OK);
 }    
 
