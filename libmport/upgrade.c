@@ -61,6 +61,8 @@ mport_upgrade(mportInstance *mport) {
 		total++;
 	}
 	mport_pkgmeta_vec_free(packs_orig);
+	packs_orig = NULL;
+	packs = NULL;
 
 	mport_call_msg_cb(mport, "Packages updated: %d\nTotal: %d\n", updated, total);
 	return (MPORT_OK);
@@ -103,6 +105,8 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack) {
 			}
 		}
 		mport_pkgmeta_vec_free(depends_orig);
+		depends_orig = NULL;
+		depends = NULL;
 	}
 
 	return (ret);
