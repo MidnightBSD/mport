@@ -68,11 +68,11 @@ mport_upgrade(mportInstance *mport) {
 
 int
 mport_update_down(mportInstance *mport, mportPackageMeta *pack) {
-	mportPackageMeta **depends;
+	mportPackageMeta **depends, **depends_orig;
 	int ret = 0;
 
-	if (mport_pkgmeta_get_downdepends(mport, pack, &depends) == MPORT_OK) {
-		if (depends == NULL) {
+	if (mport_pkgmeta_get_downdepends(mport, pack, &depends_orig) == MPORT_OK) {
+		if (depends_orig == NULL) {
 			if (mport_index_check(mport, pack)) {
 				mport_call_msg_cb(mport, "Updating %s\n", pack->name);
 				if (mport_update(mport, pack->name) !=0) {
@@ -83,6 +83,7 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack) {
 			} else
 				ret = 0;
 		} else {
+			depends = depends_orig;
 			while (*depends != NULL) {
 				ret += mport_update_down(mport, (*depends));
 				if (mport_index_check(mport, *depends)) {
@@ -101,7 +102,7 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack) {
 					ret++;
 			}
 		}
-		mport_pkgmeta_vec_free(depends);
+		mport_pkgmeta_vec_free(depends_orig);
 	}
 
 	return (ret);
