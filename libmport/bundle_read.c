@@ -89,21 +89,25 @@ mport_bundle_read_finish(mportInstance *mport, mportBundleRead *bundle)
 	int ret = MPORT_OK;
 
 	if (bundle == NULL) {
+		mport_call_msg_cb(mport, "Package is no longer open.");
 		RETURN_ERROR(MPORT_ERR_FATAL, "Bundle is null");
 	}
 
 	if (bundle->archive != NULL) {
 		if (archive_read_close(bundle->archive) != ARCHIVE_OK) {
+			mport_call_msg_cb(mport, "Unable to close pacakge.");
 			ret = SET_ERROR(MPORT_ERR_FATAL, archive_error_string(bundle->archive));
 		}
 		
 		if (ret != MPORT_ERR_FATAL && archive_read_free(bundle->archive) != ARCHIVE_OK) {
-				ret = SET_ERROR(MPORT_ERR_FATAL, archive_error_string(bundle->archive));
+			mport_call_msg_cb(mport, "Unable to free memory used by package archive file.");
+			ret = SET_ERROR(MPORT_ERR_FATAL, archive_error_string(bundle->archive));
 		}
 	}
 
 	if (bundle->stub_attached && (mport != NULL)) {
 		if (mport_detach_stub_db(mport->db) != MPORT_OK) {
+			mport_call_msg_cb(mport, "Stub database could not be detatched.");
 			ret = mport_err_code();
 		}
 	}
