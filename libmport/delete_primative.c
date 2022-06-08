@@ -396,8 +396,8 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg) {
     db = mport->db;
 
     /* Process @ldconfig steps */
-    if (mport_db_prepare(db, &assets, "SELECT type, data FROM assets WHERE pkg=%Q and type in (%d)", pkg->name,
-                         ASSET_GLIB_SCHEMAS) != MPORT_OK)
+    if (mport_db_prepare(db, &assets, "SELECT type, data FROM assets WHERE pkg=%Q and type in (%d,%d,%d,%d)", pkg->name,
+                         ASSET_DESKTOP_FILE_UTILS, ASSET_GLIB_SCHEMAS, ASSET_INFO, ASSET_KLD) != MPORT_OK)
         goto SPECIAL_ERROR;
 
     (void) strlcpy(cwd, pkg->prefix, sizeof(cwd));
@@ -422,6 +422,12 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg) {
             case ASSET_GLIB_SCHEMAS:
 				if (mport_file_exists("/usr/local/bin/glib-compile-schemas") && 
                     mport_xsystem(mport, "/usr/local/bin/glib-compile-schemas %s/share/glib-2.0/schemas > /dev/null || true", data == NULL ? pkg->prefix : data) != MPORT_OK) {
+					goto SPECIAL_ERROR;
+				}
+				break;
+            case ASSET_INFO:
+            	if (mport_file_exists("/usr/local/bin/indexinfo") && 
+                    mport_xsystem(mport, "/usr/local/bin/indexinfo %s", data == NULL ? pkg->prefix : data) != MPORT_OK) {
 					goto SPECIAL_ERROR;
 				}
 				break;
