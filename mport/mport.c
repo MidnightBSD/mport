@@ -260,11 +260,6 @@ main(int argc, char *argv[]) {
 			                       argv[3], argv[4]);
 		}
 	} else if (!strcmp(argv[1], "mirror")) {
-		if (argc < 2) {
-			mport_instance_free(mport);
-			usage();
-		}
-
 		if (!strcmp(argv[2], "list")) {
 			resultCode = mport_index_print_mirror_list(mport);
 		}
@@ -331,6 +326,7 @@ usage(void) {
 	        "       mport list [updates|prime]\n"
 	        "       mport lock [package name]\n"
 	        "       mport locks\n"
+			"       mport mirror list\n"
 	        "       mport search [query ...]\n"
 	        "       mport stats\n"
 	        "       mport unlock [package name]\n"
