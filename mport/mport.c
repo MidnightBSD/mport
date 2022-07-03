@@ -262,6 +262,8 @@ main(int argc, char *argv[]) {
 	} else if (!strcmp(argv[1], "mirror")) {
 		if (!strcmp(argv[2], "list")) {
 			loadIndex(mport);
+			printf("To set a mirror, use the following command:\n");
+			printf("mport set config mirror_region <country>\n");
 			resultCode = mport_index_print_mirror_list(mport);
 		}
 	} else if (!strcmp(argv[1], "cpe")) {
