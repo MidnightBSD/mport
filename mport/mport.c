@@ -259,6 +259,15 @@ main(int argc, char *argv[]) {
 			resultCode = configSet(mport,
 			                       argv[3], argv[4]);
 		}
+	} else if (!strcmp(argv[1], "mirror")) {
+		if (argc < 2) {
+			mport_instance_free(mport);
+			usage();
+		}
+
+		if (!strcmp(argv[2], "list")) {
+			resultCode = mport_index_print_mirror_list(mport);
+		}
 	} else if (!strcmp(argv[1], "cpe")) {
 		resultCode = cpeList(mport);
 	} else if (!strcmp(argv[1], "deleteall")) {
