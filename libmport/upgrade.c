@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2021 Lucas Holt
+ * Copyright (c) 2021, 2022 Lucas Holt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,19 +35,24 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stddef.h>
+#include <err.h>
 #include <ohash.h>
 
+static void * ecalloc(size_t, void *);
+static void efree(void *, size_t, void *);
+
 static void *
-ecalloc(size_t s1, size_t s2, void *data) {
+ecalloc(size_t s1, void *data) {
 	void *p;
 
-	if (!(p = calloc(s1, s2)))
-		err(1, "calloc");
+	if (!(p = malloc(s1)))
+		err(1, "malloc");
+	memset(p, 0, s1);
 	return p;
 }
 
 static void
-efree(void *p, void *data){
+efree(void *p, size_t s1, void *data){
 	free(p);
 }
 
@@ -84,7 +89,7 @@ mport_upgrade(mportInstance *mport) {
 		key = ohash_find(&h, slot);
 		if (key == NULL) {
 			if (mport_index_check(mport, *packs)) {
-				updated += mport_update_down(mport, *packs, info, h);
+				updated += mport_update_down(mport, *packs, &info, &h);
 			}
 		}
 		packs++;
@@ -108,8 +113,8 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 	if (mport_pkgmeta_get_downdepends(mport, pack, &depends_orig) == MPORT_OK) {
 		if (depends_orig == NULL) {
 			
-			slot = ohash_qlookup(&h, pack->name);
-			key = ohash_find(&h, slot);
+			slot = ohash_qlookup(h, pack->name);
+			key = ohash_find(h, slot);
 			if (key == NULL) {
 				if (mport_index_check(mport, pack)) {
 					mport_call_msg_cb(mport, "Updating %s\n", pack->name);
@@ -118,7 +123,7 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 						ret = 0;
 					} else {
 						ret = 1;
-						ohash_insert(&h, slot, pack->name);
+						ohash_insert(h, slot, pack->name);
 					}
 				} else
 					ret = 0;
@@ -128,17 +133,17 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 		} else {
 			depends = depends_orig;
 			while (*depends != NULL) {
-				slot = ohash_qlookup(&h, (*depends)->name);
-				key = ohash_find(&h, slot);
+				slot = ohash_qlookup(h, (*depends)->name);
+				key = ohash_find(h, slot);
 				if (key == NULL) {
-					ret += mport_update_down(mport, (*depends));
+					ret += mport_update_down(mport, (*depends), info, h);
 					if (mport_index_check(mport, *depends)) {
 						mport_call_msg_cb(mport, "Updating depends %s\n", (*depends)->name);
 						if (mport_update(mport, (*depends)->name) != 0) {
 							mport_call_msg_cb(mport, "Error updating %s\n", (*depends)->name);
 						} else {
 							ret++;
-							ohash_insert(&h, slot, (*depends)->name);
+							ohash_insert(h, slot, (*depends)->name);
 						}
 					}
 				}
@@ -149,10 +154,10 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 					mport_call_msg_cb(mport, "Error updating %s\n", pack->name);
 				} else {
 					ret++;
-					slot = ohash_qlookup(&h, pack->name);
-					key = ohash_find(&h, slot);
+					slot = ohash_qlookup(h, pack->name);
+					key = ohash_find(h, slot);
 					if (key == NULL)
-						ohash_insert(&h, slot, pack->name);
+						ohash_insert(h, slot, pack->name);
 				}
 			}
 		}
