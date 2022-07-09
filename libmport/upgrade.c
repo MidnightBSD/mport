@@ -35,12 +35,35 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stddef.h>
+#include <ohash.h>
+
+static void *
+ecalloc(size_t s1, size_t s2, void *data) {
+	void *p;
+
+	if (!(p = calloc(s1, s2)))
+		err(1, "calloc");
+	return p;
+}
+
+static void
+efree(void *p, void *data){
+	free(p);
+}
 
 MPORT_PUBLIC_API int
 mport_upgrade(mportInstance *mport) {
 	mportPackageMeta **packs, **packs_orig;
 	int total = 0;
 	int updated = 0;
+	struct ohash_info info = { 0, NULL, ecalloc, efree, NULL };
+	struct ohash h;
+	unsigned int slot;
+	char *key;
+
+	if (mport == NULL) {
+		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized\n");
+	}
 
 	if (mport_pkgmeta_list(mport, &packs_orig) != MPORT_OK) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't load package list\n");
@@ -52,10 +75,17 @@ mport_upgrade(mportInstance *mport) {
 		return (MPORT_ERR_FATAL);
 	}
 
+	ohash_init(&h, 6, &info);
+
 	packs = packs_orig;
 	while (*packs != NULL) {
-		if (mport_index_check(mport, *packs)) {
-			updated += mport_update_down(mport, *packs);
+
+		slot = ohash_qlookup(&h, (*packs)->name);
+		key = ohash_find(&h, slot);
+		if (key == NULL) {
+			if (mport_index_check(mport, *packs)) {
+				updated += mport_update_down(mport, *packs, info, h);
+			}
 		}
 		packs++;
 		total++;
@@ -69,39 +99,61 @@ mport_upgrade(mportInstance *mport) {
 }
 
 int
-mport_update_down(mportInstance *mport, mportPackageMeta *pack) {
+mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_info *info, struct ohash *h) {
 	mportPackageMeta **depends, **depends_orig;
 	int ret = 0;
+	unsigned int slot;
+	char *key;
 
 	if (mport_pkgmeta_get_downdepends(mport, pack, &depends_orig) == MPORT_OK) {
 		if (depends_orig == NULL) {
-			if (mport_index_check(mport, pack)) {
-				mport_call_msg_cb(mport, "Updating %s\n", pack->name);
-				if (mport_update(mport, pack->name) !=0) {
-					mport_call_msg_cb(mport, "Error updating %s\n", pack->name);
-					ret = 0;
+			
+			slot = ohash_qlookup(&h, pack->name);
+			key = ohash_find(&h, slot);
+			if (key == NULL) {
+				if (mport_index_check(mport, pack)) {
+					mport_call_msg_cb(mport, "Updating %s\n", pack->name);
+					if (mport_update(mport, pack->name) !=0) {
+						mport_call_msg_cb(mport, "Error updating %s\n", pack->name);
+						ret = 0;
+					} else {
+						ret = 1;
+						ohash_insert(&h, slot, pack->name);
+					}
 				} else
-					ret = 1;
-			} else
+					ret = 0;
+			} else {
 				ret = 0;
+			}
 		} else {
 			depends = depends_orig;
 			while (*depends != NULL) {
-				ret += mport_update_down(mport, (*depends));
-				if (mport_index_check(mport, *depends)) {
-					mport_call_msg_cb(mport, "Updating depends %s\n", (*depends)->name);
-					if (mport_update(mport, (*depends)->name) != 0) {
-						mport_call_msg_cb(mport, "Error updating %s\n", (*depends)->name);
-					} else
-						ret++;
+				slot = ohash_qlookup(&h, (*depends)->name);
+				key = ohash_find(&h, slot);
+				if (key == NULL) {
+					ret += mport_update_down(mport, (*depends));
+					if (mport_index_check(mport, *depends)) {
+						mport_call_msg_cb(mport, "Updating depends %s\n", (*depends)->name);
+						if (mport_update(mport, (*depends)->name) != 0) {
+							mport_call_msg_cb(mport, "Error updating %s\n", (*depends)->name);
+						} else {
+							ret++;
+							ohash_insert(&h, slot, (*depends)->name);
+						}
+					}
 				}
 				depends++;
 			}
 			if (mport_index_check(mport, pack)) {
 				if (mport_update(mport, pack->name) != 0) {
 					mport_call_msg_cb(mport, "Error updating %s\n", pack->name);
-				} else
+				} else {
 					ret++;
+					slot = ohash_qlookup(&h, pack->name);
+					key = ohash_find(&h, slot);
+					if (key == NULL)
+						ohash_insert(&h, slot, pack->name);
+				}
 			}
 		}
 		mport_pkgmeta_vec_free(depends_orig);
