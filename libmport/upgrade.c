@@ -98,6 +98,7 @@ mport_upgrade(mportInstance *mport) {
 	mport_pkgmeta_vec_free(packs_orig);
 	packs_orig = NULL;
 	packs = NULL;
+	ohash_delete(&h);
 
 	mport_call_msg_cb(mport, "Packages updated: %d\nTotal: %d\n", updated, total);
 	return (MPORT_OK);
