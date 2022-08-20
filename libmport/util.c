@@ -221,7 +221,7 @@ mport_copy_file(const char *fromName, const char *toName)
 
     FILE *fdest = fopen(toName, "we");
     if (fdest == NULL) {
-	fclose(fsrc);
+        fclose(fsrc);
         RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open destination file for copying %s: %s", toName, strerror(errno));
     }
 
@@ -468,14 +468,14 @@ mport_run_asset_exec(mportInstance *mport, const char *fmt, const char *cwd, con
                     max -= l;
                     break;
                 case 'B':
-                    name = dirname(last_file);
+                    name = dirname((char *)last_file);
                     (void) strlcpy(pos, name, max);
                     l = strlen(name);
                     pos += l;
                     max -= l;
                     break;
                 case 'f':
-                    name = basename(last_file);
+                    name = basename((char *)last_file);
                     (void) strlcpy(pos, name, max);
                     l = strlen(name);
                     pos += l;
