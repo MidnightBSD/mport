@@ -469,7 +469,7 @@ mport_run_asset_exec(mportInstance *mport, const char *fmt, const char *cwd, con
                     max -= l;
                     break;
                 case 'B':
-                    lfcpy = malloc(strlen(last_file) * size_of(char));
+                    lfcpy = malloc(strlen(last_file) * sizeof(char));
                     name = dirname(lfcpy); /* dirname(3) in MidnightBSD 3.0 and higher modifies the source. */
                     (void) strlcpy(pos, name, max);
                     l = strlen(name);
