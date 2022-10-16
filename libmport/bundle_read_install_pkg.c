@@ -81,6 +81,8 @@ static int load_pkg_msg(mportInstance *mport, mportBundleRead *bundle, mportPack
 
 static mportPackageMessage * pkg_message_from_ucl(mportInstance *mport, const ucl_object_t *obj, mportPackageMessage *msg);
 
+static int copy_metafile(mportInstance *, mportBundleRead *, mportPackageMeta *, char *);
+
 /**
  * This is a wrapper for all bundle read install operations
  */
@@ -810,16 +812,16 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 
 
 static int
-copy_metafile(char *file) 
+copy_metafile(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg, char *type) 
 {
 	char from[FILENAME_MAX];
 	char to[FILENAME_MAX];
 	char todir[FILENAME_MAX];
 	
-	(void)snprintf(from, FILENAME_MAX, "%s/%s/%s-%s/%s", bundle->tmpdir, MPORT_STUB_INFRA_DIR, pkg->name, pkg->version, TYPE);
+	(void)snprintf(from, FILENAME_MAX, "%s/%s/%s-%s/%s", bundle->tmpdir, MPORT_STUB_INFRA_DIR, pkg->name, pkg->version, type);
     if (mport_file_exists(from)) {
 		(void)snprintf(todir, FILENAME_MAX, "%s%s/%s-%s", mport->root, MPORT_INST_INFRA_DIR, pkg->name, pkg->version);
-		(void)snprintf(to, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_INST_INFRA_DIR, pkg->name, pkg->version, TYPE);
+		(void)snprintf(to, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_INST_INFRA_DIR, pkg->name, pkg->version, type);
         if (mport_mkdir(todir) != MPORT_OK)
             RETURN_CURRENT_ERROR;
         if (mport_copy_file(from, to) != MPORT_OK)
@@ -844,10 +846,10 @@ static int
 do_post_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg)
 {
 	
-	copy_metafile(MPORT_MTREE_FILE);
-	copy_metafile(MPORT_INSTALL_FILE);
-	copy_metafile(MPORT_DEINSTALL_FILE);
-	copy_metafile(MPORT_MESSAGE_FILE);
+	copy_metafile(mport, bundle, pkg, MPORT_MTREE_FILE);
+	copy_metafile(mport, bundle, pkg, MPORT_INSTALL_FILE);
+	copy_metafile(mport, bundle, pkg, MPORT_DEINSTALL_FILE);
+	copy_metafile(mport, bundle, pkg, MPORT_MESSAGE_FILE);
 
 	if (run_postexec(mport, pkg) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
