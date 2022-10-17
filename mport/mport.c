@@ -294,7 +294,8 @@ main(int argc, char *argv[]) {
 			local_argv += optind;
 
 			if (tflag) {
-				resultCode = mport_version_cmp(local_argv[2], local_argv[3]);
+				resultCode = mport_version_cmp(local_argv[0], local_argv[1]);
+				printf("%c\n", resultCode == 0 ? '=' : resultCode == -1 ? '<' : '>');
 			}
 		}
 	} else if (!strcmp(argv[1], "which")) {
