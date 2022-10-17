@@ -44,7 +44,7 @@
 
 static void usage(void);
 
-static void show_version(mportInstance *);
+static void show_version(mportInstance *, int);
 
 static void loadIndex(mportInstance *);
 
@@ -132,7 +132,7 @@ main(int argc, char *argv[]) {
 	}
 
 	if (version == 1) {
-		show_version(mport);
+		show_version(mport, version);
 		mport_instance_free(mport);
 		exit(EXIT_SUCCESS);
 	}
@@ -311,7 +311,7 @@ main(int argc, char *argv[]) {
 
 void
 usage(void) {
-	show_version(NULL);
+	show_version(NULL, 2);
 
 	fprintf(stderr,
 	        "usage: mport <command> args:\n"
@@ -344,8 +344,12 @@ usage(void) {
 }
 
 void
-show_version(mportInstance *mport) {
-	char *version = mport_version_short(mport);
+show_version(mportInstance *mport, int count) {
+	char *version;
+	if (count == 1)
+		version = mport_version_short(mport);
+	else
+		version = mport_version(mport);
 	fprintf(stderr, "%s", version);
 	if (mport == NULL)
 		fprintf(stderr, "(Host OS version, not configured)\n\n");
