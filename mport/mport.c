@@ -293,8 +293,9 @@ main(int argc, char *argv[]) {
 			local_argc -= optind;
 			local_argv += optind;
 
-		if (tflag) {
-			resultCode = mport_version_cmp(argv[2], argv[3]);
+			if (tflag) {
+				resultCode = mport_version_cmp(argv[2], argv[3]);
+			}
 		}
 	} else if (!strcmp(argv[1], "which")) {
 		int local_argc = argc;
@@ -358,6 +359,7 @@ usage(void) {
 	        "       mport update [package name]\n"
 	        "       mport upgrade\n"
 	        "       mport verify\n"
+			"       mport version -t [v1] [v2]\n"
 	        "       mport which [file path]\n"
 	);
 	exit(EXIT_FAILURE);
