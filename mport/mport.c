@@ -276,6 +276,26 @@ main(int argc, char *argv[]) {
 		resultCode = mport_autoremove(mport);
 	} else if (!strcmp(argv[1], "verify")) {
 		resultCode = verify(mport);
+	} else if (!strcmp(argv[1], "version")) {
+		int local_argc = argc;
+		char *const *local_argv = argv;
+		local_argv++;
+		if (local_argc > 2) {
+			int ch2, tflag;
+			tflag = 0;
+			while ((ch2 = getopt(local_argc, local_argv, "t")) != -1) {
+				switch (ch2) {
+					case 't':
+						tflag = 1;
+						break;
+				}
+			}
+			local_argc -= optind;
+			local_argv += optind;
+
+		if (tflag) {
+			resultCode = mport_version_cmp(argv[2], argv[3]);
+		}
 	} else if (!strcmp(argv[1], "which")) {
 		int local_argc = argc;
 		char *const *local_argv = argv;
