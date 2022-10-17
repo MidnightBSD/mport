@@ -285,6 +285,7 @@ void mport_parselist(char *, char ***);
 int mport_verify_hash(const char *, const char *);
 int mport_file_exists(const char *);
 char * mport_version(mportInstance *);
+char * mport_version_short(mportInstance *);
 char * mport_get_osrelease(mportInstance *);
 
 /* Locks */

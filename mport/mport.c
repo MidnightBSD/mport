@@ -345,7 +345,7 @@ usage(void) {
 
 void
 show_version(mportInstance *mport) {
-	char *version = mport_version(mport);
+	char *version = mport_version_short(mport);
 	fprintf(stderr, "%s", version);
 	if (mport == NULL)
 		fprintf(stderr, "(Host OS version, not configured)\n\n");
