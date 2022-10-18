@@ -585,8 +585,8 @@ delete_pkg_infra(mportInstance *mport, mportPackageMeta *pack)
 	char file[FILENAME_MAX];
 	
 	/* delete mtree file */
-	(void) snprintf(file, FILENAME_MAX, "%s/%s/%s-%s/%s", bundle->tmpdir, MPORT_STUB_INFRA_DIR, pkg->name,
-	                pkg->version,
+	(void) snprintf(file, FILENAME_MAX, "%s/%s/%s-%s/%s", bundle->tmpdir, MPORT_STUB_INFRA_DIR, pack->name,
+	                pack->version,
 	                MPORT_MTREE_FILE);
 
 	if (mport_file_exists(file) && unlink(file) != 0)
@@ -594,8 +594,8 @@ delete_pkg_infra(mportInstance *mport, mportPackageMeta *pack)
 		    mport, "Could not unlink %s: %s", file, strerror(errno));
 
 	/* delete pkg message file */
-	(void) snprintf(file, FILENAME_MAX, "%s/%s/%s-%s/%s", bundle->tmpdir, MPORT_STUB_INFRA_DIR, pkg->name,
-                    pkg->version, MPORT_MESSAGE_FILE);
+	(void) snprintf(file, FILENAME_MAX, "%s/%s/%s-%s/%s", bundle->tmpdir, MPORT_STUB_INFRA_DIR, pack->name,
+                    pack->version, MPORT_MESSAGE_FILE);
 	if (mport_file_exists(file) && unlink(file) != 0)
 		mport_call_msg_cb(
 		    mport, "Could not unlink %s: %s", file, strerror(errno));
