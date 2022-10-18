@@ -582,6 +582,7 @@ static int
 delete_pkg_infra(mportInstance *mport, mportPackageMeta *pack)
 {
 	char dir[FILENAME_MAX];
+	char file[FILENAME_MAX];
 	
 	/* delete mtree file */
 	(void) snprintf(file, FILENAME_MAX, "%s/%s/%s-%s/%s", bundle->tmpdir, MPORT_STUB_INFRA_DIR, pkg->name,
