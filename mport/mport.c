@@ -172,7 +172,27 @@ main(int argc, char *argv[]) {
 	} else if (!strcmp(argv[1], "download")) {
 		loadIndex(mport);
 		char *path;
-		for (i = 2; i < argc; i++) {
+		char *outputPath = NULL;
+		int local_argc = argc;
+		char *const *local_argv = argv;
+		local_argv++;
+		if (local_argc > 2) {
+			int ch2;
+			tflag = 0;
+			while ((ch2 = getopt(local_argc, local_argv, "o:")) != -1) {
+				switch (ch2) {
+					case 'o':
+						outputPath = optarg;
+						break;
+				}
+			}
+			local_argc -= optind;
+			local_argv += optind;
+
+			mport->outputPath = outputPath;
+		}
+
+		for (i = 0; i < local_argc; i++) {
 			tempResultCode = mport_download(mport, argv[i], &path);
 			if (tempResultCode != 0) {
 				resultCode = tempResultCode;

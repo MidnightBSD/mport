@@ -60,6 +60,10 @@ mport_instance_init(mportInstance *mport, const char *root) {
 		mport->root = strdup("");
 	}
 
+	if (mport->outputPath == NULL) {
+		mport->outputPath = strdup(MPORT_LOCAL_PKG_PATH);
+	}
+
 	(void) snprintf(dir, FILENAME_MAX, "%s/%s", mport->root, MPORT_INST_DIR);
 
 	if (mport_mkdir(dir) != MPORT_OK) {
@@ -212,6 +216,7 @@ mport_instance_free(mportInstance *mport) {
     }
 
     free(mport->root);
+	free(mport->outputPath);
     free(mport);
     return MPORT_OK;
 }

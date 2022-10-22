@@ -266,7 +266,7 @@ mport_download(mportInstance *mport, const char *packageName, char **path) {
 		RETURN_CURRENT_ERROR;
 	}
 	
-	asprintf(path, "%s/%s", MPORT_LOCAL_PKG_PATH, (*indexEntry)->bundlefile);
+	asprintf(path, "%s/%s", mport->outputPath, (*indexEntry)->bundlefile);
 	if (path == NULL) {
 		mport_index_entry_free_vec(indexEntry);
 		indexEntry = NULL;
@@ -276,7 +276,7 @@ mport_download(mportInstance *mport, const char *packageName, char **path) {
 
 getfile:
 	if (!mport_file_exists(*path)) {
-		if (mport_fetch_bundle(mport, MPORT_LOCAL_PKG_PATH, (*indexEntry)->bundlefile) != MPORT_OK) {
+		if (mport_fetch_bundle(mport, mport->outputPath, (*indexEntry)->bundlefile) != MPORT_OK) {
 			mport_call_msg_cb(mport, "Error fetching package %s, %s", packageName, mport_err_string());
 			free(*path);
 			path = NULL;

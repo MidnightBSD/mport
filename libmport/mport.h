@@ -53,6 +53,7 @@ typedef struct {
   int flags;
   sqlite3 *db;
   char *root;
+  char *outputPath; /* Download directory */
   mport_msg_cb msg_cb;
   mport_progress_init_cb progress_init_cb;
   mport_progress_step_cb progress_step_cb;
