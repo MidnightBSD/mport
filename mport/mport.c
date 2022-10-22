@@ -178,7 +178,6 @@ main(int argc, char *argv[]) {
 		local_argv++;
 		if (local_argc > 2) {
 			int ch2;
-			tflag = 0;
 			while ((ch2 = getopt(local_argc, local_argv, "o:")) != -1) {
 				switch (ch2) {
 					case 'o':
