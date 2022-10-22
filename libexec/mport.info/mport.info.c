@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2010 Lucas Holt
+ * Copyright (c) 2010, 2022 Lucas Holt
  * Copyright (c) 2008 Chris Reinhardt
  * All rights reserved.
  *
@@ -52,6 +52,9 @@ main(int argc, char *argv[]) {
 
 	while ((ch = getopt(argc, argv, "c:oqv")) != -1) {
 		switch (ch) {
+			case 'c':
+				chroot_path = optarg;
+				break;
 			case 'o':
 				origin = true;
 				break;
