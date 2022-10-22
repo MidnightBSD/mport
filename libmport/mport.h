@@ -260,7 +260,7 @@ int mport_verify_package(mportInstance *, mportPackageMeta *);
 int mport_version_cmp(const char *, const char *);
 
 /* fetch XXX: This should become private */
-int mport_fetch_bundle(mportInstance *, const char *);
+int mport_fetch_bundle(mportInstance *, const char *, const char *);
 int mport_download(mportInstance *, const char *, char **);
 
 /* Errors */

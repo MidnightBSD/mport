@@ -125,7 +125,7 @@ mport_fetch_bootstrap_index(mportInstance *mport)
  * MPORT_FETCH_STAGING_DIR directory.
  */
 int
-mport_fetch_bundle(mportInstance *mport, const char *filename)
+mport_fetch_bundle(mportInstance *mport, const char *directory, const char *filename)
 {
 	char **mirrors;
 	char **mirrorsPtr;
@@ -145,7 +145,7 @@ mport_fetch_bundle(mportInstance *mport, const char *filename)
 		}
 	}
 		
-	asprintf(&dest, "%s/%s", MPORT_FETCH_STAGING_DIR, filename);
+	asprintf(&dest, "%s/%s", directory == null ? MPORT_FETCH_STAGING_DIR : directory, filename);
  
 	mirrorsPtr = mirrors;
  
@@ -276,7 +276,7 @@ mport_download(mportInstance *mport, const char *packageName, char **path) {
 
 getfile:
 	if (!mport_file_exists(*path)) {
-		if (mport_fetch_bundle(mport, (*indexEntry)->bundlefile) != MPORT_OK) {
+		if (mport_fetch_bundle(mport, MPORT_LOCAL_PKG_PATH, (*indexEntry)->bundlefile) != MPORT_OK) {
 			mport_call_msg_cb(mport, "Error fetching package %s, %s", packageName, mport_err_string());
 			free(*path);
 			path = NULL;
