@@ -140,7 +140,7 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 		RETURN_CURRENT_ERROR;
 
 	if (stat(directory == NULL ? MPORT_FETCH_STAGING_DIR : directory, &sb) != 0 || ! S_ISDIR(sb.st_mode)) {
-		if (mkdir(directory == null ? MPORT_FETCH_STAGING_DIR : directory, S_IRWXU | S_IRWXG)) {
+		if (mkdir(directory == NULL ? MPORT_FETCH_STAGING_DIR : directory, S_IRWXU | S_IRWXG)) {
 			RETURN_CURRENT_ERROR;
 		}
 	}
