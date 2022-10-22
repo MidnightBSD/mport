@@ -139,13 +139,13 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 	if (mport_index_get_mirror_list(mport, &mirrors, &mirrorCount) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	if (stat(directory == null ? MPORT_FETCH_STAGING_DIR : directory, &sb) != 0 || ! S_ISDIR(sb.st_mode)) {
+	if (stat(directory == NULL ? MPORT_FETCH_STAGING_DIR : directory, &sb) != 0 || ! S_ISDIR(sb.st_mode)) {
 		if (mkdir(directory == null ? MPORT_FETCH_STAGING_DIR : directory, S_IRWXU | S_IRWXG)) {
 			RETURN_CURRENT_ERROR;
 		}
 	}
 		
-	asprintf(&dest, "%s/%s", directory == null ? MPORT_FETCH_STAGING_DIR : directory, filename);
+	asprintf(&dest, "%s/%s", directory == NULL ? MPORT_FETCH_STAGING_DIR : directory, filename);
  
 	mirrorsPtr = mirrors;
  
