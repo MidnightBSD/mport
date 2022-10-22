@@ -88,10 +88,12 @@ main(int argc, char *argv[]) {
 	char **searchQuery;
 	signed char ch;
 	const char *chroot_path = NULL;
+	const char *outputPath = NULL;
 	int version = 0;
 
 	struct option longopts[] = {
 			{"chroot",  required_argument, NULL, 'c'},
+			{"output",  required_argument, NULL, 'o'},
 			{"version", no_argument,       NULL, 'v'},
 			{NULL,      0,                 NULL, 0},
 	};
@@ -105,11 +107,14 @@ main(int argc, char *argv[]) {
 
 	setlocale(LC_ALL, "");
 
-	while ((ch = getopt_long(argc, argv, "+c:v", longopts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "+c:o:v", longopts, NULL)) != -1) {
 		switch (ch) {
 			case 'c':
 				chroot_path = optarg;
 				break;
+			case 'o':
+				outputPath = optarg;
+                break;
 			case 'v':
 				version++;
 				break;
@@ -127,7 +132,7 @@ main(int argc, char *argv[]) {
 
 	mport = mport_instance_new();
 
-	if (mport_instance_init(mport, NULL) != MPORT_OK) {
+	if (mport_instance_init(mport, NULL, outputPath) != MPORT_OK) {
 		errx(1, "%s", mport_err_string());
 	}
 
@@ -172,26 +177,8 @@ main(int argc, char *argv[]) {
 	} else if (!strcmp(argv[1], "download")) {
 		loadIndex(mport);
 		char *path;
-		char *outputPath = NULL;
-		int local_argc = argc;
-		char *const *local_argv = argv;
-		local_argv++;
-		if (local_argc > 2) {
-			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "o:")) != -1) {
-				switch (ch2) {
-					case 'o':
-						outputPath = optarg;
-						break;
-				}
-			}
-			local_argc -= optind;
-			local_argv += optind;
 
-			mport->outputPath = outputPath;
-		}
-
-		for (i = 0; i < local_argc; i++) {
+		for (i = 2; i < argc; i++) {
 			tempResultCode = mport_download(mport, argv[i], &path);
 			if (tempResultCode != 0) {
 				resultCode = tempResultCode;

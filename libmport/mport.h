@@ -62,7 +62,7 @@ typedef struct {
 } mportInstance;
 
 mportInstance * mport_instance_new(void);
-int mport_instance_init(mportInstance *, const char *);
+int mport_instance_init(mportInstance *, const char *, const char *);
 int mport_instance_free(mportInstance *);
 
 void mport_set_msg_cb(mportInstance *, mport_msg_cb);
