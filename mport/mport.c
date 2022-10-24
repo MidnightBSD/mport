@@ -372,7 +372,7 @@ usage(void) {
 	show_version(NULL, 2);
 
 	fprintf(stderr,
-	        "usage: mport <command> args:\n"
+	        "usage: mport [-c chroot dir] -[U] -[o output] <command> args:\n"
 	        "       mport autoremove  (experimental, use with caution!)\n"
 	        "       mport clean\n"
 	        "       mport config get [setting name]\n"
@@ -380,7 +380,7 @@ usage(void) {
 	        "       mport cpe\n"
 	        "       mport delete [package name]\n"
 	        "       mport deleteall\n"
-	        "       mport download [package name]\n"
+	        "       mport download [-d] [package name]\n"
 	        "       mport export [filename]\n"
 	        "       mport import [filename]\n"
 	        "       mport index\n"
@@ -389,14 +389,14 @@ usage(void) {
 	        "       mport list [updates|prime]\n"
 	        "       mport lock [package name]\n"
 	        "       mport locks\n"
-			"       mport mirror list\n"
+		"       mport mirror list\n"
 	        "       mport search [query ...]\n"
 	        "       mport stats\n"
 	        "       mport unlock [package name]\n"
 	        "       mport update [package name]\n"
 	        "       mport upgrade\n"
 	        "       mport verify\n"
-			"       mport version -t [v1] [v2]\n"
+		"       mport version -t [v1] [v2]\n"
 	        "       mport which [file path]\n"
 	);
 	exit(EXIT_FAILURE);
