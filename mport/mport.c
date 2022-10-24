@@ -90,8 +90,10 @@ main(int argc, char *argv[]) {
 	const char *chroot_path = NULL;
 	const char *outputPath = NULL;
 	int version = 0;
+	int noIndex = 0;
 
 	struct option longopts[] = {
+		    {"no-index", no_argument, NULL, 'U'},
 			{"chroot",  required_argument, NULL, 'c'},
 			{"output",  required_argument, NULL, 'o'},
 			{"version", no_argument,       NULL, 'v'},
@@ -107,8 +109,11 @@ main(int argc, char *argv[]) {
 
 	setlocale(LC_ALL, "");
 
-	while ((ch = getopt_long(argc, argv, "+c:o:v", longopts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "+c:o:Uv", longopts, NULL)) != -1) {
 		switch (ch) {
+			case 'U':
+				noIndex++;
+				break;
 			case 'c':
 				chroot_path = optarg;
 				break;
@@ -134,7 +139,7 @@ main(int argc, char *argv[]) {
 
 	mport = mport_instance_new();
 
-	if (mport_instance_init(mport, NULL, outputPath) != MPORT_OK) {
+	if (mport_instance_init(mport, NULL, outputPath, noIndex != 0) != MPORT_OK) {
 		errx(1, "%s", mport_err_string());
 	}
 

@@ -70,7 +70,7 @@ mport_index_load(mportInstance *mport)
 
 		mport->flags |= MPORT_INST_HAVE_INDEX;
 
-		if (!index_is_recentish()) {
+		if (!index_is_recentish() && !mport->noIndex) {
 			if (index_last_checked_recentish(mport))
 				return (MPORT_OK);
 

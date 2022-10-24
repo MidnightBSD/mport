@@ -54,6 +54,7 @@ typedef struct {
   sqlite3 *db;
   char *root;
   char *outputPath; /* Download directory */
+  bool noIndex; /* Do not fetch mport index */
   mport_msg_cb msg_cb;
   mport_progress_init_cb progress_init_cb;
   mport_progress_step_cb progress_step_cb;
@@ -62,7 +63,7 @@ typedef struct {
 } mportInstance;
 
 mportInstance * mport_instance_new(void);
-int mport_instance_init(mportInstance *, const char *, const char *);
+int mport_instance_init(mportInstance *, const char *, const char *, bool noIndex);
 int mport_instance_free(mportInstance *);
 
 void mport_set_msg_cb(mportInstance *, mport_msg_cb);
