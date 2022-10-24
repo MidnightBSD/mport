@@ -184,9 +184,10 @@ main(int argc, char *argv[]) {
 
 		int local_argc = argc;
 		char *const *local_argv = argv;
+		int dflag = 0;
+
 		if (local_argc > 1) {
-			int ch2, dflag;
-			dflag = 0;
+			int ch2;
 			while ((ch2 = getopt(local_argc, local_argv, "d")) != -1) {
 				switch (ch2) {
 					case 'd':
@@ -196,6 +197,7 @@ main(int argc, char *argv[]) {
 			}
 			local_argc -= optind;
 			local_argv += optind;
+		}
 
 		for (i = 1; i < argc; i++) {
 			tempResultCode = mport_download(mport, argv[i], dflag == 1, &path);
