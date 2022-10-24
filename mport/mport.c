@@ -182,8 +182,23 @@ main(int argc, char *argv[]) {
 		loadIndex(mport);
 		char *path;
 
+		int local_argc = argc;
+		char *const *local_argv = argv;
+		if (local_argc > 1) {
+			int ch2, dflag;
+			dflag = 0;
+			while ((ch2 = getopt(local_argc, local_argv, "d")) != -1) {
+				switch (ch2) {
+					case 'd':
+						dflag = 1;
+						break;
+				}
+			}
+			local_argc -= optind;
+			local_argv += optind;
+
 		for (i = 1; i < argc; i++) {
-			tempResultCode = mport_download(mport, argv[i], &path);
+			tempResultCode = mport_download(mport, argv[i], dflag == 1, &path);
 			if (tempResultCode != 0) {
 				resultCode = tempResultCode;
 			} else if (path != NULL) {

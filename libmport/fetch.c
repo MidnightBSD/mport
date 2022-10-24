@@ -247,8 +247,10 @@ fetch(mportInstance *mport, const char *url, const char *dest)
  * @param path returns the path of the saved file. Must be freed on success
  */
 int
-mport_download(mportInstance *mport, const char *packageName, char **path) {
+mport_download(mportInstance *mport, const char *packageName, bool includeDependencies, char **path) {
 	mportIndexEntry **indexEntry = NULL;
+	mportDependsEntry **depends = NULL;
+	mportDependsEntry **depends_orig = NULL;
 	bool existed = true;
 	int retryCount = 0;
 
@@ -272,6 +274,23 @@ mport_download(mportInstance *mport, const char *packageName, char **path) {
 		indexEntry = NULL;
 		SET_ERRORX(1, "%s", "Unable to allocate memory for path.");
 		RETURN_CURRENT_ERROR;
+	}
+
+	if (includeDependencies) {
+		mport_index_depends_list(mport, (*indexEntry)->pkgname, (*indexEntry)->version, &depends_orig);
+		depends = depends_orig;
+
+		while (*depends != NULL) {
+			char *dpath;
+			if (mport_download(mport, (*depends)->d_pkgname, includeDependencies, &dpath) != MPORT_OK) {
+     			mport_call_msg_cb(mport, "%s", mport_err_string());
+     			mport_index_depends_free_vec(depends_orig);
+				return mport_err_code();
+			}
+			free(dpath);
+			depends++;
+		}
+		mport_index_depends_free_vec(depends_orig);
 	}
 
 getfile:
