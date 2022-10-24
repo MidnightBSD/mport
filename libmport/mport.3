@@ -23,7 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd February 3, 2022
+.Dd October 24, 2022
 .Dt MPORT 3
 .Os
 .Sh NAME
@@ -31,6 +31,7 @@
 .Nm mport_clean_oldpackages ,
 .Nm mport_create_primative ,
 .Nm mport_delete_primative ,
+.Nm mport_download ,
 .Nm mport_err_code ,
 .Nm mport_err_string ,
 .Nm mport_index_load ,
@@ -88,6 +89,8 @@
 .Fn mport_create_primative "mportAssetList *assetlist" "mportPackageMeta *pack" "mportCreateExtras *extra"
 .Ft int
 .Fn mport_delete_primative "mportInstance *mport" "mportPackageMeta *pack" "int force"
+.Ft int
+.Fn mport_download "mportInstance *mport" "const char *pkgname" "bool includeDependencies" "char **path"
 .Ft int
 .Fn mport_err_code
 .Ft const char *
