@@ -213,6 +213,7 @@ int mport_index_get_mirror_list(mportInstance *, char ***, int *);
 #define MPORT_DAY 3600 * 24
 #define MPORT_MAX_INDEX_AGE MPORT_DAY * 7 /* one week */
 #define MPORT_SETTING_INDEX_LAST_CHECKED "index_last_check"
+#define MPORT_SETTING_REPO_AUTOUPDATE "REPO_AUTOUPDATE"
 
 /* Binaries we use */
 #define MPORT_MTREE_BIN		"/usr/sbin/mtree"
