@@ -600,8 +600,12 @@ install(mportInstance *mport, const char *packageName) {
 
 		if (loc > 0) {
 			char *d = strdup(packageName);
+			char *v = &d[loc+1];
 			d[loc] = '\0'; /* hack off the version number */
 			indexEntry = lookupIndex(mport, d);
+			if (strcmp(v, (*indexEntry)->version) != 0) {
+				errx(4, "Package %s not found in the index.", packageName);	
+			}
 			free(d);
 		}
 	}
