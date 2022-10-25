@@ -372,7 +372,7 @@ usage(void) {
 	show_version(NULL, 2);
 
 	fprintf(stderr,
-	        "usage: mport [-c chroot dir] -[U] -[o output] <command> args:\n"
+	        "usage: mport [-c chroot dir] [-U] [-o output] <command> args:\n"
 	        "       mport autoremove  (experimental, use with caution!)\n"
 	        "       mport clean\n"
 	        "       mport config get [setting name]\n"
