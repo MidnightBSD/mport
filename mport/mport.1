@@ -170,6 +170,44 @@ Override the OS version used to fetch packages and install them. If undefined, w
 fall back to the running kernel version.
 .It Cm index_last_check
 This is the last time the index file was checked for an update.
+.It Cm index_autoupdate
+Determines if the index file will be updated automatically. If set to NO or FALSE, it will be skipped unless
+it is missing entirely. A persistent version of the mport -U flag. 
+.Sh EXAMPLES
+Search for a package:
+.Dl $ mport search curl
+.Pp
+Install a package:
+.Dl Installing must specify a unique origin
+.Pp
+.Dl % mport install curl
+.Pp
+List installed packages:
+.Dl $ mport list
+.Pp
+Upgrade all installed packages:
+.Dl % mport upgrade
+.Pp
+Upgrade a single package:
+.Dl % mport update gmake
+.Pp
+List packages needing upgrades:
+.Dl $ mport list updates
+.Pp
+List non-automatic packages:
+.Dl $ mport list prime
+.Pp
+Delete an installed package:
+.Dl % mport delete curl
+.Pp
+Remove unneeded dependencies:
+.Dl % mport autoremove
+.Pp
+Determine which package installed a file:
+.Dl $ mport which /usr/local/bin/curl
+.Pp
+Check installed packages for checksum mismatches:
+.Dl # mport verify
 .Sh HISTORY
 The
 .Nm
