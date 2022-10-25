@@ -588,7 +588,7 @@ install(mportInstance *mport, const char *packageName) {
 	int choice;
 
 	indexEntry = lookupIndex(mport, packageName);
-	if (indexEntry == NULL) {
+	if (*indexEntry == NULL) {
 		int loc = -1;
 		size_t len = strlen(packageName);
 		for (int i = len -1; i >= 0; i--) {
@@ -598,14 +598,11 @@ install(mportInstance *mport, const char *packageName) {
 			}
 		}
 
-        if (loc > 0) {
-			packageName[loc] = '\0'; // hack off the version number
-			indexEntry = lookupIndex(mport, packageName);
-			if (indexEntry != NULL) {
-				if (strcmp((*indexEntry)->version, packageName[loc+1]) != 0) {
-					errx(4, "Package %s version %s not found in the index.", packageName, packageName[loc+1]);
-				}
-			}
+		if (loc > 0) {
+			char *d = strdup(packageName);
+			d[loc] = '\0'; /* hack off the version number */
+			indexEntry = lookupIndex(mport, d);
+			free(d);
 		}
 	}
 
