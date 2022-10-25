@@ -65,8 +65,8 @@ mport_index_load(mportInstance *mport)
 	bool noIndex = mport->noIndex;
 
 	char *autoupdate = mport_setting_get(mport, MPORT_SETTING_REPO_AUTOUPDATE);
-	if (strcmp("FALSE", autoupdate) == 0 || strcmp("false", autoupdate) == 0 ||
-			strcmp("NO", autoupdate) == 0 || strcmp("no", autoupdate) == 0) {
+	if (autoupdate != NULL && (strcmp("FALSE", autoupdate) == 0 || strcmp("false", autoupdate) == 0 ||
+			strcmp("NO", autoupdate) == 0 || strcmp("no", autoupdate) == 0)) {
 		noIndex = true;
 	}
 
