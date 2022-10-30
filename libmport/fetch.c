@@ -131,6 +131,7 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 	char **mirrorsPtr;
 	char *url;
 	char *dest;
+	char *osrel;
 	int mirrorCount = 0;
 	struct stat sb;
 
@@ -148,11 +149,12 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 	asprintf(&dest, "%s/%s", directory == NULL ? MPORT_FETCH_STAGING_DIR : directory, filename);
  
 	mirrorsPtr = mirrors;
+	osrel = mport_get_osrelease(mport);
  
 	while (mirrorsPtr != NULL) {
 		if (*mirrorsPtr == NULL)
 			break;
-		asprintf(&url, "%s/%s/%s", *mirrorsPtr, MPORT_URL_PATH, filename);
+		asprintf(&url, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, filename);
 
 		if (fetch(mport, url, dest) == MPORT_OK) {
 			free(url);
@@ -169,6 +171,7 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 		mirrorsPtr++;
 	}
 
+	free(osrel);
 	free(dest);
 	for (int mi = 0; mi < mirrorCount; mi++)
 		free(mirrors[mi]);
