@@ -60,9 +60,9 @@ int mport_default_confirm_cb(const char *msg, const char *yes, const char *no, i
   }
 
   if( !strncmp( getenv("TERM"), "xterm", 5 ) && isatty(fileno(stdout)) ) {
-    (void)fpintf(stderr, "%s%s (Y/N) [%s]:%s ", KGRN, msg, def == 1 ? yes : no, KNRM);
+    (void)fprintf(stderr, "%s%s (Y/N) [%s]:%s ", KCYN, msg, def == 1 ? yes : no, KNRM);
   } else {
-    (void)fpintf(stderr, "%s (Y/N) [%s]: ", msg, def == 1 ? yes : no);
+    (void)fprintf(stderr, "%s (Y/N) [%s]: ", msg, def == 1 ? yes : no);
   }
   
   while (1) {
@@ -80,10 +80,11 @@ int mport_default_confirm_cb(const char *msg, const char *yes, const char *no, i
       return (-1);
     
     if( !strncmp( getenv("TERM"), "xterm", 5 ) && isatty(fileno(stdout)) ) {
-      (void)fpintf(stderr, "%sPlease enter yes or no:%s ", KRED, msg, def == 1 ? yes : no, KNRM);
+      (void)fprintf(stderr, "%sPlease enter yes or no:%s ", KRED, KNRM);
     } else {  
       (void)fprintf(stderr, "Please enter yes or no: ");   
     }
+  }
   
   /* Not reached */
   return (MPORT_OK);
