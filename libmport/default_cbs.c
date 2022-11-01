@@ -147,7 +147,11 @@ void mport_default_progress_step_cb(int current, int total, const char *msg)
   
   (void)printf(BACK DEL, width);
 //  (void)printf("%s\n", msg);
-  (void)printf("%s %3i/100%%", bar, (int)(percent * 100));
+  if( !strncmp( getenv("TERM"), "xterm", 5 ) && isatty(fileno(stdout)) ) {
+    (void)printf("%s%s %3i/100%%%s", KCYN, bar, (int)(percent * 100), KNRM);
+  } else {
+    (void)printf("%s %3i/100%%", bar, (int)(percent * 100));
+  }
   (void)fflush(stdout);
   
   free(bar);
