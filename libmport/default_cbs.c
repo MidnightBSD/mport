@@ -36,6 +36,15 @@
 #include "mport.h"
 #include "mport_private.h"
 
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+#define KMAG  "\x1B[35m"
+#define KCYN  "\x1B[36m"
+#define KWHT  "\x1B[37m"
+
 void mport_default_msg_cb(const char *msg) 
 {
   (void)printf("%s\n", msg);
@@ -50,7 +59,11 @@ int mport_default_confirm_cb(const char *msg, const char *yes, const char *no, i
     return (MPORT_OK);
   }
 
-  (void)fprintf(stderr, "%s (Y/N) [%s]: ", msg, def == 1 ? yes : no);
+  if( !strncmp( getenv("TERM"), "xterm", 5 ) && isatty(fileno(stdout)) ) {
+    (void)fpintf(stderr, "%s%s (Y/N) [%s]:%s ", KGRN, msg, def == 1 ? yes : no, KNRM);
+  } else {
+    (void)fpintf(stderr, "%s (Y/N) [%s]: ", msg, def == 1 ? yes : no);
+  }
   
   while (1) {
     /* get answer, if just \n, then default. */
@@ -66,8 +79,11 @@ int mport_default_confirm_cb(const char *msg, const char *yes, const char *no, i
     if (*ans == 'N' || *ans == 'n')
       return (-1);
     
-    (void)fprintf(stderr, "Please enter yes or no: ");   
-  }
+    if( !strncmp( getenv("TERM"), "xterm", 5 ) && isatty(fileno(stdout)) ) {
+      (void)fpintf(stderr, "%sPlease enter yes or no:%s ", KRED, msg, def == 1 ? yes : no, KNRM);
+    } else {  
+      (void)fprintf(stderr, "Please enter yes or no: ");   
+    }
   
   /* Not reached */
   return (MPORT_OK);
