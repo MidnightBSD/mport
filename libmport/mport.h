@@ -180,6 +180,7 @@ typedef struct {
   char *bundlefile;
   char *license;
   char *hash;
+  mportType type;
 } mportIndexEntry;
 
 int mport_index_load(mportInstance *);
