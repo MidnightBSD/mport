@@ -293,11 +293,13 @@ main(int argc, char *argv[]) {
 			resultCode = configSet(mport, argv[2], argv[3]);
 		}
 	} else if (!strcmp(cmd, "mirror")) {
-		if (!strcmp(argv[1], "list")) {
-			loadIndex(mport);
-			printf("To set a mirror, use the following command:\n");
-			printf("mport set config mirror_region <country>\n\n");
-			resultCode = mport_index_print_mirror_list(mport);
+		if (argc > 2) {
+			if (!strcmp(argv[1], "list")) {
+				loadIndex(mport);
+				printf("To set a mirror, use the following command:\n");
+				printf("mport set config mirror_region <country>\n\n");
+				resultCode = mport_index_print_mirror_list(mport);
+			}
 		}
 	} else if (!strcmp(cmd, "cpe")) {
 		resultCode = cpeList(mport);
