@@ -60,6 +60,10 @@ int main(int argc, char *argv[])
 	// we need this to know if the user customized the "target_os" configuration.
 	// the caveat is that the userland it was built against could be wrong.
 	if (mport_instance_init(mport, NULL, NULL, false) != MPORT_OK) {
+		mport_instance_free(mport);
+		mport_pkgmeta_free(pack);
+		mport_createextras_free(extra);
+		mport_assetlist_free(assetlist);
 		errx(EXIT_FAILURE, "%s", mport_err_string());
 	}
 
@@ -113,7 +117,7 @@ int main(int argc, char *argv[])
 				if (mport_parse_plistfile(fp, assetlist) != 0) {
 					warnx("Could not parse plist file '%s'.\n", optarg);
 					fclose(fp);
-					exit(1);
+					goto cleanup;
 				}
 				fclose(fp);
 
@@ -183,8 +187,15 @@ int main(int argc, char *argv[])
 
 	if (mport_create_primative(mport, assetlist, pack, extra) != MPORT_OK) {
 		warnx("%s", mport_err_string());
-		exit(EXIT_FAILURE);
+		goto cleanup;
 	}
+
+cleanup:
+	mport_instance_free(mport);
+	mport_pkgmeta_free(pack);
+	mport_createextras_free(extra);
+	mport_assetlist_free(assetlist);
+	exit(EXIT_FAILURE);
 
 	return 0;
 }
