@@ -52,6 +52,7 @@ int main(int argc, char *argv[])
 	mportAssetList *assetlist = mport_assetlist_new();
 	FILE *fp;
 	struct tm expDate;
+	int result = EXIT_SUCCESS;
 
 	if (mport == NULL || pack == NULL || extra == NULL || assetlist == NULL) {
 		errx(EXIT_FAILURE, "Failed to allocate memory");
@@ -117,6 +118,7 @@ int main(int argc, char *argv[])
 				if (mport_parse_plistfile(fp, assetlist) != 0) {
 					warnx("Could not parse plist file '%s'.\n", optarg);
 					fclose(fp);
+					result = EXIT_FAILURE;
 					goto cleanup;
 				}
 				fclose(fp);
@@ -187,6 +189,7 @@ int main(int argc, char *argv[])
 
 	if (mport_create_primative(mport, assetlist, pack, extra) != MPORT_OK) {
 		warnx("%s", mport_err_string());
+		result = EXIT_FAILURE;
 		goto cleanup;
 	}
 
@@ -195,9 +198,8 @@ cleanup:
 	mport_pkgmeta_free(pack);
 	mport_createextras_free(extra);
 	mport_assetlist_free(assetlist);
-	exit(EXIT_FAILURE);
 
-	return 0;
+	return result;
 }
 
 
