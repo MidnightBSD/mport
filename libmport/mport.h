@@ -38,6 +38,7 @@
 #include <sys/queue.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <sys/param.h>
 
 typedef void (*mport_msg_cb)(const char *);
 typedef void (*mport_progress_init_cb)(const char *);
@@ -97,8 +98,8 @@ typedef enum _AssetListEntryType mportAssetListEntryType;
 struct _AssetListEntry {
 	mportAssetListEntryType type;
 	char *data;
-	char *checksum;
-	char *owner;
+	char checksum[65];
+	char owner[MAXLOGNAME];
 	char *group;
 	char *mode;
 

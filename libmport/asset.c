@@ -153,9 +153,9 @@ mport_asset_get_assetlist(mportInstance *mport, mportPackageMeta *pack, mportAss
 
 		e->data = data == NULL ? NULL : strdup((char *) data);
 		if (checksum != NULL)
-			e->checksum = strdup((char *) checksum);
+			strlcpy(e->checksum, checksum, 65);
 		if (owner != NULL)
-			e->owner = strdup((char *) owner);
+			strlcpy(e->owner, owner, MAXLOGNAME);
 		if (group != NULL)
 			e->group = strdup((char *) group);
 		if (mode != NULL)

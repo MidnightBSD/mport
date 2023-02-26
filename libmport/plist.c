@@ -65,17 +65,21 @@ mport_assetlist_free(mportAssetList *list) {
 
 	while (!STAILQ_EMPTY(list)) {
 		n = STAILQ_FIRST(list);
-		STAILQ_REMOVE_HEAD(list, next);
+
 		free(n->data);
-		free(n->checksum);
-		free(n->owner);
+		n->data = NULL;
 		free(n->group);
+		n->group = NULL;
 		free(n->mode);
+		n->mode = NULL;
 		/* type is not a pointer */
+
+		STAILQ_REMOVE_HEAD(list, next);
 		free(n);
 	}
 
 	free(list_orig);
+	list = NULL;
 }
 
 
@@ -123,7 +127,7 @@ mport_parse_plistfile(FILE *fp, mportAssetList *list) {
             if (cmnd == NULL)
                 RETURN_ERROR(MPORT_ERR_FATAL, "Malformed plist file.");
 
-		entry->checksum = NULL; /* checksum is only used by bundle read install */
+		entry->checksum[0] = '\0'; /* checksum is only used by bundle read install */
 		entry->type = parse_command(cmnd);
 		if (entry->type == ASSET_FILE_OWNER_MODE)
 			parse_file_owner_mode(&entry, cmnd);
@@ -195,7 +199,7 @@ parse_file_owner_mode(mportAssetListEntry **entry, char *cmdLine) {
 #ifdef DEBUG
 		fprintf(stderr, "owner %s -", permissions[0]);
 #endif
-		(*entry)->owner = strdup(permissions[0]);
+		strlcpy((*entry)->owner, permissions[0], MAXLOGNAME);
 	}
 	if (permissions[1] != NULL) {
 #ifdef DEBUG
