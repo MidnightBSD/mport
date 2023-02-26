@@ -97,11 +97,11 @@ typedef enum _AssetListEntryType mportAssetListEntryType;
 
 struct _AssetListEntry {
 	mportAssetListEntryType type;
-	char *data;
 	char checksum[65];
 	char owner[MAXLOGNAME];
-	char *group;
-	char *mode;
+	char group[MAXLOGNAME * 2]; /* no standard for this, just guess */
+	char mode[5];
+	char *data;
 
 	STAILQ_ENTRY(_AssetListEntry) next;
 };

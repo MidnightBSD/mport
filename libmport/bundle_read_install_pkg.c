@@ -381,9 +381,9 @@ mport_bundle_read_get_assetlist(mportInstance *mport, mportPackageMeta *pkg, mpo
 			if (owner != NULL)
 				strlcpy(e->owner, owner, MAXLOGNAME);
 			if (group != NULL)
-				e->group = strdup((char *) group);
+				strlcpy(e->group, group, MAXLOGNAME * 2);
 			if (mode != NULL)
-				e->mode = strdup((char *) mode);
+				strlcpy(e->mode, mode, 5);
 
 			STAILQ_INSERT_TAIL(alist, e, next);
 		}

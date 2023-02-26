@@ -65,14 +65,11 @@ mport_assetlist_free(mportAssetList *list) {
 
 	while (!STAILQ_EMPTY(list)) {
 		n = STAILQ_FIRST(list);
+		if (n == NULL)
+			continue;
 
 		free(n->data);
 		n->data = NULL;
-		free(n->group);
-		n->group = NULL;
-		free(n->mode);
-		n->mode = NULL;
-		/* type is not a pointer */
 
 		STAILQ_REMOVE_HEAD(list, next);
 		free(n);
@@ -161,6 +158,7 @@ mport_parse_plistfile(FILE *fp, mportAssetList *list) {
                 RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
             }
 
+
             char *pos = line + strlen(line) - 1;
 
             while (isspace(*pos)) {
@@ -205,13 +203,13 @@ parse_file_owner_mode(mportAssetListEntry **entry, char *cmdLine) {
 #ifdef DEBUG
 		fprintf(stderr, "; group %s -", permissions[1]);
 #endif
-		(*entry)->group = strdup(permissions[1]);
+		strlcpy((*entry)->group, permissions[1], MAXLOGNAME * 2);
 	}
 	if (permissions[2] != NULL) {
 #ifdef DEBUG
 		fprintf(stderr, "; mode %s -", permissions[2]);
 #endif
-		(*entry)->mode = strdup(permissions[2]);
+		strlcpy((*entry)->mode, permissions[2], 5);
 	}
 
 	free(start);
