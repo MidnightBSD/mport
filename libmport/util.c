@@ -64,7 +64,6 @@ mport_createextras_new(void)
     
     extra->pkg_filename = NULL;
     extra->sourcedir = NULL;
-    extra->pkg_path = NULL;
     extra->mtree = NULL;
     extra->pkginstall = NULL;
     extra->pkgdeinstall = NULL;
@@ -72,7 +71,7 @@ mport_createextras_new(void)
     extra->conflicts = NULL;
     extra->depends = NULL;
 
-    return extras;
+    return extra;
 }
 
 MPORT_PUBLIC_API void
