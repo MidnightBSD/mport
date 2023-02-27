@@ -57,14 +57,14 @@ static char * mport_get_osrelease_kern(void);
 MPORT_PUBLIC_API mportCreateExtras*
 mport_createextras_new(void)
 {
-    mportCreateExtras* extras;
-    extras = (mportCreateExtras *) calloc(1, sizeof(mportCreateExtras));
-    if (extras == NULL)
+    mportCreateExtras* extra;
+    extra = (mportCreateExtras *) calloc(1, sizeof(mportCreateExtras));
+    if (extra == NULL)
         return NULL;
     
-    extras->pkg_filename = NULL;
+    extra->pkg_filename = NULL;
     extra->sourcedir = NULL;
-    extras->pkg_path = NULL;
+    extra->pkg_path = NULL;
     extra->mtree = NULL;
     extra->pkginstall = NULL;
     extra->pkgdeinstall = NULL;
