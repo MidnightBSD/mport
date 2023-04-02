@@ -119,7 +119,7 @@ main(int argc, char *argv[]) {
 				break;
 			case 'o':
 				outputPath = optarg;
-                break;
+				break;
 			case 'v':
 				version++;
 				break;
