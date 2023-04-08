@@ -408,7 +408,7 @@ usage(void) {
 
 void
 show_version(mportInstance *mport, int count) {
-	char *version;
+	char *version = NULL;
 	if (count == 1)
 		version = mport_version_short(mport);
 	else
@@ -430,7 +430,7 @@ loadIndex(mportInstance *mport) {
 
 mportIndexEntry **
 lookupIndex(mportInstance *mport, const char *packageName) {
-	mportIndexEntry **indexEntries;
+	mportIndexEntry **indexEntries = NULL;
 
 	if (mport_index_lookup_pkgname(mport, packageName, &indexEntries) != MPORT_OK) {
 		fprintf(stderr, "Error looking up package name %s: %d %s\n",
@@ -443,7 +443,7 @@ lookupIndex(mportInstance *mport, const char *packageName) {
 
 int
 search(mportInstance *mport, char **query) {
-	mportIndexEntry **indexEntry;
+	mportIndexEntry **indexEntry = NULL;
 
 	if (query == NULL || *query == NULL) {
 		fprintf(stderr, "Search terms required\n");
@@ -473,7 +473,7 @@ search(mportInstance *mport, char **query) {
 
 int
 lock(mportInstance *mport, const char *packageName) {
-	mportPackageMeta **packs;
+	mportPackageMeta **packs = NULL;
 
 	if (packageName == NULL) {
 		warnx("%s", "Specify package name");
@@ -497,7 +497,7 @@ lock(mportInstance *mport, const char *packageName) {
 
 int
 unlock(mportInstance *mport, const char *packageName) {
-	mportPackageMeta **packs;
+	mportPackageMeta **packs = NULL;
 
 	if (packageName == NULL) {
 		warnx("%s", "Specify package name");
@@ -521,7 +521,7 @@ unlock(mportInstance *mport, const char *packageName) {
 
 static int
 stats(mportInstance *mport) {
-	mportStats *s;
+	mportStats *s = NULL;
 	if (mport_stats(mport, &s) != MPORT_OK) {
 		warnx("%s", mport_err_string());
 		return (1);
@@ -585,8 +585,8 @@ which(mportInstance *mport, const char *filePath, bool quiet, bool origin) {
 
 int
 install(mportInstance *mport, const char *packageName) {
-	mportIndexEntry **indexEntry;
-	mportIndexEntry **i2;
+	mportIndexEntry **indexEntry = NULL;
+	mportIndexEntry **i2 = NULL;
 	int resultCode;
 	int item;
 	int choice;
@@ -647,7 +647,7 @@ install(mportInstance *mport, const char *packageName) {
 
 int
 delete(const char *packageName) {
-	char *buf;
+	char *buf = NULL;
 	int resultCode;
 
 	asprintf(&buf, "%s%s %s %s", MPORT_TOOLS_PATH, "mport.delete", "-n", packageName);
@@ -662,7 +662,7 @@ delete(const char *packageName) {
 }
 
 int configGet(mportInstance *mport, const char *settingName) {
-	char *val;
+	char *val = NULL;
 
 	val = mport_setting_get(mport, settingName);
 
@@ -688,7 +688,7 @@ int configSet(mportInstance *mport, const char *settingName, const char *val) {
 
 int
 cpeList(mportInstance *mport) {
-	mportPackageMeta **packs;
+	mportPackageMeta **packs = NULL;
 	int cpe_total = 0;
 
 	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
@@ -747,8 +747,8 @@ verify(mportInstance *mport) {
 
 int
 deleteAll(mportInstance *mport) {
-	mportPackageMeta **packs;
-	mportPackageMeta **depends;
+	mportPackageMeta **packs = NULL;
+	mportPackageMeta **depends = NULL;
 	int total = 0;
 	int errors = 0;
 	int skip;
