@@ -123,7 +123,7 @@ mport_db_prepare(sqlite3 *db, sqlite3_stmt **stmt, const char *fmt, ...)
 	sqlite3_free(sql);
 
     if (result == MPORT_ERR_FATAL) {
-		if (err != null) {
+		if (err != NULL) {
 			SET_ERRORX(result, "sql error preparing '%s' : %s", sql, err);
 		} else {
 			SET_ERRORX(result, "sql error preparing '%s'", sql);
