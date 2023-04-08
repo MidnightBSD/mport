@@ -428,6 +428,12 @@ mport_index_lookup_pkgname(mportInstance *mport, const char *pkgname, mportIndex
 }
 
 
+/*
+ * Look up index entries containing the term. Supports unix style globs.
+ * e.g. mport_index_search_term(mport, &indexEntry, 'gmake');
+ * 
+ * Simplified version of mport_index_search();
+ */
 MPORT_PUBLIC_API int
 mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char *term) {
 

@@ -451,7 +451,7 @@ search(mportInstance *mport, char **query) {
 	}
 
 	while (query != NULL && *query != NULL) {
-		mport_index_search(mport, &indexEntry, "pkg glob %Q or comment glob %Q", *query, *query);
+		mport_index_search_term(mport, &indexEntry, *query);
 		if (indexEntry == NULL || *indexEntry == NULL) {
 			query++;
 			continue;
