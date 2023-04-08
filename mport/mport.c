@@ -266,7 +266,7 @@ main(int argc, char *argv[]) {
 		}
 	} else if (!strcmp(cmd, "search")) {
 		loadIndex(mport);
-		searchQuery = calloc((size_t) argc - 1, sizeof(char *));
+		searchQuery = calloc((size_t) argc, sizeof(char *));
 		for (i = 1; i < argc; i++) {
 			searchQuery[i - 1] = strdup(argv[i]);
 		}
