@@ -50,3 +50,29 @@ Example installing a vim package that is already built locally
 
 `/usr/libexec/mport.install /usr/mports/Packages/amd64/All/vim-8.2.3394.mport` 
 
+### Getting info on an installed package
+`mport info gmake`
+
+```
+gmake-4.3_2
+Name            : gmake
+Version         : 4.3_2
+Latest          : 4.3_2
+Licenses        : gpl3
+Origin          : devel/gmake
+Flavor          : 
+OS              : 3.0
+CPE             : cpe:2.3:a:gnu:make:4.3:::::midnightbsd3:x64:2
+PURL            : pkg:mport/midnightbsd/gmake@4.3_2?arch=amd64&osrel=3.0
+Locked          : no
+Prime           : yes
+Shared library  : no
+Deprecated      : no
+Expiration Date : 
+Install Date    : Tue Mar 28 17:51:14 2023
+Comment         : GNU version of 'make' utility
+Options         : 
+Type            : Application
+Description     :
+```
+
