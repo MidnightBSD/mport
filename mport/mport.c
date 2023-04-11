@@ -53,6 +53,7 @@ static mportIndexEntry **lookupIndex(mportInstance *, const char *);
 static int install(mportInstance *, const char *);
 
 static int cpeList(mportInstance *);
+static int purlList(mportInstance *);
 
 static int configGet(mportInstance *, const char *);
 
@@ -305,6 +306,8 @@ main(int argc, char *argv[]) {
 		}
 	} else if (!strcmp(cmd, "cpe")) {
 		resultCode = cpeList(mport);
+	} else if (!strcmp(cmd, "purl")) {
+		resultCode = purlList(mport);
 	} else if (!strcmp(cmd, "deleteall")) {
 		resultCode = deleteAll(mport);
 	} else if (!strcmp(cmd, "autoremove")) {
@@ -684,6 +687,36 @@ int configSet(mportInstance *mport, const char *settingName, const char *val) {
 	}
 
 	return 0;
+}
+
+
+int
+purlList(mportInstance *mport) {
+	mportPackageMeta **packs = NULL;
+	int purl_total = 0;
+
+	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
+		warnx("%s", mport_err_string());
+		return mport_err_code();
+	}
+
+	if (packs == NULL) {
+		warnx("No packages installed.");
+		return (1);
+	}
+
+	while (*packs != NULL) {
+		printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->pkgname, (*packs)->version, MPORT_ARCH, (*packs)->os_release);
+		purl_total++;
+		packs++;
+	}
+	mport_pkgmeta_vec_free(packs);
+
+	if (purl_total == 0) {
+		errx(EX_SOFTWARE, "No packages contained PURL information.");
+	}
+
+	return (0);
 }
 
 int
