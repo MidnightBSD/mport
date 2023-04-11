@@ -707,7 +707,7 @@ purlList(mportInstance *mport) {
 	}
 
 	while (*packs != NULL) {
-		printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->pkgname, (*packs)->version, MPORT_ARCH, (*packs)->os_release);
+		printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->name, (*packs)->version, MPORT_ARCH, (*packs)->os_release);
 		purl_total++;
 		packs++;
 	}
