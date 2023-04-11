@@ -23,7 +23,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"
-.Dd October 25, 2022
+.Dd April 11, 2023
 .Dt MPORT 1
 .Os
 .Sh NAME
@@ -74,6 +74,8 @@
 .Op Ar name
 .Nm
 .Cm mirror list
+.Nm
+.Cm purl
 .Nm
 .Cm search
 .Op Ar name ...
@@ -146,6 +148,8 @@ allows the user to get the latest list of packages.
 Fetch and install a package
 .It Cm mirror list
 Lists all available package mirrors.
+.It Cm purl
+Lists PURL for each installed package
 .It Cm search
 Search package names and descriptions.  Supports globbing queries such as 
 "*php*".
