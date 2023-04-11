@@ -116,7 +116,7 @@ mport_info(mportInstance *mport, const char *packageName) {
 		automatic = (*packs)->automatic;
 		installDate = (*packs)->install_date;
 		type = (*packs)->type;
-		snprintf(purl, sizeof(purl), "pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s", (*indexEntry)->pkgname, (*packs)->version, (*packs)->arch, os_release);
+		snprintf(purl, sizeof(purl), "pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s", (*indexEntry)->pkgname, (*packs)->version, MPORT_ARCH, os_release);
 	}
 
 	asprintf(&info_text,
