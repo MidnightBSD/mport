@@ -60,7 +60,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 		return (NULL);
 	}
 
-	if (packs != null) {
+	if (packs != NULL) {
 		if ((*packs)->cpe != NULL) {
 			char *path = mport_fetch_cves(mport, (*packs)->cpe);
 			char *jsonData = readJsonFile(path);
