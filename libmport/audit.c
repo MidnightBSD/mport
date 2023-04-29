@@ -101,13 +101,17 @@ mport_audit(mportInstance *mport, const char *packageName)
 				return (NULL);
 			}
 
-			fprintf(bufferFp, "%s-%s is vulnerable:\n", (*packs)->name,
-				    (*packs)->version);
-
+			bool first = true;
 			while ((cur = ucl_object_iterate(root, &it, true))) {
 				if (ucl_object_type(cur) != UCL_OBJECT) {
 					SET_ERROR(MPORT_ERR_FATAL, "Expected an object in the array");
 					continue;
+				}
+
+				if (first) {
+					fprintf(bufferFp, "%s-%s is vulnerable:\n\n", (*packs)->name,
+				    		(*packs)->version);
+					first = false;
 				}
 
 				const ucl_object_t *cveId = ucl_object_find_key(cur, "cveId");
@@ -116,8 +120,13 @@ mport_audit(mportInstance *mport, const char *packageName)
 				}
 				const ucl_object_t *desc = ucl_object_find_key(cur, "description");
 				if (desc != NULL && ucl_object_type(desc) == UCL_STRING) {
-					fprintf(bufferFp, "Description:%s\n", ucl_object_tostring(desc));
+					fprintf(bufferFp, "Description: %s\n", ucl_object_tostring(desc));
 				}
+				const ucl_object_t *severity = ucl_object_find_key(cur, "severity");
+				if (severity != NULL && ucl_object_type(severity) == UCL_STRING) {
+					fprintf(bufferFp, "Severity: %s\n", ucl_object_tostring(severity));
+				}
+				fprintf(bufferFp, "\n");
 			}
 			free(jsonData);
 			fclose(bufferFp);	

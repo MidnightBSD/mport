@@ -203,7 +203,7 @@ int mport_set_errx(int , const char *, ...);
 #define MPORT_URL_PATH			MPORT_ARCH "/" MPORT_OSVERSION
 #define MPORT_INDEX_URL_PATH		MPORT_URL_PATH "/index.db.bz2"
 #define MPORT_BOOTSTRAP_INDEX_URL 	"http://index.mport.midnightbsd.org/"
-#define MPORT_SECURITY_URL  "https://sec.midnightbsd.org/"
+#define MPORT_SECURITY_URL  "https://sec.midnightbsd.org"
 
 int mport_fetch_index(mportInstance *);
 int mport_fetch_bootstrap_index(mportInstance *);
