@@ -228,7 +228,12 @@ fetch(mportInstance *mport, const char *url, const char *dest)
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s: %s", dest, strerror(errno));
 	}
 
-	return fetch_to_file(mport, url, local);
+	int result = fetch_to_file(mport, url, local);
+	if (result == MPORT_ERROR_FATAL) {
+		unlink(dest);
+	}
+
+	return result;
 }
 
 static int 
@@ -246,7 +251,6 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local)
 	
 	if ((remote = fetchXGetURL(url, &ustat, "p")) == NULL) {
 		fclose(local);
-		unlink(dest);
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Fetch error: %s: %s", url, fetchLastErrString);
 	}
 	
@@ -257,7 +261,6 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local)
 			if (ferror(remote)) {
 				fclose(local);
 				fclose(remote);
-				unlink(dest);
 				RETURN_ERRORX(MPORT_ERR_FATAL, "Fetch error: %s: %s", url, fetchLastErrString);	 
 			} else if (feof(remote)) {
 				/* do nothing */
