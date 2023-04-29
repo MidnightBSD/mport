@@ -891,8 +891,8 @@ audit(mportInstance *mport)
 	}
 
 	while (*packs != NULL) {
-		char * output = mport_audit(mport, (*packs)->name);
-		if (output != NULL) {
+		char *output = mport_audit(mport, (*packs)->name);
+		if (output != NULL && output[0] != '\0') {
 			printf("%s\n", output);
 			free(output);
 		}
