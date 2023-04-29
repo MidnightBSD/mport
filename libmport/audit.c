@@ -142,7 +142,7 @@ readJsonFile(char *jsonFile)
 	// Open the JSON file
 	fp = fopen(jsonFile, "rb");
 	if (!fp) {
-		fprintf(stderr, "Error: could not open file\n");
+		SET_ERROR(MPORT_ERR_WARN, "could not open file");
 		return NULL;
 	}
 
@@ -154,14 +154,14 @@ readJsonFile(char *jsonFile)
 	// Allocate memory for the file contents
 	buffer = (char *)malloc(size);
 	if (!buffer) {
-		fprintf(stderr, "Error: could not allocate memory\n");
+		SET_ERROR(MPORT_ERR_WARN, "could not allocate memory");
 		fclose(fp);
 		return NULL;
 	}
 
 	// Read the file into the buffer
 	if (fread(buffer, 1, size, fp) != size) {
-		fprintf(stderr, "Error: could not read file\n");
+		SET_ERROR(MPORT_ERR_WARN, "could not read file");
 		fclose(fp);
 		free(buffer);
 		return NULL;
