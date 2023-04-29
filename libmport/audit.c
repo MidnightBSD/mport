@@ -45,7 +45,6 @@ mport_audit(mportInstance *mport, const char *packageName)
 	mportPackageMeta **packs;
 	char *pkgAudit = NULL;
 	struct ucl_parser* parser;
-	size_t size;
 
 	if (mport == NULL) {
 		SET_ERROR(MPORT_ERR_FATAL, "mport not initialized");
@@ -62,7 +61,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 	}
 
 	if (packs != NULL) {
-		if ((*packs)->cpe != NULL) {
+		if ((*packs)->cpe != NULL && (*packs)->cpe[0] != '\0') {
 			char *path = mport_fetch_cves(mport, (*packs)->cpe);
 			char *jsonData = readJsonFile(path);
 			if (jsonData == NULL) {
@@ -89,7 +88,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 			ucl_object_t *root = ucl_parser_get_object(parser);
 			ucl_parser_free(parser);
 
-			ucl_object_t *cur;
+			const ucl_object_t *cur;
 			ucl_object_iter_t it = NULL;
 
 			size_t size;
