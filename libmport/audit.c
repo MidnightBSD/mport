@@ -95,7 +95,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 			FILE *bufferFp = open_memstream(&pkgAudit, &size);
 			if (bufferFp == NULL) {
 				SET_ERROR(MPORT_ERR_FATAL, "Error allocating memory for audit entries");
-				free(jsonData)
+				free(jsonData);
 				unlink(path);
 				free(path);
 				return (NULL);
@@ -119,6 +119,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 					fprintf(bufferFp, ("Description:%s\n", ucl_object_tostring(desc));
 				}
 			}
+			free(jsonData);
 			fclose(bufferFp);	
 			unlink(path);
 			free(path);
@@ -136,6 +137,7 @@ readJsonFile(char *jsonFile)
 {
 	FILE *fp;
 	size_t size;
+	char *buffer;
 
 	// Open the JSON file
 	fp = fopen(jsonFile, "rb");
