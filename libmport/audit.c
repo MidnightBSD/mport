@@ -106,7 +106,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 
 			while ((cur = ucl_object_iterate(root, &it, true))) {
 				if (ucl_object_type(cur) != UCL_OBJECT) {
-					SET_ERRORX(MPORT_ERR_FATAL, "Expected an object in the array\n");
+					SET_ERROR(MPORT_ERR_FATAL, "Expected an object in the array");
 					continue;
 				}
 
