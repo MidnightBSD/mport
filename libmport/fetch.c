@@ -206,7 +206,7 @@ mport_fetch_cves(mportInstance *mport, char *cpe)
 	int fd;
 
 	if ((fd = mkstemp(tmpfile2)) == -1) {
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't make tmp file: %s", strerror(errno));
+		SET_ERRORX(MPORT_ERR_FATAL, "Couldn't make tmp file: %s", strerror(errno));
 	}
   
 	asprintf(&url, "%s/api/cpe/partial-match?cpe=%s", MPORT_SECURITY_URL, cpe);
