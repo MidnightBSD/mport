@@ -128,7 +128,6 @@ main(int argc, char *argv[])
 		case 'q':
 			quiet = true;
 			break;
-		default:
 		case 'v':
 			version++;
 			break;
