@@ -80,7 +80,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 				    ucl_parser_get_error(parser));
 				ucl_parser_free(parser);
 
-				free(jsonData)
+				free(jsonData);
 				unlink(path);
 
 				return (NULL);
