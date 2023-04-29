@@ -42,6 +42,7 @@
 #define BUFFSIZE 1024 * 8
 
 static int fetch(mportInstance *, const char *, const char *);
+static int fetch_to_file(mportInstance *, const char *, FILE *);
 
 
 /* mport_fetch_index(mport)
@@ -195,21 +196,51 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 }
 
 
+char *
+mport_fetch_cves(mportInstance *mport, char *cpe)
+{
+	int result;
+	char *url;
+
+	char tmpfile2[] = "/tmp/mport.cve.XXXXXXXX";
+	int fd;
+
+	if ((fd = mkstemp(tmpfile2)) == -1) {
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't make tmp file: %s", strerror(errno));
+	}
+  
+	asprintf(&url, "%s/api/cpe/partial-match?cpe=%s", MPORT_SECURITY_URL, cpe);
+	result = fetch_to_file(mport, url, fdopen(fd, "w"));
+	free(url);
+
+    if (result!= MPORT_OK) {
+       return NULL;
+    }
+	return strdup(tmpfile2); // return the file path
+}
+
 static int
 fetch(mportInstance *mport, const char *url, const char *dest) 
 {
-	FILE *remote = NULL;
 	FILE *local = NULL;
+	
+	if ((local = fopen(dest, "w")) == NULL) {
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s: %s", dest, strerror(errno));
+	}
+
+	return fetch_to_file(mport, url, local);
+}
+
+static int 
+fetch_to_file(mportInstance *mport, const char *url, FILE *local) 
+{
+	FILE *remote = NULL;
 	struct url_stat ustat;
 	char buffer[BUFFSIZE];
 	char *ptr = NULL;
 	size_t size;																	
 	size_t got = 0;
 	size_t wrote;
-	
-	if ((local = fopen(dest, "w")) == NULL) {
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s: %s", dest, strerror(errno));
-	}
 
 	mport_call_progress_init_cb(mport, "Downloading %s", url);
 	
