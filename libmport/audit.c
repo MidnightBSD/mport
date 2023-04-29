@@ -37,6 +37,8 @@
 
 #include <ucl.h>
 
+static char *readJsonFile(char *jsonFile);
+
 MPORT_PUBLIC_API char *
 mport_audit(mportInstance *mport, const char *packageName)
 {
@@ -61,82 +63,109 @@ mport_audit(mportInstance *mport, const char *packageName)
 	if (packs != null) {
 		if ((*packs)->cpe != NULL) {
 			char *path = mport_fetch_cves(mport, (*packs)->cpe);
-			FILE *fp = fopen(path, "r");
-			if (fp == NULL) {
+			char *jsonData = readJsonFile(path);
+			if (jsonData == NULL) {
 				SET_ERROR(MPORT_ERR_FATAL, "Error opening CVE file");
-                unlink(path);
-				return NULL;
+				unlink(path);
+				return (NULL);
 			}
 
-			// Create a UCL object
-			ucl_object *obj = ucl_object_new();
-			if (obj == NULL) {
-				SET_ERROR(MPORT_ERR_FATAL, "Error creating UCL object");
-                fclose(fp);
-                unlink(fp);
-				return NULL;
+			size_t len = strlen(json);
+
+			// Create a UCL parser and parse the JSON string
+			ucl_parser_t *parser = ucl_parser_new(0);
+			if (!ucl_parser_add_chunk(parser, (const unsigned char *)json, len)) {
+				SET_ERRORX(MPORT_ERR_FATAL, "Failed to parse JSON: %s\n",
+				    ucl_parser_get_error(parser));
+				ucl_parser_free(parser);
+
+				free(jsonData)
+				unlink(path);
+
+				return (NULL);
 			}
 
-			// Parse the JSON file
-			if (ucl_object_parse_file(obj, fp) < 0) {
-				SET_ERROR(MPORT_ERR_FATAL, "Error parsing CVE file");
-                fclose(fp);
-                unlink(fp);
-				return NULL;
+			ucl_object_t *root = ucl_parser_get_object(parser);
+			ucl_parser_free(parser);
+
+			ucl_object_t *cur;
+			ucl_object_iter_t it = NULL;
+
+			size_t size;
+			FILE *bufferFp = open_memstream(&pkgAudit, &size);
+			if (bufferFp == NULL) {
+				SET_ERROR(MPORT_ERR_FATAL, "Error allocating memory for audit entries");
+				free(jsonData)
+				unlink(path);
+				free(path);
+				return (NULL);
 			}
 
-			ucl_array *entries = ucl_object_get_array(obj, "entries");
-			if (entries == NULL) {
-				SET_ERROR(MPORT_ERR_FATAL, "Error parsing CVE file");
-                fclose(fp);
-                unlink(fp);
-				return NULL;
-			}
+			fprintf(bufferFp, "%s-%s is vulnerable:\n", (*packs)->name,
+				    (*packs)->version);
 
-			int entrySize = ucl_array_size(entries);
-
-			if (entrySize > 0) {
-				size_t size;
-				FILE *bufferFp = open_memstream(&pkgAudit, &size);
-                if (bufferFp == NULL) {
-                    SET_ERROR(MPORT_ERR_FATAL, "Error allocating memory for audit entries");
-                    fclose(fp);
-                    unlink(fp);
-                    return NULL;
-                }
-
-                fprintf(bufferFp, "%s-%s is vulnerable:\n", (*packs)->name, (*packs)->version);
-				
-				for (int i = 0; i < entrySize; i++) {
-					ucl_object *entry = ucl_array_get_item(entries, i);
-					if (entry == NULL) {
-						continue;
-					}
-
-					const char *cve_id = ucl_object_get_string(entry, "cveId");
-					if (cve_id == NULL) {
-						continue;
-					}
-
-                    const char *desc = ucl_object_get_string(entry, "description");
-					if (cve_id == NULL) {
-						continue;
-					}
-
-                    fprintf(bufferFp, "%s\nDescripton:%s\n", cve_id, desc);
+			while ((cur = ucl_object_iterate(root, &it, true))) {
+				if (ucl_object_type(cur) != UCL_OBJECT) {
+					SET_ERRORX(MPORT_ERR_FATAL, "Expected an object in the array\n");
+					continue;
 				}
 
-                flcose(bufferFp);
+				const ucl_object_t *cveId = ucl_object_find_key(cur, "cveId");
+				if (cveId != NULL && ucl_object_type(cveId) == UCL_STRING) {
+					fprintf(bufferFp, ("%s\n", ucl_object_tostring(cveId));
+				}
+				const ucl_object_t *desc = ucl_object_find_key(cur, "description");
+				if (desc != NULL && ucl_object_type(desc) == UCL_STRING) {
+					fprintf(bufferFp, ("Description:%s\n", ucl_object_tostring(desc));
+				}
 			}
-
-			fclose(fp);
-            unlink(fp);
-
-			ucl_object_free(obj);
+			flcose(bufferFp);	
+			unlink(path);
+			free(path);
+ 			ucl_object_unref(root);
 		}
 		mport_pkgmeta_vec_free(packs);
 		packs = NULL;
 	}
 
 	return pkgAudit;
+}
+
+static char *
+readJsonFile(char *jsonFile)
+{
+	FILE *fp;
+
+	// Open the JSON file
+	fp = fopen(jsonFile, "rb");
+	if (!fp) {
+		fprintf(stderr, "Error: could not open file\n");
+		return NULL;
+	}
+
+	// Get the file size
+	fseek(fp, 0, SEEK_END);
+	size = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+
+	// Allocate memory for the file contents
+	buffer = (char *)malloc(size);
+	if (!buffer) {
+		fprintf(stderr, "Error: could not allocate memory\n");
+		fclose(fp);
+		return NULL;
+	}
+
+	// Read the file into the buffer
+	if (fread(buffer, 1, size, fp) != size) {
+		fprintf(stderr, "Error: could not read file\n");
+		fclose(fp);
+		free(buffer);
+		return NULL;
+	}
+
+	// Close the file
+	fclose(fp);
+
+	return buffer;
 }
