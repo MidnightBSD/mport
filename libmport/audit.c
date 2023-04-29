@@ -44,6 +44,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 {
 	mportPackageMeta **packs;
 	char *pkgAudit = NULL;
+	ucl_parser_t *parser;
 	size_t size;
 
 	if (mport == NULL) {
@@ -73,7 +74,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 			size_t len = strlen(json);
 
 			// Create a UCL parser and parse the JSON string
-			ucl_parser_t *parser = ucl_parser_new(0);
+			parser = ucl_parser_new(0);
 			if (!ucl_parser_add_chunk(parser, (const unsigned char *)json, len)) {
 				SET_ERRORX(MPORT_ERR_FATAL, "Failed to parse JSON: %s\n",
 				    ucl_parser_get_error(parser));
@@ -112,11 +113,11 @@ mport_audit(mportInstance *mport, const char *packageName)
 
 				const ucl_object_t *cveId = ucl_object_find_key(cur, "cveId");
 				if (cveId != NULL && ucl_object_type(cveId) == UCL_STRING) {
-					fprintf(bufferFp, ("%s\n", ucl_object_tostring(cveId));
+					fprintf(bufferFp, "%s\n", ucl_object_tostring(cveId));
 				}
 				const ucl_object_t *desc = ucl_object_find_key(cur, "description");
 				if (desc != NULL && ucl_object_type(desc) == UCL_STRING) {
-					fprintf(bufferFp, ("Description:%s\n", ucl_object_tostring(desc));
+					fprintf(bufferFp, "Description:%s\n", ucl_object_tostring(desc));
 				}
 			}
 			free(jsonData);
