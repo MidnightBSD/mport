@@ -229,7 +229,7 @@ fetch(mportInstance *mport, const char *url, const char *dest)
 	}
 
 	int result = fetch_to_file(mport, url, local);
-	if (result == MPORT_ERROR_FATAL) {
+	if (result == MPORT_ERR_FATAL) {
 		unlink(dest);
 	}
 
@@ -274,9 +274,9 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local)
 		for (ptr = buffer; size > 0; ptr += wrote, size -= wrote) {
 			wrote = fwrite(ptr, 1, size, local);
 			if (wrote < size) {
-				fclose(local); fclose(remote);
-				unlink(dest);
-				RETURN_ERRORX(MPORT_ERR_FATAL, "Write error %s: %s", dest, strerror(errno));
+				fclose(local); 
+				fclose(remote);
+				RETURN_ERRORX(MPORT_ERR_FATAL, "Write error %s", strerror(errno));
 			}
 		}
 
