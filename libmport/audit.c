@@ -117,16 +117,17 @@ mport_audit(mportInstance *mport, const char *packageName)
 				const ucl_object_t *cveId = ucl_object_find_key(cur, "cveId");
 				if (cveId != NULL && ucl_object_type(cveId) == UCL_STRING) {
 					fprintf(bufferFp, "%s\n", ucl_object_tostring(cveId));
+				
+					const ucl_object_t *desc = ucl_object_find_key(cur, "description");
+					if (desc != NULL && ucl_object_type(desc) == UCL_STRING) {
+						fprintf(bufferFp, "Description: %s\n", ucl_object_tostring(desc));
+					}
+					const ucl_object_t *severity = ucl_object_find_key(cur, "severity");
+					if (severity != NULL && ucl_object_type(severity) == UCL_STRING) {
+						fprintf(bufferFp, "Severity: %s\n", ucl_object_tostring(severity));
+					}
+					fprintf(bufferFp, "\n");
 				}
-				const ucl_object_t *desc = ucl_object_find_key(cur, "description");
-				if (desc != NULL && ucl_object_type(desc) == UCL_STRING) {
-					fprintf(bufferFp, "Description: %s\n", ucl_object_tostring(desc));
-				}
-				const ucl_object_t *severity = ucl_object_find_key(cur, "severity");
-				if (severity != NULL && ucl_object_type(severity) == UCL_STRING) {
-					fprintf(bufferFp, "Severity: %s\n", ucl_object_tostring(severity));
-				}
-				fprintf(bufferFp, "\n");
 			}
 			free(jsonData);
 			fclose(bufferFp);	
