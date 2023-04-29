@@ -275,6 +275,9 @@ int mport_version_cmp(const char *, const char *);
 int mport_fetch_bundle(mportInstance *, const char *, const char *);
 int mport_download(mportInstance *, const char *, bool, char **);
 
+/* Auditing for CVEs */
+char * mport_audit(mportInstance *, const char *);
+
 /* Errors */
 int mport_err_code(void);
 const char * mport_err_string(void);
