@@ -35,6 +35,8 @@
 #include <err.h>
 #include <unistd.h>
 
+#include <ucl.h>
+
 MPORT_PUBLIC_API char *
 mport_audit(mportInstance *mport, const char *packageName)
 {
