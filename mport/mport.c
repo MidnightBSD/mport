@@ -95,11 +95,13 @@ main(int argc, char *argv[])
 	const char *outputPath = NULL;
 	int version = 0;
 	int noIndex = 0;
+	bool quiet = false;
 
 	struct option longopts[] = {
 		{ "no-index", no_argument, NULL, 'U' },
 		{ "chroot", required_argument, NULL, 'c' },
 		{ "output", required_argument, NULL, 'o' },
+		{ "quiet", no_argument, NULL, 'q'},
 		{ "version", no_argument, NULL, 'v' },
 		{ NULL, 0, NULL, 0 },
 	};
@@ -112,7 +114,7 @@ main(int argc, char *argv[])
 
 	setlocale(LC_ALL, "");
 
-	while ((ch = getopt_long(argc, argv, "+c:o:Uv", longopts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "+c:oq:Uv", longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'U':
 			noIndex++;
@@ -123,6 +125,10 @@ main(int argc, char *argv[])
 		case 'o':
 			outputPath = optarg;
 			break;
+		case 'q':
+			quiet = true;
+			break;
+		default:
 		case 'v':
 			version++;
 			break;
@@ -142,7 +148,7 @@ main(int argc, char *argv[])
 
 	mport = mport_instance_new();
 
-	if (mport_instance_init(mport, NULL, outputPath, noIndex != 0) != MPORT_OK) {
+	if (mport_instance_init(mport, NULL, outputPath, noIndex != 0, quiet) != MPORT_OK) {
 		errx(1, "%s", mport_err_string());
 	}
 
