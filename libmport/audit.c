@@ -71,11 +71,11 @@ mport_audit(mportInstance *mport, const char *packageName)
 				return (NULL);
 			}
 
-			size_t len = strlen(json);
+			size_t len = strlen(jsonData);
 
 			// Create a UCL parser and parse the JSON string
 			parser = ucl_parser_new(0);
-			if (!ucl_parser_add_chunk(parser, (const unsigned char *)json, len)) {
+			if (!ucl_parser_add_chunk(parser, (const unsigned char *)jsonData, len)) {
 				SET_ERRORX(MPORT_ERR_FATAL, "Failed to parse JSON: %s\n",
 				    ucl_parser_get_error(parser));
 				ucl_parser_free(parser);
