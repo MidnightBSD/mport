@@ -119,7 +119,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 					fprintf(bufferFp, ("Description:%s\n", ucl_object_tostring(desc));
 				}
 			}
-			flcose(bufferFp);	
+			fclose(bufferFp);	
 			unlink(path);
 			free(path);
  			ucl_object_unref(root);
@@ -135,6 +135,7 @@ static char *
 readJsonFile(char *jsonFile)
 {
 	FILE *fp;
+	size_t size;
 
 	// Open the JSON file
 	fp = fopen(jsonFile, "rb");
