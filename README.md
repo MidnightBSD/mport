@@ -75,4 +75,13 @@ Options         :
 Type            : Application
 Description     :
 ```
+### Security related commands
 
+`mport audit`
+Displays vulnerable packages based on their CPE indetifiers using the NVD data provided by https://sec.midnightbsd.org
+
+`mport cpe`
+Lists all CPE info on installed packages
+
+`mport verify`
+Runs a checksum on all installed files from packages against data from time of installation to see if files have been modified.
