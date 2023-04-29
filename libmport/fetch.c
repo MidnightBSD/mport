@@ -42,7 +42,7 @@
 #define BUFFSIZE 1024 * 8
 
 static int fetch(mportInstance *, const char *, const char *);
-static int fetch_to_file(mportInstance *, const char *, FILE *);
+static int fetch_to_file(mportInstance *, const char *, FILE *, bool);
 
 
 /* mport_fetch_index(mport)
@@ -210,7 +210,7 @@ mport_fetch_cves(mportInstance *mport, char *cpe)
 	}
   
 	asprintf(&url, "%s/api/cpe/partial-match?cpe=%s", MPORT_SECURITY_URL, cpe);
-	result = fetch_to_file(mport, url, fdopen(fd, "w"));
+	result = fetch_to_file(mport, url, fdopen(fd, "w"), false);
 	free(url);
 
     if (result!= MPORT_OK) {
@@ -228,7 +228,7 @@ fetch(mportInstance *mport, const char *url, const char *dest)
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s: %s", dest, strerror(errno));
 	}
 
-	int result = fetch_to_file(mport, url, local);
+	int result = fetch_to_file(mport, url, local, true);
 	if (result == MPORT_ERR_FATAL) {
 		unlink(dest);
 	}
@@ -237,7 +237,7 @@ fetch(mportInstance *mport, const char *url, const char *dest)
 }
 
 static int 
-fetch_to_file(mportInstance *mport, const char *url, FILE *local) 
+fetch_to_file(mportInstance *mport, const char *url, FILE *local, bool progress) 
 {
 	FILE *remote = NULL;
 	struct url_stat ustat;
@@ -247,7 +247,8 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local)
 	size_t got = 0;
 	size_t wrote;
 
-	mport_call_progress_init_cb(mport, "Downloading %s", url);
+	if (progress)	
+		mport_call_progress_init_cb(mport, "Downloading %s", url);
 	
 	if ((remote = fetchXGetURL(url, &ustat, "p")) == NULL) {
 		fclose(local);
@@ -268,8 +269,9 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local)
 		} 
 	
 		got += size;
-	
-		(mport->progress_step_cb)(got, ustat.size, "XXX Rate");
+
+		if (progress)	
+			(mport->progress_step_cb)(got, ustat.size, "XXX Rate");
 
 		for (ptr = buffer; size > 0; ptr += wrote, size -= wrote) {
 			wrote = fwrite(ptr, 1, size, local);
@@ -286,7 +288,9 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local)
 	
 	fclose(local);
 	fclose(remote);
-	(mport->progress_free_cb)();
+
+	if (progress)
+		(mport->progress_free_cb)();
 
 	return MPORT_OK;
 }
