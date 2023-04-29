@@ -44,7 +44,7 @@ mport_audit(mportInstance *mport, const char *packageName)
 {
 	mportPackageMeta **packs;
 	char *pkgAudit = NULL;
-	ucl_parser_t *parser;
+	struct ucl_parser* parser;
 	size_t size;
 
 	if (mport == NULL) {
