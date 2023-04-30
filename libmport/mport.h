@@ -303,6 +303,7 @@ int mport_file_exists(const char *);
 char * mport_version(mportInstance *);
 char * mport_version_short(mportInstance *);
 char * mport_get_osrelease(mportInstance *);
+int mport_drop_privileges(void);
 
 /* Locks */
 enum _LockState {
