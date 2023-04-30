@@ -676,20 +676,35 @@ install(mportInstance *mport, const char *packageName)
 	return (resultCode);
 }
 
-int delete(const char *packageName)
+int 
+delete(mportInstance *mport, const char *packageName)
 {
-	char *buf = NULL;
-	int resultCode;
+	mportPackageMeta **packs = NULL;
+	int force = 0;
 
-	asprintf(&buf, "%s%s %s %s", MPORT_TOOLS_PATH, "mport.delete", "-n", packageName);
-	if (buf == NULL) {
-		warnx("Out of memory.");
-		return (1);
+	if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", packageName) != MPORT_OK) {
+		warnx("%s", mport_err_string());
+		mport_pkgmeta_vec_free(packs);
+		return (MPORT_ERR_FATAL);
 	}
-	resultCode = system(buf);
-	free(buf);
 
-	return (resultCode);
+	if (packs == NULL) {
+		warnx("No packages installed matching '%s'", packageName);
+		return (MPORT_ERR_FATAL);
+	}
+
+	while (*packs != NULL) {
+		if (mport_delete_primative(mport, *packs, force) != MPORT_OK) {
+			warnx("%s", mport_err_string());
+			mport_pkgmeta_vec_free(packs);
+			return (MPORT_ERR_FATAL);
+		}
+		packs++;
+	}
+
+	mport_pkgmeta_vec_free(packs);
+
+	return (MPORT_OK);
 }
 
 int
@@ -843,7 +858,7 @@ deleteAll(mportInstance *mport)
 		while (*packs != NULL) {
 			if (mport_pkgmeta_get_updepends(mport, *packs, &depends) == MPORT_OK) {
 				if (depends == NULL) {
-					if (delete ((*packs)->name) != 0) {
+					if (delete ((*packs)->name) != MPORT_OK) {
 						fprintf(
 						    stderr, "Error deleting %s\n", (*packs)->name);
 						errors++;
