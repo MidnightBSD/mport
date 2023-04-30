@@ -593,6 +593,8 @@ which(mportInstance *mport, const char *filePath, bool quiet, bool origin)
 		return (1);
 	}
 
+	mport_drop_privileges();
+
 	if (pack != NULL && pack->origin != NULL) {
 		if (quiet && origin) {
 			printf("%s\n", pack->origin);
@@ -697,6 +699,8 @@ configGet(mportInstance *mport, const char *settingName)
 
 	val = mport_setting_get(mport, settingName);
 
+	mport_drop_privileges();
+
 	if (val != NULL) {
 		printf("Setting %s value is %s\n", settingName, val);
 	} else {
@@ -730,6 +734,8 @@ purlList(mportInstance *mport)
 		return mport_err_code();
 	}
 
+	mport_drop_privileges();
+
 	if (packs == NULL) {
 		warnx("No packages installed.");
 		return (1);
@@ -760,6 +766,8 @@ cpeList(mportInstance *mport)
 		warnx("%s", mport_err_string());
 		return mport_err_code();
 	}
+
+	mport_drop_privileges();
 
 	if (packs == NULL) {
 		warnx("No packages installed.");
