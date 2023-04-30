@@ -59,7 +59,7 @@ static int configGet(mportInstance *, const char *);
 
 static int configSet(mportInstance *, const char *, const char *);
 
-static int delete(const char *);
+static int delete(mportInstance *, const char *);
 
 static int deleteAll(mportInstance *);
 
@@ -176,7 +176,7 @@ main(int argc, char *argv[])
 			usage();
 		}
 		for (i = 1; i < argc; i++) {
-			tempResultCode = delete (argv[i]);
+			tempResultCode = delete(mport, argv[i]);
 			if (tempResultCode != 0)
 				resultCode = tempResultCode;
 		}
@@ -858,7 +858,7 @@ deleteAll(mportInstance *mport)
 		while (*packs != NULL) {
 			if (mport_pkgmeta_get_updepends(mport, *packs, &depends) == MPORT_OK) {
 				if (depends == NULL) {
-					if (delete ((*packs)->name) != MPORT_OK) {
+					if (delete (mport, (*packs)->name) != MPORT_OK) {
 						fprintf(
 						    stderr, "Error deleting %s\n", (*packs)->name);
 						errors++;
