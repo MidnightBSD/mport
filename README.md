@@ -80,6 +80,12 @@ Description     :
 `mport audit`
 Displays vulnerable packages based on their CPE indetifiers using the NVD data provided by https://sec.midnightbsd.org
 
+`mport audit -r`
+Prints out vulnerable packages and a list of packages depending on that one.
+
+`mport -q audit`
+Prints out vulnerable package name and version with no descriptions or details
+
 `mport cpe`
 Lists all CPE info on installed packages
 
