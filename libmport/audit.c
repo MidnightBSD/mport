@@ -40,11 +40,12 @@
 static char *readJsonFile(char *jsonFile);
 
 MPORT_PUBLIC_API char *
-mport_audit(mportInstance *mport, const char *packageName)
+mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 {
-	mportPackageMeta **packs;
+	mportPackageMeta **packs = NULL;
+	mportPackageMeta **depends, **depends_orig = NULL;
 	char *pkgAudit = NULL;
-	struct ucl_parser* parser;
+	struct ucl_parser *parser = NULL;
 
 	if (mport == NULL) {
 		SET_ERROR(MPORT_ERR_FATAL, "mport not initialized");
@@ -108,16 +109,21 @@ mport_audit(mportInstance *mport, const char *packageName)
 					continue;
 				}
 
+				if (mport->quiet) {
+					fprintf(bufferFp, "%s-%s\n", (*packs)->name, (*packs)->version);
+					break;
+				}
+
 				if (first) {
-					fprintf(bufferFp, "%s-%s is vulnerable:\n\n", (*packs)->name,
-				    		(*packs)->version);
+					fprintf(bufferFp, "%s-%s is vulnerable:\n\n",
+					    (*packs)->name, (*packs)->version);
 					first = false;
 				}
 
 				const ucl_object_t *cveId = ucl_object_find_key(cur, "cveId");
 				if (cveId != NULL && ucl_object_type(cveId) == UCL_STRING) {
 					fprintf(bufferFp, "%s\n", ucl_object_tostring(cveId));
-				
+
 					const ucl_object_t *desc = ucl_object_find_key(cur, "description");
 					if (desc != NULL && ucl_object_type(desc) == UCL_STRING) {
 						fprintf(bufferFp, "Description: %s\n", ucl_object_tostring(desc));
@@ -129,56 +135,73 @@ mport_audit(mportInstance *mport, const char *packageName)
 					fprintf(bufferFp, "\n");
 				}
 			}
+
+			if (dependOn) {
+				if (mport_pkgmeta_get_downdepends(mport, (*packs), &depends_orig) == MPORT_OK) {
+					if (depends_orig != NULL) {
+						depends = depends_orig;
+						fprintf(bufferFp, "Packages that depend on %s:", (*packs)->name);
+						while (*depends != NULL) {
+							fprintf(bufferFp, " %s", (*depends)->name);
+							depends++;
+						}
+						fprintf(bufferFp, "\n");
+
+						mport_pkgmeta_vec_free(depends_orig);
+					}
+				}
+			}
+
 			free(jsonData);
-			fclose(bufferFp);	
+			fclose(bufferFp);
 			unlink(path);
 			free(path);
- 			ucl_object_unref(root);
-		}
-		mport_pkgmeta_vec_free(packs);
-		packs = NULL;
-	}
+			ucl_object_unref(root);
 
+			mport_pkgmeta_vec_free(packs);
+			packs = NULL;
+		}
+
+	}
 	return pkgAudit;
 }
 
-static char *
-readJsonFile(char *jsonFile)
+static char *readJsonFile(char *jsonFile)
 {
-	FILE *fp;
-	size_t size;
-	char *buffer;
+		FILE *fp;
+		size_t size;
+		char *buffer;
 
-	// Open the JSON file
-	fp = fopen(jsonFile, "rb");
-	if (!fp) {
-		SET_ERROR(MPORT_ERR_WARN, "could not open file");
-		return NULL;
-	}
+		// Open the JSON file
+		fp = fopen(jsonFile, "rb");
+		if (!fp) {
+			SET_ERROR(MPORT_ERR_WARN, "could not open file");
+			return NULL;
+		}
 
-	// Get the file size
-	fseek(fp, 0, SEEK_END);
-	size = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
+		// Get the file size
+		fseek(fp, 0, SEEK_END);
+		size = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
 
-	// Allocate memory for the file contents
-	buffer = (char *)malloc(size);
-	if (!buffer) {
-		SET_ERROR(MPORT_ERR_WARN, "could not allocate memory");
+		// Allocate memory for the file contents
+		buffer = (char *)malloc(size);
+		if (!buffer) {
+			SET_ERROR(MPORT_ERR_WARN, "could not allocate memory");
+			fclose(fp);
+			return NULL;
+		}
+
+		// Read the file into the buffer
+		if (fread(buffer, 1, size, fp) != size) {
+			SET_ERROR(MPORT_ERR_WARN, "could not read file");
+			fclose(fp);
+			free(buffer);
+			return NULL;
+		}
+
+		// Close the file
 		fclose(fp);
-		return NULL;
+
+		return buffer;
 	}
-
-	// Read the file into the buffer
-	if (fread(buffer, 1, size, fp) != size) {
-		SET_ERROR(MPORT_ERR_WARN, "could not read file");
-		fclose(fp);
-		free(buffer);
-		return NULL;
-	}
-
-	// Close the file
-	fclose(fp);
-
-	return buffer;
-}
