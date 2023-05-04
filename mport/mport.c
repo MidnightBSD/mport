@@ -225,7 +225,25 @@ main(int argc, char *argv[])
 		resultCode = mport_upgrade(mport);
 	} else if (!strcmp(cmd, "audit")) {
 		loadIndex(mport);
-		resultCode = audit(mport);
+
+		int local_argc = argc;
+		char *const *local_argv = argv;
+		int rflag = 0;
+
+		if (local_argc > 1) {
+			int ch2;
+			while ((ch2 = getopt(local_argc, local_argv, "r")) != -1) {
+				switch (ch2) {
+				case 'r':
+					rflag = 1;
+					break;
+				}
+			}
+			local_argc -= optind;
+			local_argv += optind;
+		}
+
+		resultCode = audit(mport, rflag > 0);
 	} else if (!strcmp(cmd, "locks")) {
 		asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
 		flag = strdup("-l");
@@ -898,7 +916,7 @@ clean(mportInstance *mport)
 }
 
 int
-audit(mportInstance *mport)
+audit(mportInstance *mport, boolean dependsOn)
 {
 	mportPackageMeta **packs = NULL;
 
@@ -913,7 +931,7 @@ audit(mportInstance *mport)
 	}
 
 	while (*packs != NULL) {
-		char *output = mport_audit(mport, (*packs)->name);
+		char *output = mport_audit(mport, (*packs)->name, dependsOn);
 		if (output != NULL && output[0] != '\0') {
 			printf("%s\n", output);
 			free(output);
