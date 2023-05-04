@@ -79,7 +79,7 @@ static int unlock(mportInstance *, const char *);
 
 static int which(mportInstance *, const char *, bool, bool);
 
-static int audit(mportInstance *);
+static int audit(mportInstance *, bool);
 
 int
 main(int argc, char *argv[])
@@ -114,7 +114,7 @@ main(int argc, char *argv[])
 
 	setlocale(LC_ALL, "");
 
-	while ((ch = getopt_long(argc, argv, "+c:oq:Uv", longopts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "+c:o:qUv", longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'U':
 			noIndex++;
@@ -916,7 +916,7 @@ clean(mportInstance *mport)
 }
 
 int
-audit(mportInstance *mport, boolean dependsOn)
+audit(mportInstance *mport, bool dependsOn)
 {
 	mportPackageMeta **packs = NULL;
 
@@ -933,7 +933,10 @@ audit(mportInstance *mport, boolean dependsOn)
 	while (*packs != NULL) {
 		char *output = mport_audit(mport, (*packs)->name, dependsOn);
 		if (output != NULL && output[0] != '\0') {
-			printf("%s\n", output);
+			if (mport->quiet)
+				printf("%s", output);
+			else
+				printf("%s\n", output);
 			free(output);
 		}
 		packs++;

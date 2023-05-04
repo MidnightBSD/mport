@@ -40,7 +40,7 @@
 static char *readJsonFile(char *jsonFile);
 
 MPORT_PUBLIC_API char *
-mport_audit(mportInstance *mport, const char *packageName, boolean dependOn)
+mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 {
 	mportPackageMeta **packs = NULL;
 	mportPackageMeta **depends, **depends_orig = NULL;
@@ -95,8 +95,7 @@ mport_audit(mportInstance *mport, const char *packageName, boolean dependOn)
 			size_t size;
 			FILE *bufferFp = open_memstream(&pkgAudit, &size);
 			if (bufferFp == NULL) {
-				SET_ERROR(
-				    MPORT_ERR_FATAL, "Error allocating memory for audit entries");
+				SET_ERROR(MPORT_ERR_FATAL, "Error allocating memory for audit entries");
 				free(jsonData);
 				unlink(path);
 				free(path);
@@ -106,14 +105,12 @@ mport_audit(mportInstance *mport, const char *packageName, boolean dependOn)
 			bool first = true;
 			while ((cur = ucl_object_iterate(root, &it, true))) {
 				if (ucl_object_type(cur) != UCL_OBJECT) {
-					SET_ERROR(
-					    MPORT_ERR_FATAL, "Expected an object in the array");
+					SET_ERROR(MPORT_ERR_FATAL, "Expected an object in the array");
 					continue;
 				}
 
 				if (mport->quiet) {
-					fprintf(
-					    bufferFp, "%s-%s\n", (*packs)->name, (*packs)->version);
+					fprintf(bufferFp, "%s-%s\n", (*packs)->name, (*packs)->version);
 					break;
 				}
 
@@ -127,37 +124,31 @@ mport_audit(mportInstance *mport, const char *packageName, boolean dependOn)
 				if (cveId != NULL && ucl_object_type(cveId) == UCL_STRING) {
 					fprintf(bufferFp, "%s\n", ucl_object_tostring(cveId));
 
-					const ucl_object_t *desc =
-					    ucl_object_find_key(cur, "description");
+					const ucl_object_t *desc = ucl_object_find_key(cur, "description");
 					if (desc != NULL && ucl_object_type(desc) == UCL_STRING) {
-						fprintf(bufferFp, "Description: %s\n",
-						    ucl_object_tostring(desc));
+						fprintf(bufferFp, "Description: %s\n", ucl_object_tostring(desc));
 					}
-					const ucl_object_t *severity =
-					    ucl_object_find_key(cur, "severity");
-					if (severity != NULL &&
-					    ucl_object_type(severity) == UCL_STRING) {
-						fprintf(bufferFp, "Severity: %s\n",
-						    ucl_object_tostring(severity));
+					const ucl_object_t *severity = ucl_object_find_key(cur, "severity");
+					if (severity != NULL && ucl_object_type(severity) == UCL_STRING) {
+						fprintf(bufferFp, "Severity: %s\n", ucl_object_tostring(severity));
 					}
 					fprintf(bufferFp, "\n");
 				}
 			}
 
 			if (dependOn) {
-				if (mport_pkgmeta_get_downdepends(mport, pack, &depends_orig) == MPORT_OK) {
-					if (depends_orig == NULL)
-						continue;
+				if (mport_pkgmeta_get_downdepends(mport, (*packs), &depends_orig) == MPORT_OK) {
+					if (depends_orig != NULL) {
+						depends = depends_orig;
+						fprintf(bufferFp, "Packages that depend on %s:", (*packs)->name);
+						while (*depends != NULL) {
+							fprintf(bufferFp, " %s", (*depends)->name);
+							depends++;
+						}
+						fprintf(bufferFp, "\n");
 
-					depends = depends_orig;
-					fprintf(bufferFp, "Packages that depend on %s:", (*packs)->name);
-					while (*depends != NULL) {
-						fprintf(bufferFp, " %s", (*depends)->name);
-						depends++;
+						mport_pkgmeta_vec_free(depends_orig);
 					}
-					fprintf(bufferFp, "\n");
-
-					mport_pkgmeta_vec_free(depends_orig);
 				}
 			}
 
@@ -171,11 +162,12 @@ mport_audit(mportInstance *mport, const char *packageName, boolean dependOn)
 			packs = NULL;
 		}
 
-		return pkgAudit;
 	}
+	return pkgAudit;
+}
 
-	static char *readJsonFile(char *jsonFile)
-	{
+static char *readJsonFile(char *jsonFile)
+{
 		FILE *fp;
 		size_t size;
 		char *buffer;
