@@ -254,8 +254,6 @@ index_update_last_checked(mportInstance *mport)
 /*
  * Fills the string vector with the list of the mirrors for the current
  * country.  
- * 
- * XXX - The country is currently hardcoded to the US.
  */
 int
 mport_index_get_mirror_list(mportInstance *mport, char ***list_p, int *list_size)
