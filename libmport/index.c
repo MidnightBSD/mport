@@ -1,6 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
+ * Copyright (c) 2023 Lucas Holt
  * Copyright (c) 2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -648,6 +649,71 @@ mport_index_list(mportInstance *mport, mportIndexEntry ***entry_vec)
 
 	sqlite3_finalize(stmt);
 
+	return ret;
+}
+
+MPORT_PUBLIC_API int
+mport_moved_lookup(mportInstance *mport, const char *pkgname, mportIndexMovedEntry ***entry_vec)
+{
+	int count;
+	int i = 0, step;
+	sqlite3_stmt *stmt;
+	int ret = MPORT_OK;
+	mportIndexMovedEntry **e = NULL;
+
+	if (mport == NULL) {
+		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
+	}
+
+	MPORT_CHECK_FOR_INDEX(mport, "mport_moved_lookup()")
+
+	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM idx.moved  WHERE port = %Q", pkgname) != MPORT_OK) {
+		RETURN_CURRENT_ERROR;
+	}
+
+	e = (mportIndexMovedEntry **) calloc((size_t) count + 1, sizeof(mportIndexMovedEntry *));
+	if (e == NULL) {
+		RETURN_ERROR(MPORT_ERR_FATAL, "Could not allocate memory for moved entries");
+	}
+	*entry_vec = e;
+
+	if (count == 0) {
+		return MPORT_OK;
+	}
+
+	if (mport_db_prepare(mport->db, &stmt,
+	                     "SELECT port, moved_to, why, date FROM idx.moved WHERE port = %Q",
+	                     pkgname) != MPORT_OK) {
+		ret = mport_err_code();
+		goto MOVED_DONE;
+	}
+
+	while (1) {
+		step = sqlite3_step(stmt);
+
+		if (step == SQLITE_ROW) {
+			if ((e[i] = (mportIndexMovedEntry *) calloc(1, sizeof(mportIndexMovedEntry))) == NULL) {
+				ret = MPORT_ERR_FATAL;
+				goto MOVED_DONE;
+			}
+
+			strlcpy(e[i]->port, sqlite3_column_text(stmt, 0), 128);
+			strlcpy(e[i]->moved_to, sqlite3_column_text(stmt, 0), 128);
+			strlcpy(e[i]->why, sqlite3_column_text(stmt, 0), 128);
+			strlcpy(e[i]->date, sqlite3_column_text(stmt, 0), 32);
+
+			i++;
+		} else if (step == SQLITE_DONE) {
+			e[i] = NULL;
+			goto MOVED_DONE;
+		} else {
+			ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+			goto MOVED_DONE;
+		}
+	}
+
+	MOVED_DONE:
+	sqlite3_finalize(stmt);
 	return ret;
 }
 

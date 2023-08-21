@@ -186,6 +186,13 @@ typedef struct {
   mportType type;
 } mportIndexEntry;
 
+typedef struct {
+  char port[128];
+  char moved_to[128];
+  char why[128];
+  char date[32];
+} mportIndexMovedEntry;
+
 int mport_index_load(mportInstance *);
 int mport_index_get(mportInstance *);
 int mport_index_check(mportInstance *, mportPackageMeta *);
@@ -197,6 +204,8 @@ void mport_index_entry_free_vec(mportIndexEntry **);
 void mport_index_entry_free(mportIndexEntry *);
 
 int mport_index_print_mirror_list(mportInstance *);
+
+int mport_moved_lookup(mportInstance *, const char *, mportIndexMovedEntry ***);
 
 /* Index Depends */
 
