@@ -191,6 +191,8 @@ typedef struct {
   char moved_to[128];
   char why[128];
   char date[32];
+  char pkgname[128];
+  char moved_to_pkgname[128];
 } mportIndexMovedEntry;
 
 int mport_index_load(mportInstance *);
