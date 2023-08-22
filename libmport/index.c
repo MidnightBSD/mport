@@ -45,6 +45,7 @@ static int index_last_checked_recentish(mportInstance *);
 static int index_update_last_checked(mportInstance *);
 
 static int lookup_alias(mportInstance *, const char *, char **);
+static int lookup_alias_inverse(mportInstance *, const char *, char **);
 
 static int attach_index_db(sqlite3 *db);
 
@@ -655,6 +656,7 @@ mport_index_list(mportInstance *mport, mportIndexEntry ***entry_vec)
 MPORT_PUBLIC_API int
 mport_moved_lookup(mportInstance *mport, const char *pkgname, mportIndexMovedEntry ***entry_vec)
 {
+	char *lookup = NULL;
 	int count;
 	int i = 0, step;
 	sqlite3_stmt *stmt;
@@ -667,7 +669,11 @@ mport_moved_lookup(mportInstance *mport, const char *pkgname, mportIndexMovedEnt
 
 	MPORT_CHECK_FOR_INDEX(mport, "mport_moved_lookup()")
 
-	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM idx.moved  WHERE port = %Q", pkgname) != MPORT_OK) {
+	if (lookup_alias_inverse(mport, pkgname, &lookup) != MPORT_OK) {
+		RETURN_CURRENT_ERROR;
+	}
+
+	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM idx.moved  WHERE port = %Q", lookup) != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
 
@@ -683,7 +689,7 @@ mport_moved_lookup(mportInstance *mport, const char *pkgname, mportIndexMovedEnt
 
 	if (mport_db_prepare(mport->db, &stmt,
 	                     "SELECT port, moved_to, why, date FROM idx.moved WHERE port = %Q",
-	                     pkgname) != MPORT_OK) {
+	                     lookup) != MPORT_OK) {
 		ret = mport_err_code();
 		goto MOVED_DONE;
 	}
@@ -731,6 +737,32 @@ populate_row(sqlite3_stmt *stmt, mportIndexEntry *e)
 	if (sqlite3_column_type(stmt, 6) == SQLITE_INTEGER) {
         e->type = sqlite3_column_int(stmt, 6);
 	}
+}
+
+static int
+lookup_alias_inverse(mportInstance *mport, const char *query, char **result)
+{
+	sqlite3_stmt *stmt;
+	int ret = MPORT_OK;
+
+	if (mport_db_prepare(mport->db, &stmt, "SELECT pkg FROM idx.aliases WHERE pkg=%Q", query) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	switch (sqlite3_step(stmt)) {
+		case SQLITE_ROW:
+			*result = strdup((const char *) sqlite3_column_text(stmt, 0));
+			break;
+		case SQLITE_DONE:
+			*result = strdup(query);
+			break;
+		default:
+			ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+			break;
+	}
+
+	sqlite3_finalize(stmt);
+
+	return ret;
 }
 
 
