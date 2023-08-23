@@ -711,7 +711,7 @@ mport_moved_lookup(mportInstance *mport, const char *pkgname, mportIndexMovedEnt
 			strlcpy(e[i]->pkgname, pkgname, 128); // original package name
 
 			char *moved_pkg = NULL;
-			if (e[i]->moved_to != '\0' && lookup_alias_inverse(mport, e[i]->moved_to, &moved_pkg) != MPORT_OK) {
+			if (e[i]->moved_to[0] != '\0' && lookup_alias_inverse(mport, e[i]->moved_to, &moved_pkg) != MPORT_OK) {
 				ret = mport_err_code();
 				goto MOVED_DONE;
 			} else {
