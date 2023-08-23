@@ -49,6 +49,7 @@ main(int argc, char *argv[])
 	mportPackageMeta **packs;
 	mportIndexEntry **indexEntries;
 	mportIndexEntry **iestart;
+	mportIndexMovedEntry **movedEntries;
 	bool quiet = false;
 	bool verbose = false;
 	bool origin = false;
@@ -138,9 +139,36 @@ main(int argc, char *argv[])
 			}
 
 			if (indexEntries == NULL || *indexEntries == NULL) {
-				(void) printf("%-15s %8s is no longer available.\n", (*packs)->name, (*packs)->version);
-				packs++;
-				continue;
+				if (mport_moved_lookup(mport, (*packs)->name, &movedEntries) != MPORT_OK) {
+					(void) printf("%-15s %8s is not part of the package repository.\n", (*packs)->name, (*packs)->version);
+					packs++;
+					continue;
+				}
+
+				if (movedEntries == NULL || *movedEntries == NULL) {
+                    (void) printf("%-15s %8s is not part of the package repository.\n", (*packs)->name, (*packs)->version);
+                    packs++;
+                    continue;
+                }
+
+				if ((*movedEntries)->moved_to != NULL && (*movedEntries)->moved_to[0]!= '\0') {
+					(void) printf("%-15s %8s was moved to %s\n", (*packs)->name, (*packs)->version, (*movedEntries)->moved_to);
+					free(movedEntries);
+					movedEntries = NULL;
+                    packs++;
+                    continue;
+				}
+
+				if ((*movedEntries)->date != NULL && (*movedEntries)->date[0]!= '\0') {
+					(void) printf("%-15s %8s expired on %s\n", (*packs)->name, (*packs)->version, (*movedEntries)->date);
+					free(movedEntries);
+					movedEntries = NULL;
+                    packs++;
+                    continue;
+				}
+
+				free(movedEntries);
+				movedEntries = NULL;
 			}
 	
 			iestart = indexEntries;		
