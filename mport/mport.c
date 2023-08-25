@@ -912,6 +912,8 @@ clean(mportInstance *mport)
 	ret = mport_clean_database(mport);
 	if (ret == MPORT_OK)
 		ret = mport_clean_oldpackages(mport);
+	if (ret == MPORT_OK)
+		ret = mport_clean_oldmtree(mport);
 	return (ret);
 }
 
