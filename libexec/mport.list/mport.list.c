@@ -140,7 +140,7 @@ main(int argc, char *argv[])
 
 			if (indexEntries == NULL || *indexEntries == NULL) {
 				if (mport_moved_lookup(mport, (*packs)->name, &movedEntries) != MPORT_OK) {
-					(void) printf("%-15s %8s is not part of the package repository.\n", (*packs)->name, (*packs)->version);
+					(void) printf("%-25s %8s is not part of the package repository.\n", (*packs)->name, (*packs)->version);
 					packs++;
 					continue;
 				}
@@ -151,16 +151,16 @@ main(int argc, char *argv[])
                     continue;
                 }
 
-				if ((*movedEntries)->moved_to != NULL && (*movedEntries)->moved_to[0]!= '\0') {
-					(void) printf("%-15s %8s was moved to %s\n", (*packs)->name, (*packs)->version, (*movedEntries)->moved_to);
+				if ((*movedEntries)->moved_to[0]!= '\0') {
+					(void) printf("%-25s %8s was moved to %s\n", (*packs)->name, (*packs)->version, (*movedEntries)->moved_to);
 					free(movedEntries);
 					movedEntries = NULL;
                     packs++;
                     continue;
 				}
 
-				if ((*movedEntries)->date != NULL && (*movedEntries)->date[0]!= '\0') {
-					(void) printf("%-15s %8s expired on %s\n", (*packs)->name, (*packs)->version, (*movedEntries)->date);
+				if ((*movedEntries)->date[0]!= '\0') {
+					(void) printf("%-25s %8s expired on %s\n", (*packs)->name, (*packs)->version, (*movedEntries)->date);
 					free(movedEntries);
 					movedEntries = NULL;
                     packs++;
@@ -177,10 +177,10 @@ main(int argc, char *argv[])
 					|| ((*packs)->version != NULL && mport_version_cmp((*packs)->os_release, os_release) < 0)) {
 
                         if (verbose) {
-                            (void) printf("%-15s %8s (%s)  <  %-s\n", (*packs)->name, (*packs)->version,
+                            (void) printf("%-25s %8s (%s)  <  %-s\n", (*packs)->name, (*packs)->version,
                                           (*packs)->os_release, (*indexEntries)->version);
                         } else {
-                            (void) printf("%-15s %8s  <  %-8s\n", (*packs)->name, (*packs)->version,
+                            (void) printf("%-25s %8s  <  %-8s\n", (*packs)->name, (*packs)->version,
                                           (*indexEntries)->version);
                         }
 				}
