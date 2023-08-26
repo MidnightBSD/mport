@@ -43,6 +43,7 @@
 #include <sys/wait.h>
 #include <sys/signal.h>
 #include <unistd.h>
+#include <ftw.h>
 #include <spawn.h>
 #include <poll.h>
 #include <libgen.h>
@@ -220,7 +221,12 @@ mport_chdir(mportInstance *mport, const char *dir)
 int
 mport_rmtree(const char *filename)
 {
-	return mport_xsystem(NULL, "/bin/rm -r %s", filename);
+	int ret = nftw(filename, unlink_cb, 64, FTW_DEPTH | FTW_MOUNT | FTW_PHYS | FTW_CHDIR);
+
+	if (ret!= 0)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Error removing directory tree");
+	return MPORT_OK;
+	//return mport_xsystem(NULL, "/bin/rm -r %s", filename);
 }
 
 /*
