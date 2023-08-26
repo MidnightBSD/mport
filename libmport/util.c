@@ -215,6 +215,16 @@ mport_chdir(mportInstance *mport, const char *dir)
 	return (MPORT_OK);
 }
 
+static int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+{
+    int rv = remove(fpath);
+
+    if (rv)
+        perror(fpath);
+
+    return rv;
+}
+
 /* deletes the entire directory tree at filename.
  * think rm -r filename
  */
@@ -226,7 +236,6 @@ mport_rmtree(const char *filename)
 	if (ret!= 0)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Error removing directory tree");
 	return MPORT_OK;
-	//return mport_xsystem(NULL, "/bin/rm -r %s", filename);
 }
 
 /*
