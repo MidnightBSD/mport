@@ -305,6 +305,7 @@ const char * mport_err_string(void);
 int mport_clean_database(mportInstance *);
 int mport_clean_oldpackages(mportInstance *);
 int mport_clean_oldmtree(mportInstance *);
+int mport_clean_tempfiles(mportInstance *);
 
 /* Setting */
 char * mport_setting_get(mportInstance *, const char *);

@@ -187,3 +187,52 @@ mport_clean_oldmtree(mportInstance *mport)
 	return error_code;
 }
 
+MPORT_PUBLIC_API int
+mport_clean_tempfiles(mportInstance *mport)
+{
+	int error_code = MPORT_OK;
+
+	int deleted = 0;
+	struct dirent *de;
+	DIR *d = opendir("/tmp");
+	
+	if (d == NULL) {
+		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s", MPORT_INST_INFRA_DIR,
+		                        strerror(errno));
+		return error_code;
+	}
+
+	while ((de = readdir(d)) != NULL) {
+		mportPackageMeta **packs;
+		char *path;
+		if (strcmp(".", de->d_name) == 0 || strcmp("..", de->d_name) == 0)
+			continue;
+
+		if (!mport_starts_with("mport.", de->d_name))
+            continue;
+
+
+		asprintf(&path, "%s/%s", "/tmp", de->d_name);
+		if (path == NULL) {
+			continue;
+		}
+
+		int result = unlink(path);
+
+			if (result != 0) {
+				error_code = SET_ERRORX(MPORT_ERR_FATAL, "Could not delete file %s: %s", path, strerror(errno));
+				mport_call_msg_cb(mport, "%s\n", mport_err_string());
+			} else {
+				deleted++;
+			}
+		} 
+		free(path);
+		path = NULL;
+	}
+
+	closedir(d);
+
+	mport_call_msg_cb(mport, "Cleaned up %d temporary files.\n", deleted);
+
+	return error_code;
+}
