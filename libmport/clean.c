@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2011 Lucas Holt
+ * Copyright (c) 2011, 2023 Lucas Holt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -147,7 +147,7 @@ mport_clean_oldmtree(mportInstance *mport)
 		packageName[127] = '\0';
 		char *dash = strrchr(packageName, '-');
 		if (dash != NULL) {
-			dash = '\0';
+			*dash = '\0';
 		}
 
 		if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
@@ -203,13 +203,12 @@ mport_clean_tempfiles(mportInstance *mport)
 	}
 
 	while ((de = readdir(d)) != NULL) {
-		mportPackageMeta **packs;
 		char *path;
 		if (strcmp(".", de->d_name) == 0 || strcmp("..", de->d_name) == 0)
 			continue;
 
 		if (!mport_starts_with("mport.", de->d_name))
-            continue;
+	       		continue;
 
 
 		asprintf(&path, "%s/%s", "/tmp", de->d_name);
@@ -219,13 +218,13 @@ mport_clean_tempfiles(mportInstance *mport)
 
 		int result = unlink(path);
 
-			if (result != 0) {
-				error_code = SET_ERRORX(MPORT_ERR_FATAL, "Could not delete file %s: %s", path, strerror(errno));
-				mport_call_msg_cb(mport, "%s\n", mport_err_string());
-			} else {
-				deleted++;
-			}
-		} 
+		if (result != 0) {
+			error_code = SET_ERRORX(MPORT_ERR_FATAL, "Could not delete file %s: %s", path, strerror(errno));
+			mport_call_msg_cb(mport, "%s\n", mport_err_string());
+		} else {
+			deleted++;
+		}
+	 
 		free(path);
 		path = NULL;
 	}
