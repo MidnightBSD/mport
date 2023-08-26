@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2011 Lucas Holt
+ * Copyright (c) 2011, 2023 Lucas Holt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -147,7 +147,7 @@ mport_clean_oldmtree(mportInstance *mport)
 		packageName[127] = '\0';
 		char *dash = strrchr(packageName, '-');
 		if (dash != NULL) {
-			dash = '\0';
+			*dash = '\0';
 		}
 
 		if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
