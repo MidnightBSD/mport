@@ -319,10 +319,14 @@ main(int argc, char *argv[])
 			char** result = mport_setting_list(mport);
 			char **ptr = result;
 			if (result != NULL) {
+				int i = 0; 
 				while (*result != NULL) {
 					printf("%s\n", *result);
 					result++;
+					i++;
 				}
+				for (int j = 0; j < i; j++)
+					free(ptr[j]);
 				free(ptr);
 			}
 			resultCode = MPORT_OK;
