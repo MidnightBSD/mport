@@ -85,34 +85,44 @@ mport_setting_set(mportInstance *mport, const char *name, const char *val)
 	return MPORT_OK;
 }
 
-MPORT_PUBLIC_API char *
+MPORT_PUBLIC_API char **
 mport_setting_list(mportInstance *mport)
 {
 	sqlite3_stmt *stmt;
 	char *name = NULL;
 	char *val = NULL;
+	int count;
+	char **list = NULL;
 
 	if (name == NULL)
 		return NULL;
 
-	if (mport_db_prepare(mport->db, &stmt, "SELECT name, val FROM settings", name) != MPORT_OK) {
+	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM settings") != MPORT_OK) {
+		return NULL;
+	}	
+
+	list = calloc(count + 1, sizeof(char *));
+
+	if (mport_db_prepare(mport->db, &stmt, "SELECT name, val FROM settings") != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		return NULL;
 	}
 
-	switch (sqlite3_step(stmt)) {
-	case SQLITE_ROW:
-		val = strdup((const char *)sqlite3_column_text(stmt, 0));
-		sqlite3_finalize(stmt);
-		break;
-	case SQLITE_DONE:
-		SET_ERROR(MPORT_ERR_FATAL, "Setting not found.");
-		sqlite3_finalize(stmt);
-		break;
-	default:
-		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
-		sqlite3_finalize(stmt);
+    for (int i = 0; i < count; i++) {
+		int step = sqlite3_step(stmt);
+		if (step == SQLITE_ROW) {
+			name = sqlite3_column_text(stmt, 0);
+			val = sqlite3_column_text(stmt, 1);
+			list[i] = asprintf("%s=%s", name, val);			
+		} else if (step == SQLITE_DONE) {
+			SET_ERROR(MPORT_ERR_FATAL, "Setting not found.");
+			break;
+		} else {
+			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+			break;
+		}
 	}
+	sqlite3_finalize(stmt);
 
-	return val;
+	return list;
 }

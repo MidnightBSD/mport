@@ -310,7 +310,7 @@ int mport_clean_tempfiles(mportInstance *);
 /* Setting */
 char * mport_setting_get(mportInstance *, const char *);
 int mport_setting_set(mportInstance *, const char *, const char *);
-char * mport_setting_list(mportInstance *);
+char ** mport_setting_list(mportInstance *);
 
 /* Utils */
 void mport_parselist(char *, char ***);
