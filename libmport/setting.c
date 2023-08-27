@@ -89,13 +89,8 @@ MPORT_PUBLIC_API char **
 mport_setting_list(mportInstance *mport)
 {
 	sqlite3_stmt *stmt;
-	char *name = NULL;
-	char *val = NULL;
 	int count;
 	char **list = NULL;
-
-	if (name == NULL)
-		return NULL;
 
 	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM settings") != MPORT_OK) {
 		return NULL;
@@ -108,12 +103,10 @@ mport_setting_list(mportInstance *mport)
 		return NULL;
 	}
 
-    for (int i = 0; i < count; i++) {
+	for (int i = 0; i < count; i++) {
 		int step = sqlite3_step(stmt);
 		if (step == SQLITE_ROW) {
-			name = sqlite3_column_text(stmt, 0);
-			val = sqlite3_column_text(stmt, 1);
-			list[i] = asprintf("%s=%s", name, val);			
+			asprintf(&list[i], "%s=%s", sqlite3_column_text(stmt, 0), sqlite3_column_text(stmt, 1));			
 		} else if (step == SQLITE_DONE) {
 			SET_ERROR(MPORT_ERR_FATAL, "Setting not found.");
 			break;

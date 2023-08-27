@@ -317,10 +317,15 @@ main(int argc, char *argv[])
 
 		if (!strcmp(argv[1], "list")) {
 			char** result = mport_setting_list(mport);
-			while (result != NULL) {
-				printf("%s\n", *result);
-				result++;
+			char **ptr = result;
+			if (result != NULL) {
+				while (*result != NULL) {
+					printf("%s\n", *result);
+					result++;
+				}
+				free(ptr);
 			}
+			resultCode = MPORT_OK;
 		} else if (!strcmp(argv[1], "get")) {
 			resultCode = configGet(mport, argv[2]);
 		} else if (!strcmp(argv[1], "set")) {
