@@ -315,7 +315,13 @@ main(int argc, char *argv[])
 			usage();
 		}
 
-		if (!strcmp(argv[1], "get")) {
+		if (!strcmp(argv[1], "list")) {
+			char** result = mport_setting_list(mport);
+			while (result != NULL) {
+				printf("%s\n", *result);
+				result++;
+			}
+		} else if (!strcmp(argv[1], "get")) {
 			resultCode = configGet(mport, argv[2]);
 		} else if (!strcmp(argv[1], "set")) {
 			resultCode = configSet(mport, argv[2], argv[3]);
@@ -416,6 +422,7 @@ usage(void)
 	    "       mport clean\n"
 	    "       mport config get [setting name]\n"
 	    "       mport config set [setting name] [setting val]\n"
+	    "       mport config list\n"
 	    "       mport cpe\n"
 	    "       mport delete [package name]\n"
 	    "       mport deleteall\n"
