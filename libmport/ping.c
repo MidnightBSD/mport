@@ -135,10 +135,10 @@ ping(char *hostname)
 		if (icmp_reply->icmp_type == ICMP_ECHOREPLY) {
 			rtt = end_time - start_time;
 			printf("Received packet from %s, RTT = %ldms\n", hostname, rtt);
-            rtts[try] = rtt;
+            		rtts[try] = rtt;
 		} else {
 			printf("Received an ICMP packet of type %d\n", icmp_reply->icmp_type);
-            rttys[try] = -1;
+            		rtts[try] = -1;
 			try++;
 		}
 
