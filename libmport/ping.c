@@ -47,7 +47,7 @@
 
 #define PACKET_SIZE 64
 #define PING_TIMEOUT 2
-#define MAX_RETRIES = 3
+#define MAX_RETRIES 3
 
 static unsigned short calculateChecksum(unsigned short *buffer, int length);
 static long getCurrentTime(void);
