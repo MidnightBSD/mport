@@ -47,6 +47,7 @@
 
 #define PACKET_SIZE 64
 #define PING_TIMEOUT 2
+#define MAX_RETRIES = 3
 
 static unsigned short calculateChecksum(unsigned short *buffer, int length);
 static long getCurrentTime(void);
@@ -100,44 +101,46 @@ ping(char *hostname)
 	dest_addr.sin_family = AF_INET;
 	dest_addr.sin_addr.s_addr = inet_addr(hostname);
 
-	while(1) {
-	memset(packet, 0, sizeof(packet));
-	icmphdr.icmp_type = ICMP_ECHO;
-	icmphdr.icmp_code = 0;
-	icmphdr.icmp_id = getpid();
-	icmphdr.icmp_seq = try;
-	icmphdr.icmp_cksum = 0;
-	icmphdr.icmp_cksum = calculateChecksum((unsigned short *)&icmphdr, sizeof(icmphdr));
+	while (1) {
+		memset(packet, 0, sizeof(packet));
+		icmphdr.icmp_type = ICMP_ECHO;
+		icmphdr.icmp_code = 0;
+		icmphdr.icmp_id = getpid();
+		icmphdr.icmp_seq = try;
+		icmphdr.icmp_cksum = 0;
+		icmphdr.icmp_cksum = calculateChecksum((unsigned short *)&icmphdr, sizeof(icmphdr));
 
-		if (try == 4)
+		if (try == MAX_RETRIES + 1)
 			return -1;
-	if (sendto(sockfd, &icmphdr, sizeof(icmphdr), 0, (struct sockaddr *)&dest_addr,
-		sizeof(dest_addr)) <= 0) {
-		perror("sendto");
-		return -1;
-	}
+		if (sendto(sockfd, &icmphdr, sizeof(icmphdr), 0, (struct sockaddr *)&dest_addr,
+			sizeof(dest_addr)) <= 0) {
+			perror("sendto");
+			return -1;
+		}
 
-	long start_time = getCurrentTime();
+		long start_time = getCurrentTime();
 
-	char recv_packet[PACKET_SIZE];
-	socklen_t addr_len = sizeof(dest_addr);
-	if (recvfrom(sockfd, recv_packet, sizeof(recv_packet), 0, (struct sockaddr *)&dest_addr,
-		&addr_len) <= 0) {
-		perror("recvfrom");
-		return -1;
-	}
+		char recv_packet[PACKET_SIZE];
+		socklen_t addr_len = sizeof(dest_addr);
+		if (recvfrom(sockfd, recv_packet, sizeof(recv_packet), 0,
+			(struct sockaddr *)&dest_addr, &addr_len) <= 0) {
+			perror("recvfrom");
+			return -1;
+		}
 
-	long end_time = getCurrentTime();
+		long end_time = getCurrentTime();
 
-	struct icmp *icmp_reply = (struct icmp *)(recv_packet + 20); // Skip IP header
-	if (icmp_reply->icmp_type == ICMP_ECHOREPLY) {
-		rtt = end_time - start_time;
-		printf("Received packet from %s, RTT = %ldms\n", hostname, rtt);
-		return rtt;
-	} else {
-		printf("Received an ICMP packet of type %d\n", icmp_reply->icmp_type);
-		try++;
-	}
+		struct icmp *icmp_reply = (struct icmp *)(recv_packet + 20); // Skip IP header
+		if (icmp_reply->icmp_type == ICMP_ECHOREPLY) {
+			rtt = end_time - start_time;
+			printf("Received packet from %s, RTT = %ldms\n", hostname, rtt);
+			return rtt;
+		} else {
+			printf("Received an ICMP packet of type %d\n", icmp_reply->icmp_type);
+			try++;
+		}
+
+        sleep(1);
 	}
 
 	close(sockfd);
