@@ -496,6 +496,45 @@ lookupIndex(mportInstance *mport, const char *packageName)
 }
 
 int
+selectMirror(mportInstance *mport)
+{
+
+	char *url = NULL;
+	int mirrorCount = 0;
+	mportMirrorEntry **mirrorEntry = NULL;
+	long rrts[32];
+ 
+	mport_index_mirror_list(mport, &mirrorEntry);
+	 
+	int fastest = 1000;
+	char *country = "us";
+
+    while(mirrorEntry != NULL) {
+		if (*mirrorEntry[i] == NULL)
+			break;
+
+		long rtt = ping((*mirrorEntry)->url);
+
+		if (rtt < fastest) {
+            fastest = rtt;
+            country = (*mirrorEntry)->country;
+        }	
+	}
+
+	printf("Using mirror %s with rtt %d ms\n", country, fastest);
+	int result = mport_setting_set(mport, MPORT_SETTING_MIRROR_REGION, country);
+
+	if (result != MPORT_OK) {
+		warnx("%s", mport_err_string());
+		return mport_err_code();
+	}
+
+	mport_index_mirror_entry_free_vec(mirrorEntry);
+
+	return 0;
+}
+
+int
 search(mportInstance *mport, char **query)
 {
 	mportIndexEntry **indexEntry = NULL;
@@ -940,7 +979,7 @@ clean(mportInstance *mport)
 	if (ret != MPORT_OK) {
 		result = ret;
 	}
-	
+
 	ret = mport_clean_tempfiles(mport);
 	if (ret != MPORT_OK) {
 		result = ret;
