@@ -383,7 +383,6 @@ mport_index_mirror_list(mportInstance *mport, mportMirrorEntry ***entry_vec)
 		ret = sqlite3_step(stmt);
 
 		if (ret == SQLITE_ROW) {
-
 			if ((e[i] = (mportMirrorEntry *) calloc(1, sizeof(mportMirrorEntry))) == NULL) {
 				ret = MPORT_ERR_FATAL;
 				goto DONE;
@@ -391,6 +390,7 @@ mport_index_mirror_list(mportInstance *mport, mportMirrorEntry ***entry_vec)
 
 			strlcpy(e[i]->country, (const char *) sqlite3_column_text(stmt, 0), 5);
 			strlcpy(e[i]->url, (const char *) sqlite3_column_text(stmt, 1), 256);
+			i++;
 		} else if (ret == SQLITE_DONE) {
 			break;
 		} else {
