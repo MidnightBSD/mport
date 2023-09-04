@@ -89,6 +89,7 @@ ping(char *hostname)
 	struct icmp icmphdr;
 	char packet[PACKET_SIZE];
 	long rtt = 1000;
+	int try = 1;
 
 	int sockfd = socket(AF_INET, SOCK_RAW, 1); // Use 1 for ICMP (ICMPv4)
 	if (sockfd < 0) {
@@ -99,14 +100,17 @@ ping(char *hostname)
 	dest_addr.sin_family = AF_INET;
 	dest_addr.sin_addr.s_addr = inet_addr(hostname);
 
+	while(1) {
 	memset(packet, 0, sizeof(packet));
 	icmphdr.icmp_type = ICMP_ECHO;
 	icmphdr.icmp_code = 0;
 	icmphdr.icmp_id = getpid();
-	icmphdr.icmp_seq = 0;
+	icmphdr.icmp_seq = try;
 	icmphdr.icmp_cksum = 0;
 	icmphdr.icmp_cksum = calculateChecksum((unsigned short *)&icmphdr, sizeof(icmphdr));
 
+		if (try == 4)
+			return -1;
 	if (sendto(sockfd, &icmphdr, sizeof(icmphdr), 0, (struct sockaddr *)&dest_addr,
 		sizeof(dest_addr)) <= 0) {
 		perror("sendto");
@@ -128,13 +132,12 @@ ping(char *hostname)
 	struct icmp *icmp_reply = (struct icmp *)(recv_packet + 20); // Skip IP header
 	if (icmp_reply->icmp_type == ICMP_ECHOREPLY) {
 		rtt = end_time - start_time;
-#ifdef DEBUGGING
-		fprintf(stderr, "Received packet from %s, RTT = %ldms\n", hostname, rtt);
-#endif        
+		printf("Received packet from %s, RTT = %ldms\n", hostname, rtt);
+		return rtt;
 	} else {
-#ifdef DEBUGGING
-		fprintf(stderr, "Received an ICMP packet of type %d\n", icmp_reply->icmp_type);
-#endif
+		printf("Received an ICMP packet of type %d\n", icmp_reply->icmp_type);
+		try++;
+	}
 	}
 
 	close(sockfd);

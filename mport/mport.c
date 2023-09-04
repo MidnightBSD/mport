@@ -509,6 +509,7 @@ selectMirror(mportInstance *mport)
 	int mirrorCount = 0;
 	mportMirrorEntry **mirrorEntry = NULL;
 	long rrts[32];
+	char hostname[256];
  
 	mport_index_mirror_list(mport, &mirrorEntry);
 	 
@@ -516,27 +517,26 @@ selectMirror(mportInstance *mport)
 	char *country = "us";
 
 	while(mirrorEntry != NULL && *mirrorEntry != NULL) {
-		char hostname[256];
-		char *p = strchr(hostname, '/');
-
 		char *p = strchr((*mirrorEntry)->url, '/');
 		if (p!= NULL) {
-            *p = '\0';
-            p++;
+			*p = '\0';
 			p++;
-        }
+			p++;
+        	}
 		char *end = strchr(p, '/');
 		if (end!= NULL) {
-            *end = '\0';
-        }
+			*end = '\0';
+       		}
 		strlcpy(hostname, p, sizeof(hostname));
-		mport_call_msg_cb(mport, "Trying mirror %s %s: ", (*mirrorEntry)->country, (*mirrorEntry)->url);
-		long rtt = ping((*mirrorEntry)->url);
+		mport_call_msg_cb(mport, "Trying mirror %s %s", (*mirrorEntry)->country, hostname);
+		long rtt = ping(hostname);
 
-		if (rtt < fastest) {
+		if (rtt != -1 && rtt < fastest) {
 			fastest = rtt;
 			country = (*mirrorEntry)->country;
-        	}	
+        	}
+
+		mirrorEntry++;
 	}
 
 	mport_call_msg_cb(mport, "Using mirror %s with rtt %d ms\n", country, fastest);
@@ -549,7 +549,7 @@ selectMirror(mportInstance *mport)
 
 	mport_index_mirror_entry_free_vec(mirrorEntry);
 
-	return 0;
+	return MPORT_OK;
 }
 
 int
