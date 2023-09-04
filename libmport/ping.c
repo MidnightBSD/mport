@@ -45,8 +45,11 @@
 #include "mport.h"
 #include "mport_private.h"
 
-unsigned short calculateChecksum(unsigned short *buffer, int length);
-long getCurrentTime();
+#define PACKET_SIZE 64
+#define PING_TIMEOUT 2
+
+static unsigned short calculateChecksum(unsigned short *buffer, int length);
+static long getCurrentTime(void);
 long ping(char *hostname);
 
 static unsigned short
@@ -85,6 +88,7 @@ ping(char *hostname)
 	struct sockaddr_in dest_addr;
 	struct icmp icmphdr;
 	char packet[PACKET_SIZE];
+	long rtt = 1000;
 
 	int sockfd = socket(AF_INET, SOCK_RAW, 1); // Use 1 for ICMP (ICMPv4)
 	if (sockfd < 0) {
@@ -123,7 +127,7 @@ ping(char *hostname)
 
 	struct icmp *icmp_reply = (struct icmp *)(recv_packet + 20); // Skip IP header
 	if (icmp_reply->icmp_type == ICMP_ECHOREPLY) {
-		long rtt = end_time - start_time;
+		rtt = end_time - start_time;
 #ifdef DEBUGGING
 		fprintf(stderr, "Received packet from %s, RTT = %ldms\n", hostname, rtt);
 #endif        

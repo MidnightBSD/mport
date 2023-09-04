@@ -347,7 +347,6 @@ MPORT_PUBLIC_API int
 mport_index_mirror_list(mportInstance *mport, mportMirrorEntry ***entry_vec)
 {
 	
-	int ret;
 	sqlite3_stmt *stmt;
 	int count;
 	mportMirrorEntry **e = NULL;
@@ -367,7 +366,6 @@ mport_index_mirror_list(mportInstance *mport, mportMirrorEntry ***entry_vec)
 
 	e = (mportMirrorEntry **) calloc((size_t) count + 1, sizeof(mportMirrorEntry *));
 	if (e == NULL) {
-		free(lookup);
 		RETURN_ERROR(MPORT_ERR_FATAL, "Could not allocate memory for mirror entries");
 	}
 	*entry_vec = e;
@@ -386,13 +384,13 @@ mport_index_mirror_list(mportInstance *mport, mportMirrorEntry ***entry_vec)
 
 		if (ret == SQLITE_ROW) {
 
-			if ((e[i] = (mportIndexEntry *) calloc(1, sizeof(mportIndexEntry))) == NULL) {
+			if ((e[i] = (mportMirrorEntry *) calloc(1, sizeof(mportMirrorEntry))) == NULL) {
 				ret = MPORT_ERR_FATAL;
 				goto DONE;
 			}
 
 			strlcpy(e[i]->country, (const char *) sqlite3_column_text(stmt, 0), 5);
-			strlcpy(e[i]->mirror, (const char *) sqlite3_column_text(stmt, 1), 256);
+			strlcpy(e[i]->url, (const char *) sqlite3_column_text(stmt, 1), 256);
 		} else if (ret == SQLITE_DONE) {
 			break;
 		} else {
@@ -915,7 +913,7 @@ mport_index_mirror_entry_free_vec(mportMirrorEntry **e)
 	}
 
 	while (*e != NULL) {
-		mport_index_entry_free(*e);
+		mport_index_mirror_entry_free(*e);
 		e++;
 	}
 

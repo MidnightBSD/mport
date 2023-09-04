@@ -81,6 +81,8 @@ static int which(mportInstance *, const char *, bool, bool);
 
 static int audit(mportInstance *, bool);
 
+static int selectMirror(mportInstance *mport);
+
 int
 main(int argc, char *argv[])
 {
@@ -345,6 +347,9 @@ main(int argc, char *argv[])
 			printf("To set a mirror, use the following command:\n");
 			printf("mport set config mirror_region <country>\n\n");
 			resultCode = mport_index_print_mirror_list(mport);
+		} else if (!strcmp(argv[1], "select")) {
+			loadIndex(mport);
+			resultCode = selectMirror(mport);	
 		}
 	} else if (!strcmp(cmd, "cpe")) {
 		resultCode = cpeList(mport);
@@ -445,6 +450,7 @@ usage(void)
 	    "       mport lock [package name]\n"
 	    "       mport locks\n"
 	    "       mport mirror list\n"
+	    "       mport mirror select\n"
 	    "       mport purl\n"
 	    "       mport search [query ...]\n"
 	    "       mport stats\n"
@@ -509,19 +515,17 @@ selectMirror(mportInstance *mport)
 	int fastest = 1000;
 	char *country = "us";
 
-    while(mirrorEntry != NULL) {
-		if (*mirrorEntry[i] == NULL)
-			break;
-
+	while(mirrorEntry != NULL && *mirrorEntry != NULL) {
+		mport_call_msg_cb(mport, "Trying mirror %s %s: ", (*mirrorEntry)->country, (*mirrorEntry)->url);
 		long rtt = ping((*mirrorEntry)->url);
 
 		if (rtt < fastest) {
-            fastest = rtt;
-            country = (*mirrorEntry)->country;
-        }	
+			fastest = rtt;
+			country = (*mirrorEntry)->country;
+        	}	
 	}
 
-	printf("Using mirror %s with rtt %d ms\n", country, fastest);
+	mport_call_msg_cb(mport, "Using mirror %s with rtt %d ms\n", country, fastest);
 	int result = mport_setting_set(mport, MPORT_SETTING_MIRROR_REGION, country);
 
 	if (result != MPORT_OK) {
