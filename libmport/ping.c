@@ -102,7 +102,7 @@ ping(char *hostname)
 	dest_addr.sin_family = AF_INET;
 	dest_addr.sin_addr.s_addr = inet_addr(hostname);
 
-	while (1) {
+	for (; try < MAX_RETRIES; try++) {
 		memset(packet, 0, sizeof(packet));
 		icmphdr.icmp_type = ICMP_ECHO;
 		icmphdr.icmp_code = 0;
@@ -111,8 +111,6 @@ ping(char *hostname)
 		icmphdr.icmp_cksum = 0;
 		icmphdr.icmp_cksum = calculateChecksum((unsigned short *)&icmphdr, sizeof(icmphdr));
 
-		if (try == MAX_RETRIES)
-			return -1;
 		if (sendto(sockfd, &icmphdr, sizeof(icmphdr), 0, (struct sockaddr *)&dest_addr,
 			sizeof(dest_addr)) <= 0) {
 			perror("sendto");
@@ -139,7 +137,6 @@ ping(char *hostname)
 		} else {
 			printf("Received an ICMP packet of type %d\n", icmp_reply->icmp_type);
             		rtts[try] = -1;
-			try++;
 		}
 
         sleep(1);
@@ -150,14 +147,14 @@ ping(char *hostname)
 	int sum = 0;
 	int totalValid = 0;
 	for (int i = 0; i < MAX_RETRIES; i++) {
-	if (rtts[i] != -1) {
+	    if (rtts[i] != -1) {
 			sum += rtts[i];
 			totalValid++;
-	}
+	    }
 	}
 
 	if (totalValid == 0) {
-	return -1;
+	    return -1;
 	}
 	return sum / totalValid; // average
 }
