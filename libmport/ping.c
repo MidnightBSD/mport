@@ -90,7 +90,8 @@ ping(char *hostname)
 	struct icmp icmphdr;
 	char packet[PACKET_SIZE];
 	long rtt = 1000;
-	int try = 1;
+	int try = 0;
+	int rtts[MAX_RETRIES];
 
 	int sockfd = socket(AF_INET, SOCK_RAW, 1); // Use 1 for ICMP (ICMPv4)
 	if (sockfd < 0) {
@@ -110,7 +111,7 @@ ping(char *hostname)
 		icmphdr.icmp_cksum = 0;
 		icmphdr.icmp_cksum = calculateChecksum((unsigned short *)&icmphdr, sizeof(icmphdr));
 
-		if (try == MAX_RETRIES + 1)
+		if (try == MAX_RETRIES)
 			return -1;
 		if (sendto(sockfd, &icmphdr, sizeof(icmphdr), 0, (struct sockaddr *)&dest_addr,
 			sizeof(dest_addr)) <= 0) {
@@ -134,9 +135,10 @@ ping(char *hostname)
 		if (icmp_reply->icmp_type == ICMP_ECHOREPLY) {
 			rtt = end_time - start_time;
 			printf("Received packet from %s, RTT = %ldms\n", hostname, rtt);
-			return rtt;
+            rtts[try] = rtt;
 		} else {
 			printf("Received an ICMP packet of type %d\n", icmp_reply->icmp_type);
+            rttys[try] = -1;
 			try++;
 		}
 
@@ -145,5 +147,17 @@ ping(char *hostname)
 
 	close(sockfd);
 
-    return rtt;
+	int sum = 0;
+	int totalValid = 0;
+	for (int i = 0; i < MAX_RETRIES; i++) {
+	if (rtts[i] != -1) {
+			sum += rtts[i];
+			totalValid++;
+	}
+	}
+
+	if (totalValid == 0) {
+	return -1;
+	}
+	return sum / totalValid; // average
 }
