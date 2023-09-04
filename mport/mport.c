@@ -516,6 +516,20 @@ selectMirror(mportInstance *mport)
 	char *country = "us";
 
 	while(mirrorEntry != NULL && *mirrorEntry != NULL) {
+		char hostname[256];
+		char *p = strchr(hostname, '/');
+
+		char *p = strchr((*mirrorEntry)->url, '/');
+		if (p!= NULL) {
+            *p = '\0';
+            p++;
+			p++;
+        }
+		char *end = strchr(p, '/');
+		if (end!= NULL) {
+            *end = '\0';
+        }
+		strlcpy(hostname, p, sizeof(hostname));
 		mport_call_msg_cb(mport, "Trying mirror %s %s: ", (*mirrorEntry)->country, (*mirrorEntry)->url);
 		long rtt = ping((*mirrorEntry)->url);
 
