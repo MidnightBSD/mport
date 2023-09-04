@@ -196,6 +196,11 @@ typedef struct {
   char moved_to_pkgname[128];
 } mportIndexMovedEntry;
 
+typedef struct {
+  char country[5];
+  char url[256];
+} mportMirrorEntry;
+
 int mport_index_load(mportInstance *);
 int mport_index_get(mportInstance *);
 int mport_index_check(mportInstance *, mportPackageMeta *);
@@ -207,6 +212,9 @@ void mport_index_entry_free_vec(mportIndexEntry **);
 void mport_index_entry_free(mportIndexEntry *);
 
 int mport_index_print_mirror_list(mportInstance *);
+int mport_index_mirror_list(mportInstance *, mportMirrorEntry ***);
+void mport_index_mirror_entry_free_vec(mportMirrorEntry **e);
+void mport_index_mirror_entry_free(mportMirrorEntry *);
 
 int mport_moved_lookup(mportInstance *, const char *, mportIndexMovedEntry ***);
 
@@ -347,5 +355,8 @@ mportStats * mport_stats_new(void);
 /* Import/Export */
 int mport_import(mportInstance*,  char *);
 int mport_export(mportInstance*, char *);
+
+/* Ping */
+long ping(char *hostname);
 
 #endif /* ! defined _MPORT_H */

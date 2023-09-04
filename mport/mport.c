@@ -81,6 +81,8 @@ static int which(mportInstance *, const char *, bool, bool);
 
 static int audit(mportInstance *, bool);
 
+static int selectMirror(mportInstance *mport);
+
 int
 main(int argc, char *argv[])
 {
@@ -345,6 +347,9 @@ main(int argc, char *argv[])
 			printf("To set a mirror, use the following command:\n");
 			printf("mport set config mirror_region <country>\n\n");
 			resultCode = mport_index_print_mirror_list(mport);
+		} else if (!strcmp(argv[1], "select")) {
+			loadIndex(mport);
+			resultCode = selectMirror(mport);	
 		}
 	} else if (!strcmp(cmd, "cpe")) {
 		resultCode = cpeList(mport);
@@ -445,6 +450,7 @@ usage(void)
 	    "       mport lock [package name]\n"
 	    "       mport locks\n"
 	    "       mport mirror list\n"
+	    "       mport mirror select\n"
 	    "       mport purl\n"
 	    "       mport search [query ...]\n"
 	    "       mport stats\n"
@@ -493,6 +499,57 @@ lookupIndex(mportInstance *mport, const char *packageName)
 	}
 
 	return (indexEntries);
+}
+
+int
+selectMirror(mportInstance *mport)
+{
+
+	char *url = NULL;
+	int mirrorCount = 0;
+	mportMirrorEntry **mirrorEntry = NULL;
+	long rrts[32];
+	char hostname[256];
+ 
+	mport_index_mirror_list(mport, &mirrorEntry);
+	 
+	int fastest = 1000;
+	char *country = "us";
+
+	while(mirrorEntry != NULL && *mirrorEntry != NULL) {
+		char *p = strchr((*mirrorEntry)->url, '/');
+		if (p!= NULL) {
+			*p = '\0';
+			p++;
+			p++;
+        	}
+		char *end = strchr(p, '/');
+		if (end!= NULL) {
+			*end = '\0';
+       		}
+		strlcpy(hostname, p, sizeof(hostname));
+		mport_call_msg_cb(mport, "Trying mirror %s %s", (*mirrorEntry)->country, hostname);
+		long rtt = ping(hostname);
+
+		if (rtt != -1 && rtt < fastest) {
+			fastest = rtt;
+			country = (*mirrorEntry)->country;
+        	}
+
+		mirrorEntry++;
+	}
+
+	mport_call_msg_cb(mport, "Using mirror %s with rtt %d ms\n", country, fastest);
+	int result = mport_setting_set(mport, MPORT_SETTING_MIRROR_REGION, country);
+
+	if (result != MPORT_OK) {
+		warnx("%s", mport_err_string());
+		return mport_err_code();
+	}
+
+	mport_index_mirror_entry_free_vec(mirrorEntry);
+
+	return MPORT_OK;
 }
 
 int
@@ -940,7 +997,7 @@ clean(mportInstance *mport)
 	if (ret != MPORT_OK) {
 		result = ret;
 	}
-	
+
 	ret = mport_clean_tempfiles(mport);
 	if (ret != MPORT_OK) {
 		result = ret;
