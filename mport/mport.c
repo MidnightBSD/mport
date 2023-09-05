@@ -636,7 +636,7 @@ unlock(mportInstance *mport, const char *packageName)
 static int
 stats(mportInstance *mport)
 {
-	char flatsize_str[16];
+	char flatsize_str[10];
 	mportStats *s = NULL;
 	if (mport_stats(mport, &s) != MPORT_OK) {
 		warnx("%s", mport_err_string());

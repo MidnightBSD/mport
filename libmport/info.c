@@ -123,7 +123,7 @@ mport_info(mportInstance *mport, const char *packageName) {
 		snprintf(purl, sizeof(purl), "pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s", (*indexEntry)->pkgname, (*packs)->version, MPORT_ARCH, os_release);
 	}
 
-	char flatsize_str[16];
+	char flatsize_str[10];
 	humanize_number(flatsize_str, sizeof(flatsize_str), flatsize, "B", HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
 
 	asprintf(&info_text,
