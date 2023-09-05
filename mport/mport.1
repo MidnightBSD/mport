@@ -85,6 +85,8 @@
 .Cm search
 .Op Ar name ...
 .Nm
+.Cm shell
+.Nm
 .Cm stats
 .Nm
 .Cm update
@@ -164,6 +166,8 @@ Lists PURL for each installed package
 .It Cm search
 Search package names and descriptions.  Supports globbing queries such as 
 "*php*".
+.It Cm shell
+Starts a sqlite3 client connected to the mport master database.
 .It Cm stats
 List statistics about available and installed packages.
 .It Cm update Ao name Ac
