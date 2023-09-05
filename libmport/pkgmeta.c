@@ -167,15 +167,15 @@ mport_pkgmeta_read_stub(mportInstance *mport, mportPackageMeta ***ref)
 
     // this is nasty, but we want to maintain backward compatibility with older packages. 
     if (mport_db_prepare(db, &stmt,
-	    "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic, type, flatsize FROM stub.packages") != MPORT_OK) {
+	    "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic, 0 as install_date, type, flatsize FROM stub.packages") != MPORT_OK) {
 	    sqlite3_finalize(stmt);
 
 	    if (mport_db_prepare(db, &stmt,
-		    "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic, type FROM stub.packages") != MPORT_OK) {
+		    "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic, 0 as install_date, type, 0 as flatsize FROM stub.packages") != MPORT_OK) {
 			sqlite3_finalize(stmt);
 
 			if (mport_db_prepare(db, &stmt,
-				"SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic FROM stub.packages") != MPORT_OK) {
+				"SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic, 0 as install_date, 0 as type, 0 as flatsize FROM stub.packages") != MPORT_OK) {
 				sqlite3_finalize(stmt);
 				RETURN_CURRENT_ERROR;
 			}
@@ -601,33 +601,33 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 	if ((tmp = sqlite3_column_text(stmt, 12)) == NULL) {
 		pack->flavor = strdup("");
 	} else if ((pack->flavor = strdup(tmp)) == NULL) {
-        RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
-    }
+		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+	}
 
-    /* Automatic dependency install */
-    if (sqlite3_column_type(stmt, 13) == SQLITE_INTEGER) {
-        pack->automatic = sqlite3_column_int(stmt, 13);
-    } else {
-        pack->automatic = 0;
-    }
+	/* Automatic dependency install */
+	if (sqlite3_column_type(stmt, 13) == SQLITE_INTEGER) {
+		pack->automatic = sqlite3_column_int(stmt, 13);
+	} else {
+		pack->automatic = 0;
+	}
 
-    if (sqlite3_column_type(stmt, 14) == SQLITE_INTEGER) {
-        pack->install_date = sqlite3_column_int(stmt, 14);
-    } else {
+	if (sqlite3_column_type(stmt, 14) == SQLITE_INTEGER) {
+		pack->install_date = sqlite3_column_int(stmt, 14);
+	} else {
 		pack->install_date = 0;
-    }
+	}
 
-    if (sqlite3_column_type(stmt, 15) == SQLITE_INTEGER) {
-        pack->type = sqlite3_column_int(stmt, 15);
-    } else {
+	if (sqlite3_column_type(stmt, 15) == SQLITE_INTEGER) {
+		pack->type = sqlite3_column_int(stmt, 15);
+	} else {
 		pack->type = 0;
-    }
+	}
 
-    if (sqlite3_column_type(stmt, 16) == SQLITE_INTEGER) {
-        pack->flatsize = sqlite3_column_int64(stmt, 16);
-    } else {
+	if (sqlite3_column_type(stmt, 16) == SQLITE_INTEGER) {
+		pack->flatsize = sqlite3_column_int64(stmt, 16);
+	} else {
 		pack->flatsize = 0;
-    }
+	}
 
 	return MPORT_OK;
 }
