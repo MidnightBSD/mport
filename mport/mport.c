@@ -39,7 +39,7 @@
 #include <getopt.h>
 #include <mport.h>
 #include <mport_private.h>
-#include <util.h>
+#include <libutil.h>
 
 #define MPORT_TOOLS_PATH "/usr/libexec/"
 

@@ -34,7 +34,7 @@
 #include <time.h>
 #include <err.h>
 #include <unistd.h>
-#include <util.h>
+#include <libutil.h>
 
 MPORT_PUBLIC_API char *
 mport_info(mportInstance *mport, const char *packageName) {

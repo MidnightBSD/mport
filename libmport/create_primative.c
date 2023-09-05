@@ -207,7 +207,7 @@ insert_assetlist(sqlite3 *db, mportAssetList *assetlist, mportPackageMeta *pack,
 				if (sqlite3_bind_text(stmnt, 4, hash, -1, SQLITE_STATIC) != SQLITE_OK)
 					RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 
-				pack->flatsize += st.st_size
+				pack->flatsize += st.st_size;
 			} else {
 				sqlite3_bind_null(stmnt, 4);
 			}
@@ -311,7 +311,7 @@ insert_meta(mportInstance *mport, sqlite3 *db, mportPackageMeta *pack, mportCrea
 		error_code = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 		return error_code;
 	}
-	if (sqlite3_bind_int(stmnt, 14, pack->flatsize != SQLITE_OK) {
+	if (sqlite3_bind_int(stmnt, 14, pack->flatsize) != SQLITE_OK) {
 		error_code = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 		return error_code;
 	}
