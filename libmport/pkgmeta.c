@@ -624,7 +624,7 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
     }
 
     if (sqlite3_column_type(stmt, 16) == SQLITE_INTEGER) {
-        pack->flatsize = sqlite3_column_int(stmt, 16);
+        pack->flatsize = sqlite3_column_int64(stmt, 16);
     } else {
 		pack->flatsize = 0;
     }
