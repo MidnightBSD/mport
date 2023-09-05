@@ -160,6 +160,7 @@ typedef struct {
 	  time_t install_date;
     mportAction action; // not populated from package table
     mportType type;
+    int64_t flatsize;
 } __attribute__ ((aligned (16)))  mportPackageMeta;
 
 int mport_asset_get_assetlist(mportInstance *, mportPackageMeta *, mportAssetList **);
@@ -344,8 +345,8 @@ int mport_lock_islocked(mportPackageMeta *);
 typedef struct {
     unsigned int pkg_installed;
     unsigned int pkg_available;
-    /* off_t pkg_installed_size;
-       off_t pkg_available_size; */
+    int64_t pkg_installed_size;
+    /* TODO: int64_t pkg_available_size; */
 } mportStats;
 
 int mport_stats(mportInstance *, mportStats **);

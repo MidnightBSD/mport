@@ -39,6 +39,7 @@
 #include <getopt.h>
 #include <mport.h>
 #include <mport_private.h>
+#include <libutil.h>
 
 #define MPORT_TOOLS_PATH "/usr/libexec/"
 
@@ -642,14 +643,18 @@ unlock(mportInstance *mport, const char *packageName)
 static int
 stats(mportInstance *mport)
 {
+	char flatsize_str[8];
 	mportStats *s = NULL;
 	if (mport_stats(mport, &s) != MPORT_OK) {
 		warnx("%s", mport_err_string());
 		return (1);
 	}
 
+	humanize_number(flatsize_str, sizeof(flatsize_str), s->pkg_installed_size, "B", HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
+
 	printf("Local package database:\n");
 	printf("\tInstalled packages: %d\n", s->pkg_installed);
+	printf("\tDisk space occupied: %s\n", flatsize_str);
 	printf("\nRemote package database:\n");
 	printf("\tPackages available: %d\n", s->pkg_available);
 
