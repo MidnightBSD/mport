@@ -165,17 +165,21 @@ mport_pkgmeta_read_stub(mportInstance *mport, mportPackageMeta ***ref)
         RETURN_ERROR(MPORT_ERR_FATAL, "stub database contains no packages.");
     }
 
+    // this is nasty, but we want to maintain backward compatibility with older packages. 
     if (mport_db_prepare(db, &stmt,
-                         "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic, type FROM stub.packages") !=
-        MPORT_OK) {
-        sqlite3_finalize(stmt);
+	    "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic, type, flatsize FROM stub.packages") != MPORT_OK) {
+	    sqlite3_finalize(stmt);
 
-        if (mport_db_prepare(db, &stmt,
-                         "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic FROM stub.packages") !=
-        MPORT_OK) {
-        sqlite3_finalize(stmt);
-        RETURN_CURRENT_ERROR;
-        }
+	    if (mport_db_prepare(db, &stmt,
+		    "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic, type FROM stub.packages") != MPORT_OK) {
+			sqlite3_finalize(stmt);
+
+			if (mport_db_prepare(db, &stmt,
+				"SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, 0 as locked, deprecated, expiration_date, no_provide_shlib, flavor, 0 as automatic FROM stub.packages") != MPORT_OK) {
+				sqlite3_finalize(stmt);
+				RETURN_CURRENT_ERROR;
+			}
+	    }
     }
 
     ret = populate_vec_from_stmt(ref, len, db, stmt);
@@ -240,7 +244,7 @@ mport_pkgmeta_search_master(mportInstance *mport, mportPackageMeta ***ref, const
     }
 
     if (mport_db_prepare(db, &stmt,
-                         "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, locked, deprecated, expiration_date, no_provide_shlib, flavor, automatic, install_date, type FROM packages WHERE %s",
+                         "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, locked, deprecated, expiration_date, no_provide_shlib, flavor, automatic, install_date, type, flatsize FROM packages WHERE %s",
                          where) != MPORT_OK) {
         sqlite3_finalize(stmt);
         RETURN_CURRENT_ERROR;
@@ -291,7 +295,7 @@ mport_pkgmeta_list(mportInstance *mport, mportPackageMeta ***ref)
     }
 
     if (mport_db_prepare(db, &stmt,
-                         "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, locked, deprecated, expiration_date, no_provide_shlib, flavor, automatic, install_date, type FROM packages ORDER BY pkg, version") !=
+                         "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, locked, deprecated, expiration_date, no_provide_shlib, flavor, automatic, install_date, type, flatsize FROM packages ORDER BY pkg, version") !=
         MPORT_OK) {
         sqlite3_finalize(stmt);
         RETURN_CURRENT_ERROR;
@@ -334,7 +338,7 @@ mport_pkgmeta_list_locked(mportInstance *mport, mportPackageMeta ***ref)
     }
 
     if (mport_db_prepare(db, &stmt,
-                         "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, locked, deprecated, expiration_date, no_provide_shlib, flavor, automatic, install_date, type FROM packages where locked=1 ORDER BY pkg, version") !=
+                         "SELECT pkg, version, origin, lang, prefix, comment, os_release, cpe, locked, deprecated, expiration_date, no_provide_shlib, flavor, automatic, install_date, type, flatsize FROM packages where locked=1 ORDER BY pkg, version") !=
         MPORT_OK) {
         sqlite3_finalize(stmt);
         RETURN_CURRENT_ERROR;
@@ -381,7 +385,7 @@ mport_pkgmeta_get_downdepends(mportInstance *mport, mportPackageMeta *pkg, mport
   }
 
   if (mport_db_prepare(mport->db, &stmt, 
-      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.os_release, packages.cpe, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic, packages.install_date, packages.type FROM packages,depends WHERE packages.pkg=depends.depend_pkgname AND depends.pkg=%Q",
+      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.os_release, packages.cpe, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic, packages.install_date, packages.type, packages.flatsize FROM packages,depends WHERE packages.pkg=depends.depend_pkgname AND depends.pkg=%Q",
       pkg->name) != MPORT_OK) {
     sqlite3_finalize(stmt);
     RETURN_CURRENT_ERROR;
@@ -427,7 +431,7 @@ mport_pkgmeta_get_updepends(mportInstance *mport, mportPackageMeta *pkg, mportPa
   }
 
   if (mport_db_prepare(mport->db, &stmt, 
-      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.os_release, packages.cpe, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic, packages.install_date, packages.type FROM packages,depends WHERE packages.pkg=depends.pkg AND depends.depend_pkgname=%Q",
+      "SELECT packages.pkg, packages.version, packages.origin, packages.lang, packages.prefix, packages.comment, packages.os_release, packages.cpe, packages.locked, packages.deprecated, packages.expiration_date, packages.no_provide_shlib, packages.flavor, packages.automatic, packages.install_date, packages.type, packages.flatsize FROM packages,depends WHERE packages.pkg=depends.pkg AND depends.depend_pkgname=%Q",
                        pkg->name) != MPORT_OK) {
     sqlite3_finalize(stmt);
     RETURN_CURRENT_ERROR;
@@ -617,6 +621,12 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
         pack->type = sqlite3_column_int(stmt, 15);
     } else {
 		pack->type = 0;
+    }
+
+    if (sqlite3_column_type(stmt, 16) == SQLITE_INTEGER) {
+        pack->flatsize = sqlite3_column_int(stmt, 16);
+    } else {
+		pack->flatsize = 0;
     }
 
 	return MPORT_OK;
