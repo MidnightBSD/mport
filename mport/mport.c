@@ -305,6 +305,12 @@ main(int argc, char *argv[])
 			free(searchQuery[i - 1]);
 		}
 		free(searchQuery);
+	} else if (!strcmp(cmd, "shell")) {
+		asprintf(&buf, "%s/%s", "/usr/bin", "sqlite3");
+                flag = strdup("/var/db/mport/master.db");
+                resultCode = execl(buf, "sqlite3", flag, (char *)0);
+                free(flag);
+                free(buf);
 	} else if (!strcmp(cmd, "stats")) {
 		loadIndex(mport);
 		resultCode = stats(mport);
@@ -453,6 +459,7 @@ usage(void)
 	    "       mport mirror select\n"
 	    "       mport purl\n"
 	    "       mport search [query ...]\n"
+	    "       mport shell\n"
 	    "       mport stats\n"
 	    "       mport unlock [package name]\n"
 	    "       mport update [package name]\n"
