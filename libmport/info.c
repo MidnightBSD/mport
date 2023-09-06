@@ -71,7 +71,6 @@ mport_info(mportInstance *mport, const char *packageName) {
 
 	if (indexEntry == NULL || *indexEntry == NULL) {
 		SET_ERROR(MPORT_ERR_FATAL, "Could not resolve package.");
-		return (NULL);
 	}
 
 	if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
@@ -80,6 +79,7 @@ mport_info(mportInstance *mport, const char *packageName) {
 
 	if (mport_moved_lookup(mport, packageName, &movedEntries) != MPORT_OK) {
 		SET_ERROR(MPORT_ERR_FATAL, "The moved lookup failed.");
+		return (NULL);
 	}
 
 	if (packs == NULL) {
@@ -143,33 +143,25 @@ mport_info(mportInstance *mport, const char *packageName) {
 	char flatsize_str[8];
 	humanize_number(flatsize_str, sizeof(flatsize_str), flatsize, "B", HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
 
+	if (packs != NULL) {
 	asprintf(&info_text,
 	         "%s-%s\n"
 	         "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
 	         "Flavor          : %s\nOS              : %s\n"
 	         "CPE             : %s\nPURL            : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date    : %s"
 	         "Comment         : %s\nOptions         : %s\nType            : %s\nFlat Size       : %s\nDescription     :\n%s\n",
-	         (*indexEntry)->pkgname, (*indexEntry)->version,
-	         (*indexEntry)->pkgname,
-	         status,
-	         (*indexEntry)->version,
-	         (*indexEntry)->license,
-	         origin,
-	         flavor,
-	         os_release,
-	         cpe,
-			 purl,
-	         locked ? "yes" : "no",
-	         automatic == MPORT_EXPLICIT ? "yes" : "no",
-	         no_shlib_provided ? "yes" : "no",
-	         deprecated,
+	         (*packs)->name, (*packs)->version,
+	         (*packs)->name, status, indexEntry != NULL ? (*indexEntry)->version : "", indexEntry != NULL ? (*indexEntry)->license : "", origin,
+	         flavor, os_release,
+		 cpe, purl, locked ? "yes" : "no", automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no", deprecated,
 	         expirationDate == 0 ? "" : ctime(&expirationDate),
 	         installDate == 0 ? "\n" : ctime(&installDate),
-	         (*indexEntry)->comment,
+	         indexEntry != NULL ? (*indexEntry)->comment : "",
 	         options,
-			 type == MPORT_TYPE_APP ? "Application" : "System", 
-			 flatsize_str,
-	         desc);
+		 type == MPORT_TYPE_APP ? "Application" : "System", 
+		 flatsize_str,
+		 desc);
+	}
 
 	if (packs == NULL) {
 		free(status);
