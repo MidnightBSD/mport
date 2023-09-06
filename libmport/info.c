@@ -134,7 +134,10 @@ mport_info(mportInstance *mport, const char *packageName) {
 		installDate = (*packs)->install_date;
 		type = (*packs)->type;
 		flatsize = (*packs)->flatsize;
-		snprintf(purl, sizeof(purl), "pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s", (*indexEntry)->pkgname, (*packs)->version, MPORT_ARCH, os_release);
+		if (indexEntry != NULL)
+			snprintf(purl, sizeof(purl), "pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s", (*indexEntry)->pkgname, (*packs)->version, MPORT_ARCH, os_release);
+		else
+			purl[0] = '\0';	
 	}
 
 	char flatsize_str[8];
