@@ -40,6 +40,7 @@ MPORT_PUBLIC_API char *
 mport_info(mportInstance *mport, const char *packageName) {
 	mportIndexEntry **indexEntry;
 	mportPackageMeta **packs;
+	mportIndexMovedEntry **movedEntries;
 	char *status, *origin, *flavor, *deprecated;
 	char *os_release;
 	char *cpe;
@@ -77,6 +78,10 @@ mport_info(mportInstance *mport, const char *packageName) {
 		return (NULL);
 	}
 
+	if (mport_moved_lookup(mport, packageName, &movedEntries) != MPORT_OK) {
+		SET_ERROR(MPORT_ERR_FATAL, "The moved lookup failed.");
+	}
+
 	if (packs == NULL) {
 		status = strdup("N/A");
 		origin = strdup("");
@@ -105,9 +110,18 @@ mport_info(mportInstance *mport, const char *packageName) {
 		}
 		deprecated = (*packs)->deprecated;
 		if (deprecated == NULL || deprecated[0] == '\0') {
-			deprecated = strdup("no");
+			if (movedEntries != NULL && *movedEntries!= NULL && (*movedEntries)->date[0] != '\0') {
+				deprecated = strdup("yes");
+            } else {
+				deprecated = strdup("no");
+			}
 		}
 		expirationDate = (*packs)->expiration_date;
+		if (expirationDate == 0 && movedEntries != NULL && *movedEntries!= NULL && (*movedEntries)->date[0] != '\0') {
+			struct tm expDate;
+			strptime((*movedEntries)->date, "%Y-%m-%d", &expDate);
+			expirationDate = mktime(&expDate);
+		}
 		options = (*packs)->options;
 		if (options == NULL) {
 			options = strdup("");
