@@ -185,5 +185,8 @@ mport_info(mportInstance *mport, const char *packageName) {
 	mport_index_entry_free_vec(indexEntry);
 	indexEntry = NULL;
 
+	free(movedEntries);
+	movedEntries = NULL;
+
 	return info_text;
 }
