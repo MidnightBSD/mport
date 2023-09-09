@@ -60,10 +60,10 @@ static int check_if_older_os(mportInstance *, mportPackageMeta *);
  */
 int mport_check_preconditions(mportInstance *mport, mportPackageMeta *pack, long flags)
 {
-	if (flags & MPORT_PRECHECK_MOVED && check_if_moved(mport, pack)!= MPORT_OK)
-		return RETURN_CURRENT_ERROR;
-	if (flags & MPORT_PRECHECK_DEPRECATED && check_if_deprecated(mport, pack)!= MPORT_OK)
-		return RETURN_CURRENT_ERROR;
+	if (flags & MPORT_PRECHECK_MOVED && check_if_moved(mport, pack) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+	if (flags & MPORT_PRECHECK_DEPRECATED && check_if_deprecated(mport, pack) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
 	if (flags & MPORT_PRECHECK_INSTALLED && check_if_installed(mport, pack) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 	if (flags & MPORT_PRECHECK_UPGRADEABLE && check_if_older_installed(mport, pack) != MPORT_OK)
