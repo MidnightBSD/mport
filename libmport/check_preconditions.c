@@ -95,7 +95,7 @@ static int check_if_moved(mportInstance *mport, mportPackageMeta *pack)
 		return MPORT_OK; // it expired, not moved
 
 	if ((*movedEntries)->moved_to != NULL && (*movedEntries)->moved_to[0]!= '\0') {
-		SET_ERROR(MPORT_ERR_FATAL, "The package %s has been moved to %s", pack->name, (*movedEntries)->moved_to);
+		SET_ERRORX(MPORT_ERR_FATAL, "The package %s has been moved to %s", pack->name, (*movedEntries)->moved_to);
         RETURN_CURRENT_ERROR;
 	}
 
@@ -116,7 +116,7 @@ static int check_if_deprecated(mportInstance *mport, mportPackageMeta *pack)
 	}
 
 	if ((*movedEntries)->date[0] != '\0') {
-		SET_ERRORX(MPORT_ERR_FATAL, "%s expires on %s.", pack->name, *movedEntries)->date);
+		SET_ERRORX(MPORT_ERR_FATAL, "%s expires on %s.", pack->name, (*movedEntries)->date);
 		RETURN_CURRENT_ERROR;
 	}
 
