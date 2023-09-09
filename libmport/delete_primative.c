@@ -292,7 +292,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 		case ASSET_DIRRM:
 		case ASSET_DIRRMTRY:
 		case ASSET_DIR_OWNER_MODE:
-			if (is_safe_to_delete_dir(mport, pkg, file)) {
+			if (is_safe_to_delete_dir(mport, pack, file)) {
 				if (mport_rmdir(file, type == ASSET_DIRRMTRY ? 1 : 0) != MPORT_OK) {
 					mport_call_msg_cb(mport, "Could not remove directory '%s': %s",
 				    	file, mport_err_string());
@@ -351,15 +351,14 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	return (MPORT_OK);
 }
 
-bool is_safe_to_delete_dir(mportInstance *mport, mportPackageMeta *pkg, const char *path) 
+bool is_safe_to_delete_dir(mportInstance *mport, mportPackageMeta *pack, const char *path) 
 {
 	sqlite3_stmt *stmt;
-	char *msg;
 	int count;
 
 	if (mport_db_prepare(mport->db, &stmt,
 		"SELECT count(*) from assets where pkg!=%Q and type in (%d, %d, %d, %d) and data=%Q",
-		pkg-name, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE, path) != MPORT_OK) {
+		pack->name, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE, path) != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
 
