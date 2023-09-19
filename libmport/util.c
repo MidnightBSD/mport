@@ -63,8 +63,8 @@ mport_createextras_new(void)
 	if (extra == NULL)
 		return NULL;
 
-	extra->pkg_filename = NULL;
-	extra->sourcedir = NULL;
+	extra->pkg_filename[0] = '\0';
+	extra->sourcedir[0] = '\0';
 	extra->mtree = NULL;
 	extra->pkginstall = NULL;
 	extra->pkgdeinstall = NULL;
@@ -83,10 +83,6 @@ mport_createextras_free(mportCreateExtras *extra)
 	if (extra == NULL)
 		return;
 
-	free(extra->pkg_filename);
-	extra->pkg_filename = NULL;
-	free(extra->sourcedir);
-	extra->sourcedir = NULL;
 	free(extra->mtree);
 	extra->mtree = NULL;
 	free(extra->pkginstall);
@@ -96,24 +92,26 @@ mport_createextras_free(mportCreateExtras *extra)
 	free(extra->pkgmessage);
 	extra->pkgmessage = NULL;
 
-	i = 0;
 	if (extra->conflicts != NULL) {
-		while (extra->conflicts[i] != NULL) {
+		for (i = 0; i < extra->conflicts_count; i++) {
+			if (extra->conflicts[i] == NULL) {
+				break;
+			}
 			free(extra->conflicts[i]);
 			extra->conflicts[i] = NULL;
-			i++;
 		}
-
+		
 		free(extra->conflicts);
 		extra->conflicts = NULL;
 	}
 
-	i = 0;
 	if (extra->depends != NULL) {
-		while (extra->depends[i] != NULL) {
+		for (i = 0; i < extra->depends_count; i++) {
+			if (extra->depends[i] == NULL) {
+				break;
+			}
 			free(extra->depends[i]);
 			extra->depends[i] = NULL;
-			i++;
 		}
 
 		free(extra->depends);
@@ -414,12 +412,13 @@ mport_xsystem(mportInstance *mport, const char *fmt, ...)
  *
  * char input[] = "foo bar baz"
  * char **list;
+ * size_t list_size;
  *
- * mport_parselist(input, &list);
+ * mport_parselist(input, &list, &list_size);
  * list = {"foo", "bar", "baz"};
  */
 void
-mport_parselist(char *opt, char ***list)
+mport_parselist(char *opt, char ***list, size_t *list_size)
 {
 	size_t len;
 	char *input;
@@ -436,6 +435,7 @@ mport_parselist(char *opt, char ***list)
 		if (*field != '\0')
 			len++;
 	}
+	list_size = len;
 
 	if ((*list = (char **)calloc((len + 1), sizeof(char *))) == NULL) {
 		return;
