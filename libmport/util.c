@@ -78,7 +78,7 @@ mport_createextras_new(void)
 MPORT_PUBLIC_API void
 mport_createextras_free(mportCreateExtras *extra)
 {
-	int i;
+	size_t i;
 
 	if (extra == NULL)
 		return;
@@ -92,7 +92,7 @@ mport_createextras_free(mportCreateExtras *extra)
 	free(extra->pkgmessage);
 	extra->pkgmessage = NULL;
 
-	if (extra->conflicts != NULL) {
+	if (extra->conflicts_count > 0 && extra->conflicts != NULL) {
 		for (i = 0; i < extra->conflicts_count; i++) {
 			if (extra->conflicts[i] == NULL) {
 				break;
@@ -105,7 +105,7 @@ mport_createextras_free(mportCreateExtras *extra)
 		extra->conflicts = NULL;
 	}
 
-	if (extra->depends != NULL) {
+	if (extra->depends_count > 0 && extra->depends != NULL) {
 		for (i = 0; i < extra->depends_count; i++) {
 			if (extra->depends[i] == NULL) {
 				break;
@@ -420,7 +420,6 @@ mport_xsystem(mportInstance *mport, const char *fmt, ...)
 void
 mport_parselist(char *opt, char ***list, size_t *list_size)
 {
-	size_t len;
 	char *input;
 	char *field;
 
@@ -431,29 +430,33 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 	}
 
 	/* first we need to get the length of the dependency list */
-	for (len = 0; (field = strsep(&opt, " \t\n")) != NULL;) {
+	for (*list_size = 0; (field = strsep(&opt, " \t\n")) != NULL;) {
 		if (*field != '\0')
-			len++;
+			(*list_size)++;
 	}
-	list_size = len;
 
-	if ((*list = (char **)calloc((len + 1), sizeof(char *))) == NULL) {
+	if (*list_size == 0) {
+		**list = NULL;
 		return;
 	}
 
-	if (len == 0) {
-		**list = NULL;
+	if ((*list = (char **)calloc((*list_size + 1), sizeof(char *))) == NULL) {
 		return;
 	}
 
 	/* dereference once so we don't lose our minds. */
 	char **vec = *list;
 
+	size_t loc = 0;
 	while ((field = strsep(&input, " \t\n")) != NULL) {
+		if (loc == *list_size)
+			break;
+
 		if (*field == '\0')
 			continue;
 
-		*vec = field;
+		*vec = strdup(field);
+		loc++;
 		vec++;
 	}
 
