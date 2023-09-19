@@ -78,12 +78,15 @@ mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPac
 		goto CLEANUP;
 	}
 
+puts("stub");
 	if ((error_code = create_stub_db(mport, &db, tmpdir)) != MPORT_OK)
 		goto CLEANUP;
 
+puts("assetlist");
 	if ((error_code = insert_assetlist(db, assetlist, pack, extra)) != MPORT_OK)
 		goto CLEANUP;
 
+puts("meta");
 	if ((error_code = insert_meta(mport, db, pack, extra)) != MPORT_OK)
 		goto CLEANUP;
 
@@ -92,6 +95,7 @@ mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPac
 		goto CLEANUP;
 	}
 
+puts("archive files");
 	error_code = archive_files(assetlist, pack, extra, tmpdir); /* cleanup will run next which is the desired action */
 
 	CLEANUP:
