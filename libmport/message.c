@@ -168,6 +168,11 @@ mport_pkg_message_from_ucl(mportInstance *mport, const ucl_object_t *obj, mportP
 			msg->minimum_version = strdup(ucl_object_tostring(enhanced));
 		}
 
+		enhanced = ucl_object_find_key(obj, "maximum_version");
+		if (enhanced != NULL && ucl_object_type(enhanced) == UCL_STRING) {
+			msg->maximum_version = strdup(ucl_object_tostring(enhanced));
+		}
+
 		enhanced = ucl_object_find_key(obj, "type");
 		if (enhanced != NULL && ucl_object_type(enhanced) == UCL_STRING) {
 			const char *type = ucl_object_tostring(enhanced);
