@@ -56,6 +56,7 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		pkg = pkgs[i];
         pkg->automatic = automatic;
 		pkg->install_date = mport_get_time();
+		pkg->action = MPORT_ACTION_INSTALL;
 
 		if (prefix != NULL) {
 			/* override the default prefix with the given prefix */
