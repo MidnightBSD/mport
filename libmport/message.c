@@ -46,19 +46,19 @@
 int
 mport_pkg_message_display(mportInstance *mport, mportPackageMeta *pkg)
 {
-    mportPackageMessage packageMessage;
-    pkg_message_t expectedType;
+	mportPackageMessage packageMessage;
+	pkg_message_t expectedType;
 
 	packageMessage.minimum_version = NULL;
 	packageMessage.maximum_version = NULL;
 	packageMessage.str = NULL;
 	packageMessage.prev = NULL;
 	packageMessage.next = NULL;
-    packageMessage.type = PKG_MESSAGE_ALWAYS; // default type
+	packageMessage.type = PKG_MESSAGE_ALWAYS; // default type
 
-    if (mport_pkg_message_load(mport, pkg, &packageMessage) != MPORT_OK) {
-        RETURN_CURRENT_ERROR;
-    }
+	if (mport_pkg_message_load(mport, pkg, &packageMessage) != MPORT_OK) {
+		RETURN_CURRENT_ERROR;
+	}
 
     switch (pkg->action) {
         case MPORT_ACTION_INSTALL:
@@ -75,12 +75,12 @@ mport_pkg_message_display(mportInstance *mport, mportPackageMeta *pkg)
             expectedType = PKG_MESSAGE_INSTALL;
     }
 
-    if (packageMessage.type == expectedType || packageMessage.type == PKG_MESSAGE_ALWAYS) {
-        if (packageMessage.str != NULL && packageMessage.str[0] != '\0')
-            mport_call_msg_cb(mport, "%s", packageMessage.str);
-    }
+	if (packageMessage.type == expectedType || packageMessage.type == PKG_MESSAGE_ALWAYS) {
+		if (packageMessage.str != NULL && packageMessage.str[0] != '\0')
+			mport_call_msg_cb(mport, "%s", packageMessage.str);
+	}
 
-    free(packageMessage.str);
+	free(packageMessage.str);
 
 	return MPORT_OK;
 }
@@ -149,11 +149,11 @@ mport_pkg_message_load(mportInstance *mport, mportPackageMeta *pkg, mportPackage
 mportPackageMessage *
 mport_pkg_message_from_ucl(mportInstance *mport, const ucl_object_t *obj, mportPackageMessage *msg)
 {
-    const ucl_object_t *enhanced;
+	const ucl_object_t *enhanced;
 
-    if (ucl_object_type(obj) == UCL_STRING) {
-        msg->str = strdup(ucl_object_tostring(obj));
-    } else if (ucl_object_type(obj) == UCL_OBJECT) {
+	if (ucl_object_type(obj) == UCL_STRING) {
+		msg->str = strdup(ucl_object_tostring(obj));
+	} else if (ucl_object_type(obj) == UCL_OBJECT) {
         /* New format of pkg message */
         enhanced = ucl_object_find_key(obj, "message");
         if (enhanced == NULL || ucl_object_type(enhanced) != UCL_STRING) {
@@ -179,9 +179,9 @@ mport_pkg_message_from_ucl(mportInstance *mport, const ucl_object_t *obj, mportP
 				} else {
 					msg->type = PKG_MESSAGE_ALWAYS;
 				}
-        	}
+			}
 		}
-    }
+	}
 
-    return msg;
+	return msg;
 }
