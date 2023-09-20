@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2013-2015, 2021 Lucas Holt
+ * Copyright (c) 2013-2015, 2021, 2023 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -848,7 +848,7 @@ do_post_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta 
 	if (run_postexec(mport, pkg) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	if (mport_pkg_message_display(mport, bundle, pkg) != MPORT_OK)
+	if (mport_pkg_message_display(mport, pkg) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	if (run_pkg_install(mport, bundle, pkg, "POST-INSTALL") != MPORT_OK)

@@ -150,8 +150,8 @@ int mport_update_down(mportInstance *, mportPackageMeta *, struct ohash_info *, 
 void mport_version_cmp_sqlite(sqlite3_context *, int, sqlite3_value **);
 int mport_version_require_check(const char *, const char *);
 
-int mport_pkg_message_display(mportInstance *, mportBundleRead *, mportPackageMeta *);
-int mport_pkg_message_load(mportInstance *, mportBundleRead *, mportPackageMeta *, mportPackageMessage *);
+int mport_pkg_message_display(mportInstance *, mportPackageMeta *);
+int mport_pkg_message_load(mportInstance *, mportPackageMeta *, mportPackageMessage *);
 mportPackageMessage* mport_pkg_message_from_ucl(mportInstance *, const ucl_object_t *, mportPackageMessage *);
 
 #define RETURN_CURRENT_ERROR return mport_err_code()

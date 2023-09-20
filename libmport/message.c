@@ -44,7 +44,7 @@
 #include <ucl.h>
 
 int
-mport_pkg_message_display(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg)
+mport_pkg_message_display(mportInstance *mport, mportPackageMeta *pkg)
 {
     mportPackageMessage packageMessage;
     pkg_message_t expectedType;
@@ -56,7 +56,7 @@ mport_pkg_message_display(mportInstance *mport, mportBundleRead *bundle, mportPa
 	packageMessage.next = NULL;
     packageMessage.type = PKG_MESSAGE_ALWAYS; // default type
 
-    if (mport_pkg_message_load(mport, bundle, pkg, &packageMessage) != MPORT_OK) {
+    if (mport_pkg_message_load(mport, pkg, &packageMessage) != MPORT_OK) {
         RETURN_CURRENT_ERROR;
     }
 
@@ -86,7 +86,7 @@ mport_pkg_message_display(mportInstance *mport, mportBundleRead *bundle, mportPa
 }
 
 int
-mport_pkg_message_load(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg, mportPackageMessage *packageMessage)
+mport_pkg_message_load(mportInstance *mport, mportPackageMeta *pkg, mportPackageMessage *packageMessage)
 {
     char filename[FILENAME_MAX];
     char *buf;
@@ -95,8 +95,8 @@ mport_pkg_message_load(mportInstance *mport, mportBundleRead *bundle, mportPacka
     struct ucl_parser *parser;
     ucl_object_t *obj;
 
-    (void) snprintf(filename, FILENAME_MAX, "%s/%s/%s-%s/%s", bundle->tmpdir, MPORT_STUB_INFRA_DIR, pkg->name,
-                    pkg->version, MPORT_MESSAGE_FILE);
+    /* Assumes copy_metafile has run on install already */
+	(void)snprintf(filename, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_INST_INFRA_DIR, pkg->name, pkg->version, MPORT_MESSAGE_FILE);
 
     if (stat(filename, &st) == -1) {
         /* if we couldn't stat the file, we assume there isn't a pkg-msg */
