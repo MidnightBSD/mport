@@ -150,6 +150,10 @@ int mport_update_down(mportInstance *, mportPackageMeta *, struct ohash_info *, 
 void mport_version_cmp_sqlite(sqlite3_context *, int, sqlite3_value **);
 int mport_version_require_check(const char *, const char *);
 
+int mport_pkg_message_display(mportInstance *, mportBundleRead *, mportPackageMeta *);
+int mport_pkg_message_load(mportInstance *, mportBundleRead *, mportPackageMeta *, mportPackageMessage *);
+mportPackageMessage* mport_pkg_message_from_ucl(mportInstance *, const ucl_object_t *, mportPackageMessage *);
+
 #define RETURN_CURRENT_ERROR return mport_err_code()
 #define RETURN_ERROR(code, msg) return mport_set_errx((code), "Error at %s:(%d): %s", __FILE__, __LINE__, (msg))
 #define SET_ERROR(code, msg) mport_set_errx((code), "Error at %s:(%d): %s", __FILE__, __LINE__, (msg))
