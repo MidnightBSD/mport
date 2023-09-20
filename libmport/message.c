@@ -75,6 +75,20 @@ mport_pkg_message_display(mportInstance *mport, mportPackageMeta *pkg)
 		expectedType = PKG_MESSAGE_INSTALL;
 	}
 
+	/* Limit message display based on version if provided. */
+	if (packageMessage.minimum_version != NULL && 
+		mport_version_cmp(packageMessage.minimum_version, pkg->version) == 1) {
+			free(packageMessage.str);
+			return MPORT_OK;
+	}
+
+	if (packageMessage.maximum_version != NULL && 
+		mport_version_cmp(packageMessage.maximum_version, pkg->version) == -1) {
+			free(packageMessage.str);
+			return MPORT_OK;
+	}
+
+
 	if (packageMessage.type == expectedType || packageMessage.type == PKG_MESSAGE_ALWAYS) {
 		if (packageMessage.str != NULL && packageMessage.str[0] != '\0')
 			mport_call_msg_cb(mport, "%s", packageMessage.str);
