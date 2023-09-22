@@ -93,7 +93,7 @@ get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
 			sqlite3_finalize(stmt);
 			break;
 		} else {
-			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
+			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 			sqlite3_finalize(stmt);
 			return NULL;
 		}
@@ -153,7 +153,7 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		deps = dependencies;
 		char *dir = mport_directory(filename);
 		while (deps!= NULL) {
-			const char * dep_filename = asnprintf("%s/%s.mport", dir, *deps);
+			const char * dep_filename = asprintf("%s/%s.mport", dir, *deps);
 			if (dep_filename != NULL && mport_install_primative(mport, dep_filename, prefix, MPORT_AUTOMATIC)!= MPORT_OK) {
                 mport_call_msg_cb(mport, "Unable to install %s: %s", *deps, mport_err_string());
                 return MPORT_ERR_FATAL;
