@@ -109,7 +109,6 @@ int mport_decompress_bzip2(const char *, const char *);
 int mport_shell_register(const char *);
 int mport_shell_unregister(const char *);
 time_t mport_get_time(void);
-char *
 
 /* Mport Bundle (a file containing packages) */
 typedef struct {
