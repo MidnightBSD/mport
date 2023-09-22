@@ -37,8 +37,6 @@ static char ** get_dependencies(mportInstance *mport, mportPackageMeta *pack);
 static char **
 get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
 {
-	mportBundleRead *bundle;
-	mportPackageMeta **pkgs;
 	sqlite3_stmt *stmt;
 	int ret, count = 0;
 	char **dependencies;
@@ -79,7 +77,6 @@ get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
     int i = 0;
 	while (1) {
 		const char *depend_pkg, *depend_version;
-		char *deppath = NULL;
 
 		ret = sqlite3_step(stmt);
 
@@ -153,7 +150,7 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		deps = dependencies;
 		char *dir = mport_directory(filename);
 		while (deps!= NULL) {
-			const char * dep_filename = asprintf("%s/%s.mport", dir, *deps);
+			const char * dep_filename = asprintf("%s/%s.mport", *dir, **deps);
 			if (dep_filename != NULL && mport_install_primative(mport, dep_filename, prefix, MPORT_AUTOMATIC)!= MPORT_OK) {
                 mport_call_msg_cb(mport, "Unable to install %s: %s", *deps, mport_err_string());
                 return MPORT_ERR_FATAL;
