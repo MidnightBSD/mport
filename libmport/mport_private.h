@@ -96,6 +96,7 @@ char* mport_hash_file(const char *);
 int mport_copy_file(const char *, const char *);
 uid_t mport_get_uid(const char *);
 gid_t mport_get_gid(const char *);
+char* mport_directory(const char *path);
 int mport_rmtree(const char *);
 int mport_mkdir(const char *);
 int mport_mkdirp(char *, mode_t);
@@ -108,6 +109,7 @@ int mport_decompress_bzip2(const char *, const char *);
 int mport_shell_register(const char *);
 int mport_shell_unregister(const char *);
 time_t mport_get_time(void);
+char *
 
 /* Mport Bundle (a file containing packages) */
 typedef struct {

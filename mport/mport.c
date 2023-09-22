@@ -51,6 +51,7 @@ static void loadIndex(mportInstance *);
 
 static mportIndexEntry **lookupIndex(mportInstance *, const char *);
 
+static int add(mportInstance *mport, const char *filename, mportAutomatic automatic);
 static int install(mportInstance *, const char *);
 
 static int cpeList(mportInstance *);
@@ -162,7 +163,38 @@ main(int argc, char *argv[])
 
 	char *cmd = argv[0];
 
-	if (!strcmp(cmd, "install")) {
+	if (!strcmp(cmd, "add")) {
+		if (argc == 1) {
+			mport_instance_free(mport);
+			usage();
+		}
+
+		int local_argc = argc;
+		char *const *local_argv = argv;
+		int aflag = 0;
+
+		if (local_argc > 1) {
+			int ch2;
+			while ((ch2 = getopt(local_argc, local_argv, "A")) != -1) {
+				switch (ch2) {
+				case 'A':
+					aflag = 1;
+					break;
+				}
+			}
+			local_argc -= optind;
+			local_argv += optind;
+		}
+
+		mport->noIndex = true;
+		mport->offline = true;
+
+		for (i = 1; i < argc; i++) {
+			tempResultCode = add(mport, argv[i], a == 1 ? MPORT_AUTOMATIC | MPORT_EXPLICIT);
+			if (tempResultCode != 0)
+				resultCode = tempResultCode;
+		}
+	} else if (!strcmp(cmd, "install")) {
 		if (argc == 1) {
 			mport_instance_free(mport);
 			usage();
@@ -708,6 +740,11 @@ which(mportInstance *mport, const char *filePath, bool quiet, bool origin)
 	}
 
 	return (0);
+}
+
+int
+add(mportInstance *mport, const char *filename, mportAutomatic automatic) {
+	mport_install_primative(mport, filename, NULL, automatic);
 }
 
 int
