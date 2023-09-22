@@ -112,7 +112,6 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 {
 	mportBundleRead *bundle;
 	mportPackageMeta **pkgs, *pkg;
-	sqlite3_stmt *stmt;
 	int i;
 	bool error = false;
 	char **dependencies, **deps;
