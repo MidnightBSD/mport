@@ -38,7 +38,7 @@ static char **
 get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
 {
 	mportBundleRead *bundle;
-	mportPackageMeta **pkgs, *pkg;
+	mportPackageMeta **pkgs;
 	sqlite3_stmt *stmt;
 	int ret, count = 0;
 	char **dependencies;
@@ -86,7 +86,7 @@ get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
 		if (ret == SQLITE_ROW) {
 			depend_pkg = sqlite3_column_text(stmt, 0);
 			depend_version = sqlite3_column_text(stmt, 1);
-			asnprintf(dependencies[i], "%s-%s", depend_pkg, depend_version);
+			asprintf(dependencies[i], "%s-%s", depend_pkg, depend_version);
 			i++;
 		} else if (ret == SQLITE_DONE) {
 			/* No more dependencies to check. */
