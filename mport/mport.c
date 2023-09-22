@@ -190,7 +190,7 @@ main(int argc, char *argv[])
 		mport->offline = true;
 
 		for (i = 1; i < argc; i++) {
-			tempResultCode = add(mport, argv[i], a == 1 ? MPORT_AUTOMATIC | MPORT_EXPLICIT);
+			tempResultCode = add(mport, argv[i], aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
 			if (tempResultCode != 0)
 				resultCode = tempResultCode;
 		}
@@ -744,7 +744,7 @@ which(mportInstance *mport, const char *filePath, bool quiet, bool origin)
 
 int
 add(mportInstance *mport, const char *filename, mportAutomatic automatic) {
-	mport_install_primative(mport, filename, NULL, automatic);
+	return mport_install_primative(mport, filename, NULL, automatic);
 }
 
 int
