@@ -96,6 +96,7 @@ char* mport_hash_file(const char *);
 int mport_copy_file(const char *, const char *);
 uid_t mport_get_uid(const char *);
 gid_t mport_get_gid(const char *);
+char* mport_directory(const char *path);
 int mport_rmtree(const char *);
 int mport_mkdir(const char *);
 int mport_mkdirp(char *, mode_t);
