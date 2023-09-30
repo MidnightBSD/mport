@@ -621,7 +621,7 @@ search(mportInstance *mport, char **query)
 }
 
 static mportPackageMeta** 
-lookup_for_lock(mportInstance *mport, const char *pkgname)
+lookup_for_lock(mportInstance *mport, const char *packageName)
 {
 	mportPackageMeta **packs = NULL;
 
@@ -637,6 +637,7 @@ lookup_for_lock(mportInstance *mport, const char *pkgname)
 
 	if (packs == NULL) {
 		warnx("Package name not found, %s", packageName);
+	}
 
 	return (packs);
 }
@@ -648,7 +649,7 @@ lock(mportInstance *mport, const char *packageName)
 
 	if (packs != NULL) {
 		mport_lock_lock(mport, (*packs));
-		mport_pkgmeta_free(packs);
+		mport_pkgmeta_free(*packs);
 		return (MPORT_OK);
 	}
 
@@ -662,7 +663,7 @@ unlock(mportInstance *mport, const char *packageName)
 
 	if (packs != NULL) {
 		mport_lock_unlock(mport, (*packs));
-		mport_pkgmeta_free(packs);
+		mport_pkgmeta_free(*packs);
 		return (MPORT_OK);
 	}
 
@@ -785,7 +786,7 @@ install(mportInstance *mport, const char *packageName)
 	if (indexEntry == NULL || *indexEntry == NULL)
 		errx(4, "Package %s not found in the index.", packageName);
 
-    ie = &indexEntry;
+	ie = indexEntry;
 	if (indexEntry[1] != NULL) {
 		printf("Multiple packages found. Please select one:\n");
 		i2 = indexEntry;
