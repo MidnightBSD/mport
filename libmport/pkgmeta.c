@@ -267,10 +267,9 @@ mport_pkgmeta_count(mportInstance *mport, enum count_type type, char *where)
 	else if (type == LOCKED)
 		sql = "SELECT count(*) FROM packages WHERE locked = 1";
 	else if (type == WHERE)
-		sql = "SELECT count(*) FROM packages WHERE %s",
-		where
+		sql = "SELECT count(*) FROM packages WHERE %s";
 
-		    if (mport == NULL) return len;
+	if (mport == NULL) return len;
 
 	if (type == WHERE && where != NULL) {
 		if (mport_db_prepare(mport->db, &stmt, sql, where) != MPORT_OK) {
