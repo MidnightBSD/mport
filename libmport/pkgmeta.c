@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2010, 2021 Lucas Holt
+ * Copyright (c) 2010, 2021, 2023 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -36,9 +36,15 @@
 #include "mport.h"
 #include "mport_private.h"
 
+enum count_type {
+	ALL,
+	LOCKED,
+	WHERE
+};
+
 static int populate_meta_from_stmt(mportPackageMeta *, sqlite3 *, sqlite3_stmt *);
 static int populate_vec_from_stmt(mportPackageMeta ***, int, sqlite3 *, sqlite3_stmt *);
-
+static int mport_pkgmeta_count(mportInstance *mport, enum count_type type, char * where);
 
 /* Package meta-data creation and destruction */
 MPORT_PUBLIC_API mportPackageMeta* 
@@ -226,18 +232,7 @@ mport_pkgmeta_search_master(mportInstance *mport, mportPackageMeta ***ref, const
     if (mport == NULL)
     	RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
 
-    if (mport_db_prepare(db, &stmt, "SELECT count(*) FROM packages WHERE %s", where) != MPORT_OK) {
-        sqlite3_finalize(stmt);
-        RETURN_CURRENT_ERROR;
-    }
-
-    if (sqlite3_step(stmt) != SQLITE_ROW) {
-        sqlite3_finalize(stmt);
-        RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-    }
-
-    len = sqlite3_column_int(stmt, 0);
-    sqlite3_finalize(stmt);
+	len = mport_pkgmeta_count(mport, WHERE, where);
 
     if (len == 0) {
         sqlite3_free(where);
@@ -260,6 +255,46 @@ mport_pkgmeta_search_master(mportInstance *mport, mportPackageMeta ***ref, const
     return ret;
 }
 
+static int 
+mport_pkgmeta_count(mportInstance *mport, enum count_type type, char * where) 
+{
+	sqlite3_stmt *stmt = NULL;
+	int len = 0;
+	char *sql = NULL;
+
+	if (type == ALL) 
+		sql = "SELECT count(*) FROM packages";
+	else if (type == LOCKED) 
+        sql = "SELECT count(*) FROM packages WHERE locked = 1";
+	else if (type == WHERE)
+		sql = "SELECT count(*) FROM packages WHERE %s", where
+
+	if (mport == NULL)
+    	return len;
+
+    if (type == WHERE && where != NULL) {
+    	if (mport_db_prepare(mport->db, &stmt, sql, where)!= MPORT_OK) {
+        	sqlite3_finalize(stmt);
+        	return len;
+    	}
+	} else {
+    	if (mport_db_prepare(mport->db, &stmt, sql) != MPORT_OK) {
+        	sqlite3_finalize(stmt);
+        	return len;
+    	}
+	}
+
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        return len;
+    }
+
+    len = sqlite3_column_int(stmt, 0);
+    sqlite3_finalize(stmt);
+
+    return len;
+}
+
 
 /* int mport_pkgmeta_list(mportInstance *mport, mportPackageMeta ***ref)
  *
@@ -279,19 +314,8 @@ mport_pkgmeta_list(mportInstance *mport, mportPackageMeta ***ref)
 
     sqlite3 *db = mport->db;
 
-    if (mport_db_prepare(db, &stmt, "SELECT count(*) FROM packages") != MPORT_OK) {
-        sqlite3_finalize(stmt);
-        RETURN_CURRENT_ERROR;
-    }
-
-    if (sqlite3_step(stmt) != SQLITE_ROW) {
-        sqlite3_finalize(stmt);
-        RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-    }
-
-    len = sqlite3_column_int(stmt, 0);
-    sqlite3_finalize(stmt);
-
+	len = mport_pkgmeta_count(mport, ALL, NULL);
+    
     if (len == 0) {
         *ref = NULL;
         return MPORT_OK;
@@ -322,18 +346,7 @@ mport_pkgmeta_list_locked(mportInstance *mport, mportPackageMeta ***ref)
 
     sqlite3 *db = mport->db;
 
-    if (mport_db_prepare(db, &stmt, "SELECT count(*) FROM packages where locked=1") != MPORT_OK) {
-        sqlite3_finalize(stmt);
-        RETURN_CURRENT_ERROR;
-    }
-
-    if (sqlite3_step(stmt) != SQLITE_ROW) {
-        sqlite3_finalize(stmt);
-        RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-    }
-
-    len = sqlite3_column_int(stmt, 0);
-    sqlite3_finalize(stmt);
+	len = mport_pkgmeta_count(mport, LOCKED, NULL);
 
     if (len == 0) {
         *ref = NULL;
