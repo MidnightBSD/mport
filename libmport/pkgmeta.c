@@ -147,7 +147,8 @@ mport_pkgmeta_read_stub(mportInstance *mport, mportPackageMeta ***ref)
 {
     sqlite3_stmt *stmt;
     sqlite3 *db = mport->db;
-    int len, ret;
+    int len;
+	int ret;
 
     if (mport_db_prepare(db, &stmt, "SELECT COUNT(*) FROM stub.packages") != MPORT_OK)
         RETURN_CURRENT_ERROR;
@@ -210,7 +211,8 @@ mport_pkgmeta_search_master(mportInstance *mport, mportPackageMeta ***ref, const
 {
     va_list args;
     sqlite3_stmt *stmt;
-    int ret, len;
+    int ret;
+	int len;
     char *where;
     sqlite3 *db = mport->db;
 
@@ -269,7 +271,8 @@ MPORT_PUBLIC_API int
 mport_pkgmeta_list(mportInstance *mport, mportPackageMeta ***ref)
 {
     sqlite3_stmt *stmt;
-    int ret, len;
+    int ret;
+	int len;
 
     if (mport == NULL)
     	RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
