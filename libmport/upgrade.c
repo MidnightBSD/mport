@@ -98,8 +98,8 @@ mport_upgrade(mportInstance *mport) {
 
 		if (mport_moved_lookup(mport, (*packs)->name, &movedEntries) != MPORT_OK ||
 		    movedEntries == NULL || *movedEntries == NULL) {
-            continue;
-        }
+			continue;
+		}
 
 		if ((*movedEntries)->date[0] != '\0') {
 			asprintf(&msg, "Package %s is deprecated with expiration date %s. Do you want to remove it?", (*packs)->name, (*movedEntries)->date);
