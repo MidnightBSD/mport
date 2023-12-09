@@ -93,11 +93,13 @@ mport_upgrade(mportInstance *mport) {
 		slot = ohash_qlookup(&h, (*packs)->name);
 		key = ohash_find(&h, slot);
 		if (key != NULL) {
+			packs++;
 			continue;
 		}
 
 		if (mport_moved_lookup(mport, (*packs)->name, &movedEntries) != MPORT_OK ||
 		    movedEntries == NULL || *movedEntries == NULL) {
+			packs++;
 			continue;
 		}
 
@@ -109,6 +111,7 @@ mport_upgrade(mportInstance *mport) {
 				ohash_insert(&h, slot, (*packs)->name);
 			}	
 
+			packs++;
 			continue;
 		}		
 
@@ -121,6 +124,7 @@ mport_upgrade(mportInstance *mport) {
 			ohash_insert(&h, slot, (*packs)->name);
 			ohash_insert(&h, slot, (*movedEntries)->moved_to_pkgname);
 		}
+		packs++;
 	}
 
     // update packages that haven't moved already
