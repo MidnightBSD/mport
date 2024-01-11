@@ -126,8 +126,17 @@ do_pre_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *
 
 	(void) strlcpy(cwd, pkg->prefix, sizeof(cwd));
 
-	if (mport_chdir(mport, cwd) != MPORT_OK)
-		goto ERROR;
+	if (mport_chdir(mport, cwd) != MPORT_OK)  {
+		if (strcmp("/compat/linux", cwd) == 0) {
+			mport_mkdir("/compat");
+			mport_mkdir("/compat/linux");
+		} else {
+			mport_mkdir(cwd);
+		}
+		if (mport_chdir(mport, cwd) != MPORT_OK)  {
+			goto ERROR;
+		}
+	}
 
 	STAILQ_FOREACH(e, alist, next)
 	{
