@@ -333,8 +333,8 @@ mport_bundle_read_get_assetlist(mportInstance *mport, mportPackageMeta *pkg, mpo
 		}
 	} else if (state == POSTINSTALL) {
 		if (mport_db_prepare(mport->db, &stmt,
-		                     "SELECT type,data,checksum,owner,grp,mode FROM stub.assets WHERE pkg=%Q and type in (%d, %d, %d, %d, %d, %d)",
-		                     pkg->name, ASSET_CWD, ASSET_POSTEXEC, ASSET_LDCONFIG, ASSET_LDCONFIG_LINUX, ASSET_GLIB_SCHEMAS, ASSET_INFO) != MPORT_OK) {
+		                     "SELECT type,data,checksum,owner,grp,mode FROM stub.assets WHERE pkg=%Q and type in (%d, %d, %d, %d, %d, %d, %d)",
+		                     pkg->name, ASSET_CWD, ASSET_POSTEXEC, ASSET_LDCONFIG, ASSET_LDCONFIG_LINUX, ASSET_GLIB_SCHEMAS, ASSET_INFO, ASSET_TOUCH) != MPORT_OK) {
 			sqlite3_finalize(stmt);
 			RETURN_CURRENT_ERROR;
 		}
@@ -942,6 +942,10 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 					goto ERROR;
 				}
 				break;
+			case ASSET_TOUCH:
+			    if (mport_xsystem(mport, "/usr/bin/touch %s", file)!= MPORT_OK) {
+                    goto ERROR;
+                }
 			default:
 				/* do nothing */
 				break;
