@@ -223,9 +223,9 @@ char * mport_fetch_cves(mportInstance *mport, char *cpe);
 /* a few index things */
 int mport_index_get_mirror_list(mportInstance *, char ***, int *);
 
-#define MPORT_CHECK_FOR_INDEX(mport, func) if (!(mport->flags & MPORT_INST_HAVE_INDEX)) RETURN_ERRORX(MPORT_ERR_FATAL, "Attempt to use %s before loading index.", func);
-#define MPORT_DAY 3600 * 24
-#define MPORT_MAX_INDEX_AGE MPORT_DAY * 7 /* one week */
+#define MPORT_CHECK_FOR_INDEX(mport, func) if (!(mport->flags & MPORT_INST_HAVE_INDEX)) RETURN_ERRORX(MPORT_ERR_FATAL, "Attempt to use %s before loading index.", (func));
+#define MPORT_DAY (3600 * 24)
+#define MPORT_MAX_INDEX_AGE (MPORT_DAY * 7) /* one week */
 #define MPORT_SETTING_INDEX_LAST_CHECKED "index_last_check"
 #define MPORT_SETTING_REPO_AUTOUPDATE "index_autoupdate"
 
