@@ -146,25 +146,25 @@ main(int argc, char *argv[])
 				}
 
 				if (movedEntries == NULL || *movedEntries == NULL) {
-                    (void) printf("%-15s %8s is not part of the package repository.\n", (*packs)->name, (*packs)->version);
-                    packs++;
-                    continue;
-                }
+					(void) printf("%-15s %8s is not part of the package repository.\n", (*packs)->name, (*packs)->version);
+					packs++;
+					continue;
+				}
 
 				if ((*movedEntries)->moved_to[0]!= '\0') {
 					(void) printf("%-25s %8s was moved to %s\n", (*packs)->name, (*packs)->version, (*movedEntries)->moved_to);
 					free(movedEntries);
 					movedEntries = NULL;
-                    packs++;
-                    continue;
+					packs++;
+					continue;
 				}
 
 				if ((*movedEntries)->date[0]!= '\0') {
 					(void) printf("%-25s %8s expired on %s\n", (*packs)->name, (*packs)->version, (*movedEntries)->date);
 					free(movedEntries);
 					movedEntries = NULL;
-                    packs++;
-                    continue;
+					packs++;
+					continue;
 				}
 
 				free(movedEntries);
@@ -176,13 +176,11 @@ main(int argc, char *argv[])
 				if (((*indexEntries)->version != NULL && mport_version_cmp((*packs)->version, (*indexEntries)->version) < 0) 
 					|| ((*packs)->version != NULL && mport_version_cmp((*packs)->os_release, os_release) < 0)) {
 
-                        if (verbose) {
-                            (void) printf("%-25s %8s (%s)  <  %-s\n", (*packs)->name, (*packs)->version,
-                                          (*packs)->os_release, (*indexEntries)->version);
-                        } else {
-                            (void) printf("%-25s %8s  <  %-8s\n", (*packs)->name, (*packs)->version,
-                                          (*indexEntries)->version);
-                        }
+					if (verbose) {
+						(void) printf("%-25s %8s (%s)  <  %-s\n", (*packs)->name, (*packs)->version, (*packs)->os_release, (*indexEntries)->version);
+					} else {
+						(void) printf("%-25s %8s  <  %-8s\n", (*packs)->name, (*packs)->version, (*indexEntries)->version);
+					}
 				}
 				indexEntries++;
 			}
@@ -196,8 +194,8 @@ main(int argc, char *argv[])
 			(void) printf("%-30s\t%6s\t%s\n", name_version, (*packs)->os_release, comment);
 			free(comment);
 		}
-        else if (prime && (*packs)->automatic == 0)
-            (void) printf("%s\n", (*packs)->name);
+		else if (prime && (*packs)->automatic == 0)
+			(void) printf("%s\n", (*packs)->name);
 		else if (quiet && !origin)
 			(void) printf("%s\n", (*packs)->name);
 		else if (quiet && origin)
@@ -240,10 +238,10 @@ str_remove( const char *str, const char ch )
 			output[x] = str[i];
 			x++;
 		}
-    }
-    output[len] = '\0';
+	}
+	output[len] = '\0';
 	
-    return (output);
+	return (output);
 } 
 
 
