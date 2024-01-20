@@ -298,7 +298,7 @@ mport_rmdir(const char *dir, int ignore_nonempty)
 			return (MPORT_OK);
 		} else {
 			RETURN_ERRORX(
-			    MPORT_ERR_FATAL, "Couldn't rmdir %s: %s", dir, strerror(errno));
+			    MPORT_ERR_FATAL, "Couldn't rmdir %s: %s. With ZFS, this could indicate a snapshot is blocking removal.", dir, strerror(errno));
 		}
 	}
 
