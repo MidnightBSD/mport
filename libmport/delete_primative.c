@@ -362,7 +362,7 @@ bool is_safe_to_delete_dir(mportInstance *mport, mportPackageMeta *pack, const c
 	if (mport_db_prepare(mport->db, &stmt,
 		"SELECT count(*) from assets where pkg!=%Q and type in (%d, %d, %d, %d) and data=%Q",
 		pack->name, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE, path) != MPORT_OK) {
-		RETURN_CURRENT_ERROR;
+		return false;
 	}
 
 	switch (sqlite3_step(stmt)) {
