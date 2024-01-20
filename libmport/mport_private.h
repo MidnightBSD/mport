@@ -100,6 +100,7 @@ char* mport_directory(const char *path);
 int mport_rmtree(const char *);
 int mport_mkdir(const char *);
 int mport_mkdirp(char *, mode_t);
+int mport_removeflags(const char *, const char *;
 int mport_rmdir(const char *, int);
 int mport_chdir(mportInstance *, const char *);
 int mport_xsystem(mportInstance *, const char *, ...);

@@ -306,6 +306,37 @@ mport_rmdir(const char *dir, int ignore_nonempty)
 }
 
 /**
+ * @brief remove all flags from a directory rooted at root
+ * 
+ * @param root 
+ * @param dir 
+ * @return int 
+ */
+int mport_removeflags(const char *root, const char *dir) {
+	struct stat st;
+	int statresult;
+	
+	int rootfd = open(root, O_RDONLY | O_DIRECTORY);
+
+	if (mport_starts_with(root, dir)) {
+		statresult = lstat(dir, &st);
+	} else {
+		statresult = fstatat(rootfd, dir, &st, AT_SYMLINK_NOFOLLOW);
+	} 
+
+	if (statresult != -1) {
+		if (st.st_flags & NOCHANGESFLAGS) {
+			/* Disable all flags*/
+			chflagsat(rootfd, dir, 0, AT_SYMLINK_NOFOLLOW);
+		}
+	}
+
+	close(rootfd);
+
+	return (MPORT_OK);
+}
+
+/**
  * @brief register a new user shell 
  * 
  * @param shell_file path to shell file
