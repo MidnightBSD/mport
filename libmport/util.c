@@ -325,7 +325,7 @@ int mport_removeflags(const char *root, const char *dir) {
 	} 
 
 	if (statresult != -1) {
-		if (st.st_flags & NOCHANGESFLAGS) {
+		if (st.st_flags & (UF_IMMUTABLE | UF_APPEND | SF_IMMUTABLE | SF_APPEND)) {
 			/* Disable all flags*/
 			chflagsat(rootfd, dir, 0, AT_SYMLINK_NOFOLLOW);
 		}
