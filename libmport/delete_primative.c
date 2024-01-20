@@ -366,11 +366,11 @@ bool is_safe_to_delete_dir(mportInstance *mport, mportPackageMeta *pack, const c
 
 	/* Don't delete the root or the package prefix directories */
 	if (mport->root != NULL && strcmp(mport->root, path) == 0) {
-		mport_call_msg_cb(mport, "Skipping removal of root (DESTDIR) directory: '%s'", file);
+		mport_call_msg_cb(mport, "Skipping removal of root (DESTDIR) directory: '%s'", path);
 		return false;
 	}
 	if (pack->prefix != NULL && strcmp(pack->prefix, path) == 0) {
-		mport_call_msg_cb(mport, "Skipping removal of package prefix directory: '%s'", file);
+		mport_call_msg_cb(mport, "Skipping removal of package prefix directory: '%s'", path);
 		return false;
 	}
 
