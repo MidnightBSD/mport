@@ -40,7 +40,6 @@
 #include <mport_private.h>
 
 static void usage(void);
-static char * str_remove(const char *, const char);
 
 int 
 main(int argc, char *argv[]) 
@@ -217,7 +216,6 @@ main(int argc, char *argv[])
 	
 	return (0);
 }
-
 
 static void 
 usage(void) 
