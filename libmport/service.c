@@ -35,6 +35,7 @@ int
 mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_action_t action) 
 {
     sqlite3_stmt *stmt;
+	int ret;
 	char *service;
 	char *rc_script;
 	char *handle_rc_script;
