@@ -43,7 +43,7 @@ mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_a
 
     // if handle rc scripts is disabled, we don't need to do anything
 	handle_rc_script = mport_setting_get(mport, MPORT_SETTING_HANDLE_RC_SCRIPTS);
-	if (!mport_check_answer_bool(handle_rc_script) || getenv("HANDLE_RC_SCRIPTS") == NULL)
+	if (getenv("HANDLE_RC_SCRIPTS") == NULL && !mport_check_answer_bool(handle_rc_script))
 	    return MPORT_OK;
 	
 	/* stop any services that might exist; this replaces @stopdaemon */
