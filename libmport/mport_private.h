@@ -118,6 +118,7 @@ int mport_shell_register(const char *);
 int mport_shell_unregister(const char *);
 char * mport_str_remove(const char *str, const char ch);
 time_t mport_get_time(void);
+bool mport_check_answer_bool(char *answer);
 
 /* Mport Bundle (a file containing packages) */
 typedef struct {
@@ -237,6 +238,7 @@ int mport_index_get_mirror_list(mportInstance *, char ***, int *);
 #define MPORT_MAX_INDEX_AGE (MPORT_DAY * 7) /* one week */
 #define MPORT_SETTING_INDEX_LAST_CHECKED "index_last_check"
 #define MPORT_SETTING_REPO_AUTOUPDATE "index_autoupdate"
+#define MPORT_SETTING_HANDLE_RC_SCRIPTS "handle_rc_scripts"
 
 /* Binaries we use */
 #define MPORT_MTREE_BIN		"/usr/sbin/mtree"

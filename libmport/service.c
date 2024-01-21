@@ -37,7 +37,13 @@ mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_a
     sqlite3_stmt *stmt;
 	char *service;
 	char *rc_script;
+	char *handle_rc_script;
 
+    // if handle rc scripts is disabled, we don't need to do anything
+	handle_rc_script = mport_setting_get(mport, MPORT_SETTING_HANDLE_RC_SCRIPTS);
+	if (!mport_check_answer_bool(handle_rc_script) || getenv("HANDLE_RC_SCRIPTS") == NULL))
+	    return MPORT_OK;
+	
 	/* stop any services that might exist; this replaces @stopdaemon */
 	if (mport_db_prepare(mport->db, &stmt,
 		"select * from assets where data like '/usr/local/etc/rc.d/%%' and type=%i and pkg=%Q",

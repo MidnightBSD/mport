@@ -909,3 +909,16 @@ mport_drop_privileges(void)
 
 	return (MPORT_OK);
 }
+
+bool
+mport_check_answer_bool(char *answer) {
+	if (answer == NULL)
+	    return (false);
+
+    if (*ans == 'Y' || *ans == 'y' || *ans == 't' || *ans == 'T' || *ans == '1') 
+      return (true);
+    if (*ans == 'N' || *ans == 'n' || *ans == 'f' || *ans == 'F' || *ans == '0') 
+      return (false);
+
+	return (false);
+}
