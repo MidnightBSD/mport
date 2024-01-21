@@ -134,25 +134,25 @@ main(int argc, char *argv[])
 	while (*packs != NULL) {
 		if (update) {
 			if (mport_index_lookup_pkgname(mport, (*packs)->name, &indexEntries) != MPORT_OK) {
-				mport_call_msg_cb(mport, "Error Looking up package name %s: %d %s\n", (*packs)->name,  mport_err_code(), mport_err_string());
+				mport_call_msg_cb(mport, "Error Looking up package name %s: %d %s", (*packs)->name,  mport_err_code(), mport_err_string());
 				exit(mport_err_code());
 			}
 
 			if (indexEntries == NULL || *indexEntries == NULL) {
 				if (mport_moved_lookup(mport, (*packs)->name, &movedEntries) != MPORT_OK) {
-					mport_call_msg_cb(mport,"%-25s %8s is not part of the package repository.\n", (*packs)->name, (*packs)->version);
+					mport_call_msg_cb(mport,"%-25s %8s is not part of the package repository.", (*packs)->name, (*packs)->version);
 					packs++;
 					continue;
 				}
 
 				if (movedEntries == NULL || *movedEntries == NULL) {
-					mport_call_msg_cb(mport,"%-15s %8s is not part of the package repository.\n", (*packs)->name, (*packs)->version);
+					mport_call_msg_cb(mport,"%-15s %8s is not part of the package repository.", (*packs)->name, (*packs)->version);
 					packs++;
 					continue;
 				}
 
 				if ((*movedEntries)->moved_to[0]!= '\0') {
-					mport_call_msg_cb(mport,"%-25s %8s was moved to %s\n", (*packs)->name, (*packs)->version, (*movedEntries)->moved_to);
+					mport_call_msg_cb(mport,"%-25s %8s was moved to %s", (*packs)->name, (*packs)->version, (*movedEntries)->moved_to);
 					free(movedEntries);
 					movedEntries = NULL;
 					packs++;
@@ -160,7 +160,7 @@ main(int argc, char *argv[])
 				}
 
 				if ((*movedEntries)->date[0]!= '\0') {
-					mport_call_msg_cb(mport,"%-25s %8s expired on %s\n", (*packs)->name, (*packs)->version, (*movedEntries)->date);
+					mport_call_msg_cb(mport,"%-25s %8s expired on %s", (*packs)->name, (*packs)->version, (*movedEntries)->date);
 					free(movedEntries);
 					movedEntries = NULL;
 					packs++;
@@ -177,9 +177,9 @@ main(int argc, char *argv[])
 					|| ((*packs)->version != NULL && mport_version_cmp((*packs)->os_release, os_release) < 0)) {
 
 					if (verbose) {
-						mport_call_msg_cb(mport,"%-25s %8s (%s)  <  %-s\n", (*packs)->name, (*packs)->version, (*packs)->os_release, (*indexEntries)->version);
+						mport_call_msg_cb(mport,"%-25s %8s (%s)  <  %-s", (*packs)->name, (*packs)->version, (*packs)->os_release, (*indexEntries)->version);
 					} else {
-						mport_call_msg_cb(mport,"%-25s %8s  <  %-8s\n", (*packs)->name, (*packs)->version, (*indexEntries)->version);
+						mport_call_msg_cb(mport,"%-25s %8s  <  %-8s", (*packs)->name, (*packs)->version, (*indexEntries)->version);
 					}
 				}
 				indexEntries++;
@@ -191,24 +191,24 @@ main(int argc, char *argv[])
 			comment = mport_str_remove((*packs)->comment, '\\');
 			snprintf(name_version, 30, "%s-%s", (*packs)->name, (*packs)->version);
 			
-			mport_call_msg_cb(mport,"%-30s\t%6s\t%s\n", name_version, (*packs)->os_release, comment);
+			mport_call_msg_cb(mport,"%-30s\t%6s\t%s", name_version, (*packs)->os_release, comment);
 			free(comment);
 		}
 		else if (prime && (*packs)->automatic == 0)
-			mport_call_msg_cb(mport,"%s\n", (*packs)->name);
+			mport_call_msg_cb(mport,"%s", (*packs)->name);
 		else if (quiet && !origin)
-			mport_call_msg_cb(mport,"%s\n", (*packs)->name);
+			mport_call_msg_cb(mport,"%s", (*packs)->name);
 		else if (quiet && origin)
-			mport_call_msg_cb(mport,"%s\n", (*packs)->origin);
+			mport_call_msg_cb(mport,"%s", (*packs)->origin);
 		else if (origin)
-			mport_call_msg_cb(mport,"Information for %s-%s:\n\nOrigin:\n%s\n\n",
+			mport_call_msg_cb(mport,"Information for %s-%s:\n\nOrigin:\n%s\n",
 						  (*packs)->name, (*packs)->version, (*packs)->origin);
 		else if (locks) {
 			if ((*packs)->locked == 1)
-				mport_call_msg_cb(mport,"%s-%s\n", (*packs)->name, (*packs)->version);
+				mport_call_msg_cb(mport,"%s-%s", (*packs)->name, (*packs)->version);
 
 		} else
-			mport_call_msg_cb(mport, "%s-%s\n", (*packs)->name, (*packs)->version);
+			mport_call_msg_cb(mport, "%s-%s", (*packs)->name, (*packs)->version);
 		packs++;
 	}
 	
