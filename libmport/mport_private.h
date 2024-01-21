@@ -90,6 +90,13 @@ int mport_db_count(sqlite3 *, int *, const char *, ...);
 int mport_pkgmeta_read_stub(mportInstance *, mportPackageMeta ***);
 int mport_pkgmeta_logevent(mportInstance *, mportPackageMeta *, const char *);
 
+/* Service */
+typedef enum {
+    SERVICE_START,
+    SERVICE_STOP
+} service_action_t;
+int mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_action_t action);
+
 /* Utils */
 bool mport_starts_with(const char *, const char *);
 char* mport_hash_file(const char *);

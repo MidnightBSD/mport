@@ -69,26 +69,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 
 	mport_call_progress_init_cb(mport, "Deleting %s-%s", pack->name, pack->version);
 
-	/* stop any services that might exist; this replaces @stopdaemon */
-	if (mport_db_prepare(mport->db, &stmt,
-		"select * from assets where data like '/usr/local/etc/rc.d/%%' and type=%i and pkg=%Q",
-		ASSET_FILE, pack->name) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
-
-	while (1) {
-		ret = sqlite3_step(stmt);
-		if (ret != SQLITE_ROW) {
-			break;
-		}
-
-		rc_script = sqlite3_column_text(stmt, 0);
-		if (rc_script == NULL)
-			continue;
-		service = basename((char *)rc_script);
-		if (mport_xsystem(mport, "/usr/sbin/service %s forcestop", service) != 0) {
-			mport_call_msg_cb(mport, "Unable to stop service %s\n", service);
-		}
-	}
+	mport_start_stop_service(mport, pack, SERVICE_STOP);
 
 	/* get the file count for the progress meter */
 	if (mport_db_prepare(mport->db, &stmt,
