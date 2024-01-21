@@ -58,7 +58,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	sqlite3_stmt *stmt;
 	int ret, current, total;
 	mportAssetListEntryType type;
-	const char *data, *checksum, *cwd, *service, *rc_script;
+	const char *data, *checksum, *cwd;
 	struct stat st;
 	char hash[65];
 
