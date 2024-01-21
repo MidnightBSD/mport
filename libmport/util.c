@@ -370,6 +370,39 @@ mport_shell_unregister(const char *shell_file)
 	    shell_file);
 }
 
+/**
+ * @brief Remove a character from a string
+ * 
+ * @param str 
+ * @param ch 
+ * @return char* (must be freed)
+ */
+char * 
+mport_str_remove(const char *str, const char ch)
+{
+	size_t i;
+	size_t x;
+	size_t len;
+	char *output;
+	
+	if (str == NULL)
+		return NULL;
+	
+	len = strlen(str);
+	
+	output = calloc(len + 1, sizeof(char));
+	
+	for (i = 0, x = 0; i <= len; i++) {
+		if (str[i] != ch) {
+			output[x] = str[i];
+			x++;
+		}
+	}
+	output[len] = '\0';
+	
+	return (output);
+} 
+
 /*
  * Quick test to see if a file exists.
  */

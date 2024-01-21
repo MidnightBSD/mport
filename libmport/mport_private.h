@@ -116,6 +116,7 @@ void mport_free_vec(void *);
 int mport_decompress_bzip2(const char *, const char *);
 int mport_shell_register(const char *);
 int mport_shell_unregister(const char *);
+char * mport_str_remove(const char *str, const char ch);
 time_t mport_get_time(void);
 
 /* Mport Bundle (a file containing packages) */

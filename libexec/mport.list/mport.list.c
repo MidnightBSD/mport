@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <mport.h>
+#include <mport_private.h>
 
 static void usage(void);
 static char * str_remove(const char *, const char);
@@ -188,7 +189,7 @@ main(int argc, char *argv[])
 			mport_index_entry_free_vec(iestart);
 			indexEntries = NULL;
 		} else if (verbose) {
-			comment = str_remove((*packs)->comment, '\\');
+			comment = mport_str_remove((*packs)->comment, '\\');
 			snprintf(name_version, 30, "%s-%s", (*packs)->name, (*packs)->version);
 			
 			(void) printf("%-30s\t%6s\t%s\n", name_version, (*packs)->os_release, comment);
@@ -216,33 +217,6 @@ main(int argc, char *argv[])
 	
 	return (0);
 }
-
-
-static char * 
-str_remove( const char *str, const char ch )
-{
-	size_t i;
-	size_t x;
-	size_t len;
-	char *output;
-	
-	if (str == NULL)
-		return NULL;
-	
-	len = strlen(str);
-	
-	output = calloc(len + 1, sizeof(char));
-	
-	for (i = 0, x = 0; i <= len; i++) {
-		if (str[i] != ch) {
-			output[x] = str[i];
-			x++;
-		}
-	}
-	output[len] = '\0';
-	
-	return (output);
-} 
 
 
 static void 
