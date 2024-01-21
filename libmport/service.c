@@ -30,6 +30,7 @@
 #include "mport_private.h"
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 
 int 
 mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_action_t action) 
@@ -37,7 +38,7 @@ mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_a
     sqlite3_stmt *stmt;
 	int ret;
 	char *service;
-	char *rc_script;
+	const unsigned char *rc_script;
 	char *handle_rc_script;
 
     // if handle rc scripts is disabled, we don't need to do anything
