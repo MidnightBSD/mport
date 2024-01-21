@@ -911,8 +911,8 @@ mport_drop_privileges(void)
 }
 
 bool
-mport_check_answer_bool(char *answer) {
-	if (answer == NULL)
+mport_check_answer_bool(char *ans) {
+	if (ans == NULL)
 	    return (false);
 
     if (*ans == 'Y' || *ans == 'y' || *ans == 't' || *ans == 'T' || *ans == '1') 
