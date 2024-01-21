@@ -284,7 +284,7 @@ mport_upgrade_master_schema(sqlite3 *db, int databaseVersion)
 			mport_upgrade_master_schema_8to9(db);
 			mport_upgrade_master_schema_9to10(db);
 			mport_upgrade_master_schema_10to11(db);
-			mport_upgrade_master_schema_11to12(db)
+			mport_upgrade_master_schema_11to12(db);
 			mport_set_database_version(db);
 			break;
 		case 2:
