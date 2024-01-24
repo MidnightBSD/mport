@@ -150,6 +150,9 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if (argc < 2)
+		usage();
+
 	if (chroot_path != NULL) {
 		if (chroot(chroot_path) == -1) {
 			err(EXIT_FAILURE, "chroot failed");
@@ -476,7 +479,7 @@ usage(void)
 	show_version(NULL, 2);
 
 	fprintf(stderr,
-	    "usage: mport [-c chroot dir] [-U] [-o output] [-q] <command> args:\n"
+	    "usage: mport [-c chroot dir] [-U] [-o output] [-q] [-V] <command> args:\n"
 	    "       mport audit\n"
 	    "       mport autoremove\n"
 	    "       mport clean\n"
