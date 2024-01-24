@@ -922,3 +922,17 @@ mport_check_answer_bool(char *ans) {
 
 	return (false);
 }
+
+MPORT_PUBLIC_API int
+mport_verbosity(bool quiet, bool verbose) {
+	if (quiet && verbose)
+	    return (MPORT_VNORMAL);
+
+	if (quiet)
+        return (MPORT_VQUIET);
+
+    if (verbose)
+        return (MPORT_VVERBOSE);
+		
+    return (MPORT_NORMAL);
+}

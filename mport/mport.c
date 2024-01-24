@@ -79,7 +79,7 @@ static int lock(mportInstance *, const char *);
 
 static int unlock(mportInstance *, const char *);
 
-static int which(mportInstance *, const char *, bool, bool);
+static int which(mportInstance *, const char *, bool);
 
 static int audit(mportInstance *, bool);
 
@@ -153,7 +153,7 @@ main(int argc, char *argv[])
 
 	mport = mport_instance_new();
 
-	if (mport_instance_init(mport, NULL, outputPath, noIndex != 0, quiet) != MPORT_OK) {
+	if (mport_instance_init(mport, NULL, outputPath, noIndex != 0, quiet ? MPORT_VQUIET : MPORT_VNORMAL) != MPORT_OK) {
 		errx(1, "%s", mport_err_string());
 	}
 
@@ -452,7 +452,7 @@ main(int argc, char *argv[])
 			}
 			local_argc -= optind;
 			local_argv += optind;
-			which(mport, *local_argv, qflag, oflag);
+			which(mport, *local_argv, oflag);
 		} else {
 			usage();
 		}
@@ -712,7 +712,7 @@ info(mportInstance *mport, const char *packageName)
 }
 
 int
-which(mportInstance *mport, const char *filePath, bool quiet, bool origin)
+which(mportInstance *mport, const char *filePath, bool origin)
 {
 	mportPackageMeta *pack = NULL;
 
@@ -729,9 +729,9 @@ which(mportInstance *mport, const char *filePath, bool quiet, bool origin)
 	mport_drop_privileges();
 
 	if (pack != NULL && pack->origin != NULL) {
-		if (quiet && origin) {
+		if (mport->verbosity == MPORT_VQUIET && origin) {
 			printf("%s\n", pack->origin);
-		} else if (quiet) {
+		} else if (mport->verbosity == MPORT_VQUIET) {
 			printf("%s-%s\n", pack->name, pack->version);
 		} else if (origin) {
 			printf("%s was installed by package %s\n", filePath, pack->origin);
@@ -1076,7 +1076,7 @@ audit(mportInstance *mport, bool dependsOn)
 	while (*packs != NULL) {
 		char *output = mport_audit(mport, (*packs)->name, dependsOn);
 		if (output != NULL && output[0] != '\0') {
-			if (mport->quiet)
+			if (mport->verbosity == MPORT_VQUIET)
 				printf("%s", output);
 			else
 				printf("%s\n", output);
