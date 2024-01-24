@@ -56,7 +56,7 @@ enum _Verbosity{
     MPORT_VVERBOSE
 };
 typedef enum _Verbosity mportVerbosity;
-int mport_verbosity(bool quiet, bool verbose);
+mportVerbosity mport_verbosity(bool quiet, bool verbose);
 
 typedef struct {
   int flags;
