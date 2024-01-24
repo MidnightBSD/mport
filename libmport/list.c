@@ -138,4 +138,6 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 			mport_call_msg_cb(mport, "%s-%s", (*packs)->name, (*packs)->version);
 		packs++;
 	}
+
+	return (MPORT_OK);
 }

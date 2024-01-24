@@ -934,5 +934,5 @@ mport_verbosity(bool quiet, bool verbose) {
     if (verbose)
         return (MPORT_VVERBOSE);
 		
-    return (MPORT_NORMAL);
+    return (MPORT_VNORMAL);
 }
