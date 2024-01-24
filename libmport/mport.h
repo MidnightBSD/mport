@@ -55,7 +55,7 @@ enum _Verbosity{
     MPORT_VNORMAL,
     MPORT_VVERBOSE
 };
-typedef enum _Type mportVerbosity;
+typedef enum _Verbosity mportVerbosity;
 int mport_verbosity(bool quiet, bool verbose);
 
 typedef struct {
