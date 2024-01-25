@@ -485,7 +485,7 @@ usage(void)
 	show_version(NULL, 2);
 
 	fprintf(stderr,
-	    "usage: mport [-c chroot dir] [-o output] [-qUVv] <command> args:\n"
+	    "usage: mport [-c chroot dir] [-o output] [-fqUVv] <command> args:\n"
 	    "       mport audit\n"
 	    "       mport autoremove\n"
 	    "       mport clean\n"

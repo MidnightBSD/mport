@@ -23,7 +23,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"
-.Dd September 4, 2023
+.Dd Januar 25, 2024
 .Dt MPORT 1
 .Os
 .Sh NAME
@@ -33,6 +33,7 @@
 .Nm
 .Op Fl v
 .Op Fl c Ao chroot path Ac
+.Op Fl f
 .Op Fl o Ao output path Ac
 .Op Fl q
 .Op Fl V
@@ -117,6 +118,8 @@ will chroot in the
 Make output less verbose and hide download progress.
 .It Fl V, Cm --verbose
 Make output more verbose.
+.It Fl f, Cm --force
+Force the operation.  Supported for install and delete currently.
 .It Fl o Ao output path Ac , Cm --output Ao output path Ac
 .Nm
 will download packages into the 
