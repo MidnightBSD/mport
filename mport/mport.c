@@ -494,7 +494,7 @@ usage(void)
 	    "       mport import [filename]\n"
 	    "       mport index\n"
 	    "       mport info [package name]\n"
-	    "       mport install [package name]\n"
+	    "       mport install [-A] [package name]\n"
 	    "       mport list [updates|prime]\n"
 	    "       mport lock [package name]\n"
 	    "       mport locks\n"
