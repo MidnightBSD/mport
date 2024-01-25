@@ -103,11 +103,13 @@ main(int argc, char *argv[])
 	int noIndex = 0;
 	bool quiet = false;
 	bool verbose = false;
+	bool force = false;
 
 	struct option longopts[] = {
 		{ "no-index", no_argument, NULL, 'U' },
 		{ "verbose", no_argument, NULL, 'V' },
 		{ "chroot", required_argument, NULL, 'c' },
+		{ "force", no_argument, NULL, 'f' },
 		{ "output", required_argument, NULL, 'o' },
 		{ "quiet", no_argument, NULL, 'q'},
 		{ "version", no_argument, NULL, 'v' },
@@ -122,7 +124,7 @@ main(int argc, char *argv[])
 
 	setlocale(LC_ALL, "");
 
-	while ((ch = getopt_long(argc, argv, "+c:o:qUVv", longopts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "+c:o:fqUVv", longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'U':
 			noIndex++;
@@ -132,6 +134,9 @@ main(int argc, char *argv[])
 			break;
 		case 'c':
 			chroot_path = optarg;
+			break;
+		case 'f':
+		    force = true;
 			break;
 		case 'o':
 			outputPath = optarg;
@@ -161,6 +166,7 @@ main(int argc, char *argv[])
 	if (mport_instance_init(mport, NULL, outputPath, noIndex != 0, mport_verbosity(quiet, verbose)) != MPORT_OK) {
 		errx(1, "%s", mport_err_string());
 	}
+	mport->force = force;
 
 	if (version == 1) {
 		show_version(mport, version);
@@ -479,7 +485,7 @@ usage(void)
 	show_version(NULL, 2);
 
 	fprintf(stderr,
-	    "usage: mport [-c chroot dir] [-U] [-o output] [-q] [-V] [-v] <command> args:\n"
+	    "usage: mport [-c chroot dir] [-o output] [-qUVv] <command> args:\n"
 	    "       mport audit\n"
 	    "       mport autoremove\n"
 	    "       mport clean\n"
