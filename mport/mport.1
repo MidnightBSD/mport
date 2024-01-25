@@ -75,6 +75,7 @@
 .Cm index
 .Nm
 .Cm install
+.Op Fl A
 .Op Ar name
 .Nm
 .Cm mirror list
@@ -158,8 +159,10 @@ The d flag will allow it to download dependencies as well.
 .It Cm index
 Force a download of the index to refresh it without waiting for the timeout interval. This
 allows the user to get the latest list of packages.
-.It Cm install Ao name Ac
-Fetch and install a package
+.It Cm install Fl A Ao name Ac
+Fetch and install a package.  
+With the A flag set, marks the installed packages as automatic.  Will be automati-
+		  cally	removed	if no other packages depend on them.
 .It Cm mirror list
 Lists all available package mirrors.
 .It Cm mirror select
