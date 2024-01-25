@@ -836,7 +836,6 @@ int
 delete(mportInstance *mport, const char *packageName)
 {
 	mportPackageMeta **packs = NULL;
-	int force = 0;
 
 	if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", packageName) != MPORT_OK) {
 		warnx("%s", mport_err_string());
@@ -851,7 +850,7 @@ delete(mportInstance *mport, const char *packageName)
 
 	while (*packs != NULL) {
 		(*packs)->action = MPORT_ACTION_DELETE;
-		if (mport_delete_primative(mport, *packs, force) != MPORT_OK) {
+		if (mport_delete_primative(mport, *packs, mport->force) != MPORT_OK) {
 			warnx("%s", mport_err_string());
 			mport_pkgmeta_vec_free(packs);
 			return (MPORT_ERR_FATAL);
