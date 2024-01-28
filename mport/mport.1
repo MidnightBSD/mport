@@ -40,6 +40,10 @@
 .Ao command Ac
 .Pp
 .Nm
+.Cm add
+.Op Fl A
+.Op Ar name
+.Nm
 .Cm autoremove
 .Nm
 .Cm clean
@@ -128,6 +132,9 @@ will download packages into the
 The following commands are supported by
 .Nm :
 .Bl -tag -width ".Cm install"
+.It Cm add Ao name Ac
+Installs a local package file and also attempts to install any missing dependencies in the path specified.
+For online installs, use mport install instead.
 .It Cm audit
 Displays vulnerable packages installed on the system. Uses CPE data to match against
 a NVD feed provided by the MidnightBSD project.
@@ -164,8 +171,8 @@ Force a download of the index to refresh it without waiting for the timeout inte
 allows the user to get the latest list of packages.
 .It Cm install Fl A Ao name Ac
 Fetch and install a package.  
-With the A flag set, marks the installed packages as automatic.  Will be automati-
-		  cally	removed	if no other packages depend on them.
+With the A flag set, marks the installed packages as automatic.  Will be automatically
+removed	if no other packages depend on them.
 .It Cm mirror list
 Lists all available package mirrors.
 .It Cm mirror select
