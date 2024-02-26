@@ -41,28 +41,28 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 {
 
 	mportPackageMeta **packs;
-    mportIndexEntry **indexEntries;
+	mportIndexEntry **indexEntries;
 	mportIndexEntry **iestart;
 	mportIndexMovedEntry **movedEntries;
-    char *comment;
-    char *os_release;
-    char name_version[30];
+	char *comment;
+	char *os_release;
+	char name_version[30];
 
-    if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
+	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
 		mport_pkgmeta_vec_free(packs);
 		RETURN_CURRENT_ERROR;
 	}
 
-    if (packs == NULL) {
-        RETURN_ERROR(MPORT_ERR_WARN, "No packages installed matching.");
+	if (packs == NULL) {
+		RETURN_ERROR(MPORT_ERR_WARN, "No packages installed matching.");
 	}
 
-    os_release = mport_get_osrelease(mport);
+	os_release = mport_get_osrelease(mport);
     
-    while (*packs != NULL) {
+	while (*packs != NULL) {
 		if (print->update) {
 			if (mport_index_lookup_pkgname(mport, (*packs)->name, &indexEntries) != MPORT_OK) {
-                RETURN_ERRORX(MPORT_ERR_FATAL, "Error looking up package name %s: %d %s", (*packs)->name, mport_err_code(), mport_err_string());
+				RETURN_ERRORX(MPORT_ERR_FATAL, "Error looking up package name %s: %d %s", (*packs)->name, mport_err_code(), mport_err_string());
 			}
 
 			if (indexEntries == NULL || *indexEntries == NULL) {
