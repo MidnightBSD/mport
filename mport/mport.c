@@ -130,13 +130,13 @@ main(int argc, char *argv[])
 			noIndex++;
 			break;
 		case 'V':
-		    verbose = true;
+			verbose = true;
 			break;
 		case 'c':
 			chroot_path = optarg;
 			break;
 		case 'f':
-		    force = true;
+			force = true;
 			break;
 		case 'o':
 			outputPath = optarg;
@@ -822,9 +822,8 @@ install(mportInstance *mport, const char *packageName)
 		}
 	}
 
-    if (indexEntry != NULL && *indexEntry != NULL) {
-		resultCode = mport_install_depends(
-	    	mport, (*indexEntry)->pkgname, (*indexEntry)->version, MPORT_EXPLICIT);
+	if (indexEntry != NULL && *indexEntry != NULL) {
+		resultCode = mport_install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version, MPORT_EXPLICIT);
 	}
 
 	mport_index_entry_free_vec(ie);

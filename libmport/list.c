@@ -139,5 +139,7 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 		packs++;
 	}
 
+	(mport->progress_free_cb)();
+
 	return (MPORT_OK);
 }
