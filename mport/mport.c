@@ -457,7 +457,7 @@ main(int argc, char *argv[])
 			while ((ch2 = getopt(local_argc, local_argv, "qo")) != -1) {
 				switch (ch2) {
 				case 'q':
-					quiet = true;
+					mport->verbosity = MPORT_VQUIET;
 					break;
 				case 'o':
 					oflag = 1;
@@ -466,7 +466,6 @@ main(int argc, char *argv[])
 			}
 			local_argc -= optind;
 			local_argv += optind;
-			mport->verbosity = mport_verbosity(quiet, verbose); /* reset for backward compatibility with q flag */
 			which(mport, *local_argv, oflag);
 		} else {
 			usage();
