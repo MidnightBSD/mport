@@ -452,12 +452,12 @@ main(int argc, char *argv[])
 		int local_argc = argc;
 		char *const *local_argv = argv;
 		if (local_argc > 1) {
-			int ch2, qflag, oflag;
-			qflag = oflag = 0;
+			int ch2, oflag;
+			oflag = 0;
 			while ((ch2 = getopt(local_argc, local_argv, "qo")) != -1) {
 				switch (ch2) {
 				case 'q':
-					qflag = 1;
+					quiet = true;
 					break;
 				case 'o':
 					oflag = 1;
@@ -466,6 +466,7 @@ main(int argc, char *argv[])
 			}
 			local_argc -= optind;
 			local_argv += optind;
+			mport->verbosity = mport_verbosity(quiet, verbose); /* reset for backward compatibility with q flag */
 			which(mport, *local_argv, oflag);
 		} else {
 			usage();
