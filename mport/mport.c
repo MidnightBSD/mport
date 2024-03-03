@@ -338,7 +338,7 @@ main(int argc, char *argv[])
 		} else {
 			opts.verbose = true;
 		}
-		resultCode = mport_list_print(mport, opts);
+		resultCode = mport_list_print(mport, &opts);
 	} else if (!strcmp(cmd, "info")) {
 		loadIndex(mport);
 		resultCode = info(mport, argv[1]);
