@@ -209,7 +209,7 @@ mport_fetch_cves(mportInstance *mport, char *cpe)
 		SET_ERRORX(MPORT_ERR_FATAL, "Couldn't make tmp file: %s", strerror(errno));
 	}
   
-	asprintf(&url, "%s/api/cpe/partial-match?cpe=%s", MPORT_SECURITY_URL, cpe);
+	asprintf(&url, "%s/api/cpe/partial-match?cpe=%s&startDate=2006-02-28", MPORT_SECURITY_URL, cpe);
 	result = fetch_to_file(mport, url, fdopen(fd, "w"), false);
 	free(url);
 
