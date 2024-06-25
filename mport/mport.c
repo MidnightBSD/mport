@@ -1114,7 +1114,7 @@ audit(mportInstance *mport, bool dependsOn)
 }
 
 int 
-audit_package(mportInstance *mport, const char *pkgname, bool dependsOn) 
+audit_package(mportInstance *mport, const char *packageName, bool dependsOn) 
 {
 	mportPackageMeta **packs = NULL;
 
