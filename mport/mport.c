@@ -83,6 +83,8 @@ static int which(mportInstance *, const char *, bool);
 
 static int audit(mportInstance *, bool);
 
+static int audit_package(mportInstance *, const char*, bool);
+
 static int selectMirror(mportInstance *mport);
 
 static mportPackageMeta** lookup_for_lock(mportInstance *, const char *);
@@ -294,7 +296,11 @@ main(int argc, char *argv[])
 			local_argv += optind;
 		}
 
-		resultCode = audit(mport, rflag > 0);
+		if (argc > 1) {
+			resultCode = audit_package(mport, argv[1], rflag > 0);
+		} else {
+			resultCode = audit(mport, rflag > 0);
+		}
 	} else if (!strcmp(cmd, "locks")) {
 		asprintf(&buf, "%s%s", MPORT_TOOLS_PATH, "mport.list");
 		flag = strdup("-l");
@@ -1088,6 +1094,39 @@ audit(mportInstance *mport, bool dependsOn)
 	if (packs == NULL) {
 		fprintf(stderr, "No packages installed.\n");
 		return (1);
+	}
+
+	while (*packs != NULL) {
+		char *output = mport_audit(mport, (*packs)->name, dependsOn);
+		if (output != NULL && output[0] != '\0') {
+			if (mport->verbosity == MPORT_VQUIET)
+				printf("%s", output);
+			else
+				printf("%s\n", output);
+			free(output);
+		}
+		packs++;
+	}
+
+	mport_pkgmeta_vec_free(packs);
+
+	return (0);
+}
+
+int 
+audit_package(mportInstance *mport, const char *pkgname, bool dependsOn) 
+{
+	mportPackageMeta **packs = NULL;
+
+	if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", packageName) != MPORT_OK) {
+		warnx("%s", mport_err_string());
+		mport_pkgmeta_vec_free(packs);
+		return (MPORT_ERR_FATAL);
+	}
+
+	if (packs == NULL) {
+		warnx("No packages installed matching '%s'", packageName);
+		return (MPORT_ERR_FATAL);
 	}
 
 	while (*packs != NULL) {
