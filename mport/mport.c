@@ -250,15 +250,19 @@ main(int argc, char *argv[])
 
 		int local_argc = argc;
 		char *const *local_argv = argv;
+		int aflag = 0;
 		int dflag = 0;
 
 		if (local_argc > 1) {
 			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "d")) != -1) {
+			while ((ch2 = getopt(local_argc, local_argv, "ad")) != -1) {
 				switch (ch2) {
-				case 'd':
-					dflag = 1;
-					break;
+					case 'a':
+                    	aflag = 1;
+                    	break;
+					case 'd':
+						dflag = 1;
+						break;
 				}
 			}
 			local_argc -= optind;
@@ -266,7 +270,7 @@ main(int argc, char *argv[])
 		}
 
 		for (i = 1; i < argc; i++) {
-			tempResultCode = mport_download(mport, argv[i], dflag == 1, &path);
+			tempResultCode = mport_download(mport, argv[i], aflag == 1, dflag == 1, &path);
 			if (tempResultCode != 0) {
 				resultCode = tempResultCode;
 			} else if (path != NULL) {
