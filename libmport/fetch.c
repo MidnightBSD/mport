@@ -84,7 +84,7 @@ mport_fetch_index(mportInstance *mport)
 		}
 
 		if (fetch(mport, url, MPORT_INDEX_FILE_BZ2) == MPORT_OK) {
-			mport_decompress_bzip2(MPORT_INDEX_FILE_BZ2, MPORT_INDEX_FILE);
+			mport_decompress_bzip2(MPORT_INDEX_FILE_BZ2, mport_index_file_path());
 			free(url);
 			for (int mi = 0; mi < mirrorCount; mi++)
 				free(mirrors[mi]);
@@ -126,7 +126,7 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 	asprintf(&url, "%s/%s/%s/%s", MPORT_BOOTSTRAP_INDEX_URL, MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE);
 
 	result = fetch(mport, url, MPORT_INDEX_FILE_BZ2);
-	mport_decompress_bzip2(MPORT_INDEX_FILE_BZ2, MPORT_INDEX_FILE);
+	mport_decompress_bzip2(MPORT_INDEX_FILE_BZ2, mport_index_file_path());
 
 	free(url);
 	free(osrel);
