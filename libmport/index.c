@@ -54,13 +54,28 @@ static void populate_row(sqlite3_stmt *stmt, mportIndexEntry *e);
 
 char *
 mport_index_file_path() {
-	char *indexFile = MPORT_INDEX_FILE;
+	char *envIndexFile = getenv("PKG_DB");
 
-	if (getenv("PKG_DB") != NULL) {
-        indexFile = getenv("PKG_DB");
-    }
-	
-	return indexFile;
+	if (envIndexFile == NULL || strlen(envIndexFile) == 0)
+	    return MPORT_INDEX_FILE;
+
+    /*
+     * Reject any ".." components in the path.  This is a security
+     * measure to prevent directory traversal attacks.
+     */
+	char *dotDot = strstr(envIndexFile, "..");
+	if (dotDot != NULL) {
+		SET_ERROR(MPORT_ERR_WARN, "Relative path is not allowed in PKG_DB environment variable");
+    	return MPORT_INDEX_FILE;
+	}
+
+	char *path = realpath(envIndexFile, NULL);
+	if (path == NULL) {
+		SET_ERROR(MPORT_ERR_WARN, "Invalid path or file access error in PKG_DB environment variable");
+    	return MPORT_INDEX_FILE;
+	}
+	free(path);
+	return envIndexFile;
 }
 
 /*
