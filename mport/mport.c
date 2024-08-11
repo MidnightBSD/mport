@@ -257,24 +257,28 @@ main(int argc, char *argv[])
 			int ch2;
 			while ((ch2 = getopt(local_argc, local_argv, "ad")) != -1) {
 				switch (ch2) {
-					case 'a':
-                    	aflag = 1;
-                    	break;
-					case 'd':
-						dflag = 1;
-						break;
+				case 'a':
+					aflag = 1;
+					break;
+				case 'd':
+					dflag = 1;
+					break;
 				}
 			}
 			local_argc -= optind;
 			local_argv += optind;
 		}
 
-		for (i = 1; i < argc; i++) {
-			tempResultCode = mport_download(mport, argv[i], aflag == 1, dflag == 1, &path);
-			if (tempResultCode != 0) {
-				resultCode = tempResultCode;
-			} else if (path != NULL) {
-				free(path);
+		if (aflag) {
+			resultCode = mport_download(mport, NULL, true, false, &path);
+		} else {
+			for (i = 1; i < argc; i++) {
+				tempResultCode = mport_download(mport, argv[i], aflag == 1, dflag == 1, &path);
+				if (tempResultCode != 0) {
+					resultCode = tempResultCode;
+				} else if (path != NULL) {
+					free(path);
+				}
 			}
 		}
 	} else if (!strcmp(cmd, "upgrade")) {
@@ -510,7 +514,7 @@ usage(void)
 	    "       mport cpe\n"
 	    "       mport delete [package name]\n"
 	    "       mport deleteall\n"
-	    "       mport download [-d] [package name]\n"
+	    "       mport download [-a] [-d] [package name]\n"
 	    "       mport export [filename]\n"
 	    "       mport import [filename]\n"
 	    "       mport index\n"
