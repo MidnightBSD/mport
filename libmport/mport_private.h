@@ -232,7 +232,7 @@ char * mport_fetch_cves(mportInstance *mport, char *cpe);
 
 /* a few index things */
 int mport_index_get_mirror_list(mportInstance *, char ***, int *);
-char * mport_index_file_path();
+char * mport_index_file_path(void);
 
 #define MPORT_CHECK_FOR_INDEX(mport, func) if (!(mport->flags & MPORT_INST_HAVE_INDEX)) RETURN_ERRORX(MPORT_ERR_FATAL, "Attempt to use %s before loading index.", (func));
 #define MPORT_DAY (3600 * 24)
