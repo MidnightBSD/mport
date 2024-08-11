@@ -327,20 +327,21 @@ mport_download(mportInstance *mport, const char *packageName, bool all, bool inc
 	int retryCount = 0;
 
 	if (all) {
-		mport_index_list(mport, &depends_orig);
-		depends = depends_orig;
+		mportIndexEntry **ie2_orig;
+		mport_index_list(mport, &ie2_orig);
+		mportIndexEntry **ie2 = ie2_orig;
 
-		while (*depends != NULL) {
+		while (*ie2 != NULL) {
 			char *dpath;
-			if (mport_download(mport, (*depends)->d_pkgname, false, includeDependencies, &dpath) != MPORT_OK) {
-     			mport_call_msg_cb(mport, "%s", mport_err_string());
-     			mport_index_depends_free_vec(depends_orig);
+			if (mport_download(mport, (*ie2)->pkgname, false, false, &dpath) != MPORT_OK) {
+				mport_call_msg_cb(mport, "%s", mport_err_string());
+				mport_index_entry_free_vec(ie2_orig);
 				return mport_err_code();
 			}
 			free(dpath);
-			depends++;
+			ie2++;
 		}
-		mport_index_depends_free_vec(depends_orig);
+		mport_index_entry_free_vec(ie2_orig);
 		return (MPORT_OK);
 	}
 
