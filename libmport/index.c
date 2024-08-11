@@ -69,13 +69,6 @@ mport_index_file_path() {
 		return MPORT_INDEX_FILE;
 	}
 
-	char *path = realpath(envIndexFile, NULL);
-	if (path == NULL) {
-		SET_ERROR(MPORT_ERR_WARN, "Invalid path or file access error in PKG_DB environment variable");
-		return MPORT_INDEX_FILE;
-	}
-	free(path);
-
 	return envIndexFile;
 }
 
