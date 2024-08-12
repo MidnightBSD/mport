@@ -106,10 +106,12 @@ main(int argc, char *argv[])
 	bool quiet = false;
 	bool verbose = false;
 	bool force = false;
+	bool brief = false;
 
 	struct option longopts[] = {
 		{ "no-index", no_argument, NULL, 'U' },
 		{ "verbose", no_argument, NULL, 'V' },
+		{ "brief", no_argument, NULL, 'b'},
 		{ "chroot", required_argument, NULL, 'c' },
 		{ "force", no_argument, NULL, 'f' },
 		{ "output", required_argument, NULL, 'o' },
@@ -126,13 +128,16 @@ main(int argc, char *argv[])
 
 	setlocale(LC_ALL, "");
 
-	while ((ch = getopt_long(argc, argv, "+c:o:fqUVv", longopts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "+c:o:bfqUVv", longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'U':
 			noIndex++;
 			break;
 		case 'V':
 			verbose = true;
+			break;
+		case 'b':
+			brief = true;
 			break;
 		case 'c':
 			chroot_path = optarg;
@@ -165,7 +170,7 @@ main(int argc, char *argv[])
 
 	mport = mport_instance_new();
 
-	if (mport_instance_init(mport, NULL, outputPath, noIndex != 0, mport_verbosity(quiet, verbose)) != MPORT_OK) {
+	if (mport_instance_init(mport, NULL, outputPath, noIndex != 0, mport_verbosity(quiet, verbose, brief)) != MPORT_OK) {
 		errx(1, "%s", mport_err_string());
 	}
 	mport->force = force;
