@@ -249,7 +249,7 @@ main(int argc, char *argv[])
 			mportPackageMeta **packs = NULL;
 			mportPackageMeta **packs_orig = NULL;
 			char *pkg = mport_string_replace(argv[1], "*", "%");
-			if (mport_pkgmeta_search_master(mport, &packs, "pkg like %s", pkg) != MPORT_OK) {
+			if (mport_pkgmeta_search_master(mport, &packs, "pkg like %Q", pkg) != MPORT_OK) {
 				warnx("%s", mport_err_string());
 				mport_instance_free(mport);
 				return (MPORT_ERR_FATAL);
