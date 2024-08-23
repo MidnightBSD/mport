@@ -244,10 +244,34 @@ main(int argc, char *argv[])
 			usage();
 		}
 		loadIndex(mport);
-		for (i = 1; i < argc; i++) {
-			tempResultCode = mport_update(mport, argv[i]);
-			if (tempResultCode != 0)
-				resultCode = tempResultCode;
+
+        if (strchr(argv[1], '*') != NULL) {
+			mportPackageMeta **packs = NULL;
+			mportPackageMeta **packs_orig = NULL;
+			char *pkg = mport_string_replace(argv[1], "*", "%");
+			if (mport_pkgmeta_search_master(mport, &packs, "pkg like %Q", pkg) != MPORT_OK) {
+				warnx("%s", mport_err_string());
+				mport_instance_free(mport);
+				return (MPORT_ERR_FATAL);
+			}
+
+			if (packs == NULL) {
+				warnx("No packages installed matching '%s'", argv[1]);
+				return (MPORT_ERR_FATAL);
+			}
+
+			packs_orig = packs;
+			while (*packs != NULL) {
+				mport_update(mport, (*packs)->name);
+				packs++;
+			}
+			mport_pkgmeta_free(*packs_orig);
+		} else { 
+			for (i = 1; i < argc; i++) {
+				tempResultCode = mport_update(mport, argv[i]);
+				if (tempResultCode != 0)
+					resultCode = tempResultCode;
+			}
 		}
 	} else if (!strcmp(cmd, "download")) {
 		loadIndex(mport);

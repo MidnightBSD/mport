@@ -343,6 +343,7 @@ char * mport_version(mportInstance *);
 char * mport_version_short(mportInstance *);
 char * mport_get_osrelease(mportInstance *);
 int mport_drop_privileges(void);
+char * mport_string_replace(const char *str, const char *old, const char *new);
 
 /* Locks */
 enum _LockState {
