@@ -911,7 +911,8 @@ mport_drop_privileges(void)
 }
 
 bool
-mport_check_answer_bool(char *ans) {
+mport_check_answer_bool(char *ans) 
+{
 	if (ans == NULL)
 	    return (false);
 
@@ -924,7 +925,8 @@ mport_check_answer_bool(char *ans) {
 }
 
 MPORT_PUBLIC_API mportVerbosity 
-mport_verbosity(bool quiet, bool verbose, bool brief) {
+mport_verbosity(bool quiet, bool verbose, bool brief) 
+{
 
 	/* if both are specified, we need quiet for backward compatibility */
 
@@ -938,4 +940,34 @@ mport_verbosity(bool quiet, bool verbose, bool brief) {
 		return (MPORT_VVERBOSE);
 		
 	return (MPORT_VNORMAL);
+}
+
+MPORT_PUBLIC_API char *
+mport_string_replace(const char *str, const char *old, const char *new)
+{
+	char *ret, *r;
+	const char *p, *q;
+	size_t oldlen = strlen(old);
+	size_t count, retlen, newlen = strlen(new);
+
+	if (oldlen != newlen) {
+		for (count = 0, p = str; (q = strstr(p, old)) != NULL; p = q + oldlen)
+			count++;
+		retlen = p - str + strlen(p) + count * (newlen - oldlen);
+	} else {
+		retlen = strlen(str);
+	}
+
+	ret = malloc(retlen + 1);
+
+	for (r = ret, p = str; (q = strstr(p, old)) != NULL; p = q + oldlen) {
+		ptrdiff_t l = q - p;
+		memcpy(r, p, l);
+		r += l;
+		memcpy(r, new, newlen);
+		r += newlen;
+	}
+	strcpy(r, p);
+
+	return ret;
 }
