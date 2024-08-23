@@ -264,7 +264,7 @@ main(int argc, char *argv[])
 				mport_update(mport, (*packs)->name);
 				packs++;
 			}
-			mport_pkgmeta_free_list(packs_orig);
+			mport_pkgmeta_free(*packs_orig);
 		} else { 
 			for (i = 1; i < argc; i++) {
 				tempResultCode = mport_update(mport, argv[i]);
