@@ -77,7 +77,7 @@ mport_info(mportInstance *mport, const char *packageName) {
 		return (NULL);
 	}
 
-	if (mport_moved_lookup(mport, packageName, &movedEntries) != MPORT_OK) {
+	if (packs != NULL && mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK) {
 		SET_ERROR(MPORT_ERR_FATAL, "The moved lookup failed.");
 		return (NULL);
 	}
