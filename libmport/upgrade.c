@@ -97,7 +97,7 @@ mport_upgrade(mportInstance *mport) {
 			continue;
 		}
 
-		if (mport_moved_lookup(mport, (*packs)->name, &movedEntries) != MPORT_OK ||
+		if (mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK ||
 		    movedEntries == NULL || *movedEntries == NULL) {
 			packs++;
 			continue;

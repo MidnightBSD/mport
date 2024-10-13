@@ -739,9 +739,8 @@ mport_index_list(mportInstance *mport, mportIndexEntry ***entry_vec)
 }
 
 MPORT_PUBLIC_API int
-mport_moved_lookup(mportInstance *mport, const char *pkgname, mportIndexMovedEntry ***entry_vec)
+mport_moved_lookup(mportInstance *mport, const char *origin, mportIndexMovedEntry ***entry_vec)
 {
-	char *lookup = NULL;
 	int count;
 	int i = 0, step;
 	sqlite3_stmt *stmt;
@@ -754,11 +753,7 @@ mport_moved_lookup(mportInstance *mport, const char *pkgname, mportIndexMovedEnt
 
 	MPORT_CHECK_FOR_INDEX(mport, "mport_moved_lookup()")
 
-	if (lookup_alias_inverse(mport, pkgname, &lookup) != MPORT_OK) {
-		RETURN_CURRENT_ERROR;
-	}
-
-	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM idx.moved  WHERE port = %Q", lookup) != MPORT_OK) {
+	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM idx.moved  WHERE port = %Q", origin) != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
 
@@ -774,7 +769,7 @@ mport_moved_lookup(mportInstance *mport, const char *pkgname, mportIndexMovedEnt
 
 	if (mport_db_prepare(mport->db, &stmt,
 	                     "SELECT port, moved_to, why, date FROM idx.moved WHERE port = %Q",
-	                     lookup) != MPORT_OK) {
+	                     origin) != MPORT_OK) {
 		ret = mport_err_code();
 		goto MOVED_DONE;
 	}

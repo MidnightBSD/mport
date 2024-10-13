@@ -66,7 +66,7 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 			}
 
 			if (indexEntries == NULL || *indexEntries == NULL) {
-				if (mport_moved_lookup(mport, (*packs)->name, &movedEntries) != MPORT_OK) {
+				if (mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK) {
 					mport_call_msg_cb(mport,"%-25s %8s is not part of the package repository.", (*packs)->name, (*packs)->version);
 					packs++;
 					continue;
