@@ -978,20 +978,22 @@ int
 cpeList(mportInstance *mport)
 {
 	mportPackageMeta **packs = NULL;
+	mportPackageMeta **packs_orig = NULL;
 	int cpe_total = 0;
 
-	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
+	if (mport_pkgmeta_list(mport, &packs_orig) != MPORT_OK) {
 		warnx("%s", mport_err_string());
 		return mport_err_code();
 	}
 
 	mport_drop_privileges();
 
-	if (packs == NULL) {
+	if (packs_orig == NULL) {
 		warnx("No packages installed.");
 		return (1);
 	}
 
+    packs = packs_orig;
 	while (*packs != NULL) {
 		if ((*packs)->cpe != NULL && strlen((*packs)->cpe) > 0) {
 			printf("%s\n", (*packs)->cpe);
@@ -999,7 +1001,7 @@ cpeList(mportInstance *mport)
 		}
 		packs++;
 	}
-	mport_pkgmeta_vec_free(packs);
+	mport_pkgmeta_vec_free(packs_orig);
 
 	if (cpe_total == 0) {
 		errx(EX_SOFTWARE, "No packages contained CPE information.");
