@@ -165,14 +165,17 @@ mport_install_depends(mportInstance *mport, const char *packageName, const char 
 			mport_call_msg_cb(mport, "%s", mport_err_string());
 			mport_index_depends_free_vec(depends_orig);
       depends_orig = NULL;
+      depends = NULL;
 			return mport_err_code();
 		}
 		mport_index_depends_free_vec(depends_orig);
     depends_orig = NULL;
+    depends = NULL;
 	} else {
 		/* already installed, double check we are on the latest */
 		mport_index_depends_free_vec(depends_orig);
     depends_orig = NULL;
+    depends = NULL;
 
 		if (mport_check_preconditions(mport, packs[0], MPORT_PRECHECK_UPGRADEABLE) == MPORT_OK) {
 			if (mport_update(mport, packageName) != MPORT_OK) {
