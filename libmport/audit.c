@@ -43,7 +43,8 @@ MPORT_PUBLIC_API char *
 mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 {
 	mportPackageMeta **packs = NULL;
-	mportPackageMeta **depends, **depends_orig = NULL;
+	mportPackageMeta **depends = NULL;
+	mportPackageMeta **depends_orig = NULL;
 	char *pkgAudit = NULL;
 	struct ucl_parser *parser = NULL;
 
@@ -58,6 +59,7 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 	}
 
 	if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
+		mport_pkgmeta_vec_free(packs);
 		return (NULL);
 	}
 
@@ -69,6 +71,10 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 				SET_ERROR(MPORT_ERR_FATAL, "Error opening CVE file");
 				unlink(path);
 				free(path);
+				path = NULL;
+				mport_pkgmeta_vec_free(packs);
+				packs = NULL;
+
 				return (NULL);
 			}
 
@@ -84,6 +90,9 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 				free(jsonData);
 				unlink(path);
 				free(path);
+
+				mport_pkgmeta_vec_free(packs);
+				packs = NULL;
 
 				return (NULL);
 			}
@@ -101,6 +110,10 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 				free(jsonData);
 				unlink(path);
 				free(path);
+
+				mport_pkgmeta_vec_free(packs);
+				packs = NULL;
+
 				return (NULL);
 			}
 
@@ -150,6 +163,8 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 						fprintf(bufferFp, "\n");
 
 						mport_pkgmeta_vec_free(depends_orig);
+						depends_orig = NULL;
+						depends = NULL;
 					}
 				}
 			}
