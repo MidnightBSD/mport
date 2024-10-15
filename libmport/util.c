@@ -58,7 +58,7 @@ static char *mport_get_osrelease_kern(void);
 MPORT_PUBLIC_API mportCreateExtras *
 mport_createextras_new(void)
 {
-	mportCreateExtras *extra;
+	mportCreateExtras *extra = NULL;
 	extra = (mportCreateExtras *)calloc(1, sizeof(mportCreateExtras));
 	if (extra == NULL)
 		return NULL;
@@ -119,6 +119,7 @@ mport_createextras_free(mportCreateExtras *extra)
 	}
 
 	free(extra);
+	extra = NULL;
 }
 
 MPORT_PUBLIC_API int
@@ -191,7 +192,7 @@ mport_chdir(mportInstance *mport, const char *dir)
 {
 
 	if (mport != NULL) {
-		char *finaldir;
+		char *finaldir = NULL;
 
 		asprintf(&finaldir, "%s%s", mport->root, dir);
 
@@ -204,6 +205,7 @@ mport_chdir(mportInstance *mport, const char *dir)
 		}
 
 		free(finaldir);
+		finaldir = NULL;
 	} else {
 		if (chdir(dir) != 0)
 			RETURN_ERRORX(
@@ -383,7 +385,7 @@ mport_str_remove(const char *str, const char ch)
 	size_t i;
 	size_t x;
 	size_t len;
-	char *output;
+	char *output = NULL;
 	
 	if (str == NULL)
 		return NULL;
@@ -391,6 +393,8 @@ mport_str_remove(const char *str, const char ch)
 	len = strlen(str);
 	
 	output = calloc(len + 1, sizeof(char));
+	if (output == NULL)
+		return NULL;
 	
 	for (i = 0, x = 0; i <= len; i++) {
 		if (str[i] != ch) {
@@ -427,6 +431,7 @@ mport_directory(const char *path)
 			return dir;
 		} else {
 			free(dir);
+			dir = NULL;
 		}
 	} else {
 		// 'path' is just a filename, so get the current working directory
@@ -462,8 +467,10 @@ mport_xsystem(mportInstance *mport, const char *fmt, ...)
 	if (vasprintf(&cmnd, fmt, args) == -1) {
 		/* XXX How will the caller know this is no mem, and not a failed exec? */
 		va_end(args);
-		if (cmnd != NULL)
+		if (cmnd != NULL) {
 			free(cmnd);
+			cmnd = NULL;
+		}
 		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate xsystem cmnd string.");
 	}
 	va_end(args);
@@ -479,6 +486,7 @@ mport_xsystem(mportInstance *mport, const char *fmt, ...)
 
 	ret = system(cmnd);
 	free(cmnd);
+	cmnd = NULL;
 
 	/* system(3) ignores SIGINT and SIGQUIT */
 	if (WIFSIGNALED(ret) && (WTERMSIG(ret) == SIGINT || WTERMSIG(ret) == SIGQUIT)) {
@@ -532,11 +540,13 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 	if (*list_size == 0) {
 		*list = NULL;
 		free(input);
+		input = NULL;
 		return;
 	}
 
 	if ((*list = (char **)calloc((*list_size + 1), sizeof(char *))) == NULL) {
 		free(input);
+		input = NULL;
 		return;
 	}
 
@@ -558,6 +568,7 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 
 	*vec = NULL;
 	free(input);
+	input = NULL;
 }
 
 /*
@@ -577,10 +588,10 @@ int
 mport_run_asset_exec(mportInstance *mport, const char *fmt, const char *cwd, const char *last_file)
 {
 	size_t l;
-	char *cmnd;
-	char *pos;
-	char *name;
-	char *lfcpy;
+	char *cmnd = NULL;
+	char *pos = NULL;
+	char *name = NULL;
+	char *lfcpy = NULL;
 	int ret;
 	static int max = 0;
 	size_t maxlen = sizeof(max);
@@ -647,6 +658,8 @@ mport_run_asset_exec(mportInstance *mport, const char *fmt, const char *cwd, con
 	/* cmnd now hold the expanded command, now execute it*/
 	ret = mport_xsystem(mport, cmnd);
 	free(cmnd);
+	cmnd = NULL;
+
 	return ret;
 }
 
@@ -657,7 +670,7 @@ mport_run_asset_exec(mportInstance *mport, const char *fmt, const char *cwd, con
 void
 mport_free_vec(void *vec)
 {
-	char *p;
+	char *p = NULL;
 
 	if (vec == NULL)
 		return;
@@ -757,7 +770,7 @@ mport_get_osrelease_kern(void)
 {
 	char osrelease[128];
 	size_t len;
-	char *version;
+	char *version = NULL;
 
 	len = sizeof(osrelease);
 	if (sysctlbyname("kern.osrelease", &osrelease, &len, NULL, 0) < 0)
@@ -855,11 +868,12 @@ mport_get_osrelease_userland(void)
 MPORT_PUBLIC_API char *
 mport_version(mportInstance *mport)
 {
-	char *version;
+	char *version = NULL;
 	char *osrel = mport_get_osrelease(mport);
 	asprintf(&version, "mport %s for MidnightBSD %s, Bundle Version %s\n", MPORT_VERSION, osrel,
 	    MPORT_BUNDLE_VERSION_STR);
 	free(osrel);
+	osrel = NULL;
 
 	return version;
 }
@@ -867,10 +881,11 @@ mport_version(mportInstance *mport)
 MPORT_PUBLIC_API char *
 mport_version_short(mportInstance *mport)
 {
-	char *version;
+	char *version = NULL;
 	char *osrel = mport_get_osrelease(mport);
 	asprintf(&version, "%s\n", MPORT_VERSION);
 	free(osrel);
+	osrel = NULL;
 
 	return version;
 }
@@ -890,7 +905,7 @@ mport_get_time(void)
 MPORT_PUBLIC_API int
 mport_drop_privileges(void)
 {
-	struct passwd *nobody;
+	struct passwd *nobody = NULL;
 
 	if (geteuid() == 0) {
 		nobody = getpwnam("nobody");
@@ -945,7 +960,8 @@ mport_verbosity(bool quiet, bool verbose, bool brief)
 MPORT_PUBLIC_API char *
 mport_string_replace(const char *str, const char *old, const char *new)
 {
-	char *ret, *r;
+	char *ret = NULL;
+	char *r = NULL;
 	const char *p, *q;
 	size_t oldlen = strlen(old);
 	size_t count, retlen, newlen = strlen(new);
@@ -959,6 +975,8 @@ mport_string_replace(const char *str, const char *old, const char *new)
 	}
 
 	ret = malloc(retlen + 1);
+	if (ret == NULL)
+	    return NULL;
 
 	for (r = ret, p = str; (q = strstr(p, old)) != NULL; p = q + oldlen) {
 		ptrdiff_t l = q - p;

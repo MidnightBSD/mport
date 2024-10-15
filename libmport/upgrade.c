@@ -60,7 +60,7 @@ efree(void *p, size_t s1, void *data){
 
 MPORT_PUBLIC_API int
 mport_upgrade(mportInstance *mport) {
-	mportPackageMeta **packs, **packs_orig;
+	mportPackageMeta **packs, **packs_orig = NULL;
 	int total = 0;
 	int updated = 0;
 	struct ohash_info info = { 0, NULL, ecalloc, efree, NULL };
