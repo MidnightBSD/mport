@@ -60,6 +60,8 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 
 	if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
 		mport_pkgmeta_vec_free(packs);
+		packs = NULL;
+
 		return (NULL);
 	}
 
@@ -69,9 +71,11 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 			char *jsonData = readJsonFile(path);
 			if (jsonData == NULL) {
 				SET_ERROR(MPORT_ERR_FATAL, "Error opening CVE file");
-				unlink(path);
-				free(path);
-				path = NULL;
+				if (path != NULL) {
+					unlink(path);
+					free(path);
+					path = NULL;
+				}
 				mport_pkgmeta_vec_free(packs);
 				packs = NULL;
 
@@ -88,8 +92,11 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 				ucl_parser_free(parser);
 
 				free(jsonData);
+				jsonData = NULL;
+
 				unlink(path);
 				free(path);
+				path = NULL;
 
 				mport_pkgmeta_vec_free(packs);
 				packs = NULL;
@@ -108,9 +115,12 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 			if (bufferFp == NULL) {
 				SET_ERROR(MPORT_ERR_FATAL, "Error allocating memory for audit entries");
 				free(jsonData);
+				jsonData = NULL;
+
 				unlink(path);
 				free(path);
-
+				path = NULL;
+				
 				mport_pkgmeta_vec_free(packs);
 				packs = NULL;
 
@@ -121,6 +131,38 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 			while ((cur = ucl_object_iterate(root, &it, true))) {
 				if (ucl_object_type(cur) != UCL_OBJECT) {
 					SET_ERROR(MPORT_ERR_FATAL, "Expected an object in the array");
+					continue;
+				}
+
+				bool isVulnerable = false;
+				const ucl_object_t *products = ucl_object_find_key(cur, "products");
+				if (products != NULL && ucl_object_type(products) == UCL_ARRAY) {
+					ucl_object_iter_t pit = NULL;
+					const ucl_object_t *product;
+
+					for (product = ucl_object_iterate_array(products, &pit);
+					     product != NULL;
+					     product = ucl_object_iterate_array(products, &pit)) {
+						const ucl_object_t *version =
+						    ucl_object_find_key(product, "version");
+						if (version != NULL &&
+						    ucl_object_type(version) == UCL_STRING) {
+							const char *version_str =
+							    ucl_object_tostring(version);
+
+							if (version_str == NULL)
+							    continue;
+
+							// Skip based on the version field
+							if ('*' == version_str[0] || mport_version_cmp((*packs)->version, version_str) < 1) {
+								isVulnerable = true;
+                                break;
+							}
+						}
+					}
+				}
+
+				if (!isVulnerable) {
 					continue;
 				}
 
@@ -170,9 +212,15 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 			}
 
 			free(jsonData);
+			jsonData = NULL;
+
 			fclose(bufferFp);
+			bufferFp = NULL;
+
 			unlink(path);
 			free(path);
+			path = NULL;
+
 			ucl_object_unref(root);
 
 			mport_pkgmeta_vec_free(packs);
