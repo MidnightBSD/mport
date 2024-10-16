@@ -140,9 +140,9 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 					ucl_object_iter_t pit = NULL;
 					const ucl_object_t *product;
 
-					for (product = ucl_object_iterate_with_error(products, &pit, NULL);
+					for (product = ucl_object_iterate(products, &pit, true);
 					     product != NULL;
-					     product = ucl_object_iterate_with_error(products, &pit, NULL)) {
+					     product = ucl_object_iterate(products, &pit, true)) {
 						const ucl_object_t *version =
 						    ucl_object_find_key(product, "version");
 						if (version != NULL &&
@@ -154,9 +154,9 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 							    continue;
 
 							// Skip based on the version field
-							if ('*' == version_str[0] || mport_version_cmp((*packs)->version, version_str) < 1) {
+							if ('*' == version_str[0] || mport_version_cmp((*packs)->version, version_str) <= 0) {
 								isVulnerable = true;
-                                break;
+								break;
 							}
 						}
 					}
