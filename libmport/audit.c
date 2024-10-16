@@ -140,9 +140,9 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 					ucl_object_iter_t pit = NULL;
 					const ucl_object_t *product;
 
-					for (product = ucl_object_iterate_array(products, &pit);
+					for (product = ucl_object_iterate(products, &pit);
 					     product != NULL;
-					     product = ucl_object_iterate_array(products, &pit)) {
+					     product = ucl_object_iterate(products, &pit)) {
 						const ucl_object_t *version =
 						    ucl_object_find_key(product, "version");
 						if (version != NULL &&
