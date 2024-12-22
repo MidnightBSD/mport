@@ -102,3 +102,8 @@ Lists all CPE info on installed packages
 
 `mport verify`
 Runs a checksum on all installed files from packages against data from time of installation to see if files have been modified.
+
+### Known Bugs
+
+Old versions of mport had a bug that would prevent it working over a serial connection such as during a bhyve installation.  A workaround is to ssh into the box to do installs.  This is known
+to impact MidnightBSD 1.2.x and lower.  It was fixed.
