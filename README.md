@@ -2,13 +2,14 @@
 MidnightBSD Package Manager
 
 ## Requirements
-Will run on MidnightBSD 1.2 and higher. 
+Recent versions will run on MidnightBSD 3.0 and higher. 
 
 Depends on:
 * sqlite3
 * libarchive
 * bzip2
 * lzma
+* ucl
 
 Versions prior to 2.1.0 also depended on
 * libdispatch
@@ -16,9 +17,11 @@ Versions prior to 2.1.0 also depended on
 
 ## Backward compatibility
 
+The last version that works with MidnightBSD 1.2.8 or lower is mport 2.1.4. (lack of libucl)  
+
 There was a breaking change in 2.1.6 in libmport with respect to mport_install and mport_install_primative use.
 
-There was a breaking change in 2.6.0 in libmport which changes the mport_init function to use mportVerbosity rather than a boolean for quiet mode.
+There was a breaking change in 2.6.0 in libmport which changed the mport_init function to use mportVerbosity rather than a boolean for quiet mode.
 
 mportVerbosity has three values currently: 
 MPORT_VQUIET, MPORT_VNORMAL, MPORT_VVERBOSE 
@@ -36,7 +39,7 @@ Installing a package named xorg:
 
 `mport install xorg`
 
-Deleting the xorg meta package:
+Deleting the xorg meta-package:
 
 `mport delete xorg`
 
@@ -48,13 +51,13 @@ Upgrading all packages
 
 `mport upgrade`
 
-Update a specific package (and it's dependencies)
+Update a specific package (and its dependencies)
 
 `mport update xorg`
 
 ### Installing from package file
 
-Example installing a vim package that is already built locally
+For example, installing a vim package that is already built locally
 
 `/usr/libexec/mport.install /usr/mports/Packages/amd64/All/vim-8.2.3394.mport` 
 
@@ -83,10 +86,10 @@ Options         :
 Type            : Application
 Description     :
 ```
-### Security related commands
+### Security-related commands
 
 `mport audit`
-Displays vulnerable packages based on their CPE indetifiers using the NVD data provided by https://sec.midnightbsd.org
+Displays vulnerable packages based on their CPE identifiers using the NVD data provided by https://sec.midnightbsd.org
 
 `mport audit -r`
 Prints out vulnerable packages and a list of packages depending on that one.
