@@ -11,6 +11,9 @@ Depends on:
 * lzma
 * ucl
 
+Depends on included libs:
+external/tllist 
+
 Versions prior to 2.1.0 also depended on
 * libdispatch
 * Blocksruntime
@@ -27,6 +30,8 @@ mportVerbosity has three values currently:
 MPORT_VQUIET, MPORT_VNORMAL, MPORT_VVERBOSE 
 
 There's also the new mport_verbosity function which translates quiet and verbose flags into the right value.
+
+The last version that works with MidnightBSD 2.x is mport 2.6.5.
 
 ## Using mport
 
