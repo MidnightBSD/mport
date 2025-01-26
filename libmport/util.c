@@ -687,59 +687,70 @@ mport_free_vec(void *vec)
 	vec = NULL;
 }
 
-/* mport_decompress_bzip2(char * input, char * output)
- *
- * Extract a bzip2 file such as an index
- */
-int
-mport_decompress_bzip2(const char *input, const char *output)
+int 
+mport_decompress_zstd(const char *input, const char *output)
 {
-	FILE *f;
-	FILE *fout;
-	BZFILE *b;
-	int nBuf;
-	char buf[4096];
-	int bzerror;
+    FILE *f;
+    FILE *fout;
+    size_t const buffInSize = ZSTD_DStreamInSize();
+    size_t const buffOutSize = ZSTD_DStreamOutSize();
+    void* const buffIn = malloc(buffInSize);
+    void* const buffOut = malloc(buffOutSize);
+    ZSTD_DStream* const dstream = ZSTD_createDStream();
+    size_t const initResult = ZSTD_initDStream(dstream);
 
-	f = fopen(input, "r");
-	if (!f) {
-		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't open bzip2 file for reading");
-	}
+    if (ZSTD_isError(initResult)) {
+        free(buffIn);
+        free(buffOut);
+        ZSTD_freeDStream(dstream);
+        RETURN_ERROR(MPORT_ERR_FATAL, "Failed to initialize ZSTD decompression stream");
+    }
 
-	fout = fopen(output, "w");
-	if (!fout) {
-		fclose(f);
-		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't open file for writing");
-	}
+    f = fopen(input, "rb");
+    if (!f) {
+        free(buffIn);
+        free(buffOut);
+        ZSTD_freeDStream(dstream);
+        RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't open zstd file for reading");
+    }
 
-	b = BZ2_bzReadOpen(&bzerror, f, 0, 0, NULL, 0);
-	if (bzerror != BZ_OK) {
-		BZ2_bzReadClose(&bzerror, b);
-		RETURN_ERROR(MPORT_ERR_FATAL, "Input error reading bzip2 file");
-	}
+    fout = fopen(output, "wb");
+    if (!fout) {
+        fclose(f);
+        free(buffIn);
+        free(buffOut);
+        ZSTD_freeDStream(dstream);
+        RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't open file for writing");
+    }
 
-	bzerror = BZ_OK;
-	while (bzerror == BZ_OK) {
-		nBuf = BZ2_bzRead(&bzerror, b, buf, 4096);
-		if (bzerror == BZ_OK || bzerror == BZ_STREAM_END) {
-			if (fwrite(buf, nBuf, 1, fout) < 1) {
-				fclose(fout);
-				RETURN_ERROR(MPORT_ERR_FATAL, "Error writing decompressed file");
-			}
-		}
-	}
+    size_t toRead = buffInSize;
+    while (1) {
+        size_t const read = fread(buffIn, 1, toRead, f);
+        if (read == 0) break;
 
-	if (bzerror != BZ_STREAM_END) {
-		BZ2_bzReadClose(&bzerror, b);
-		RETURN_ERROR(MPORT_ERR_FATAL, "Unknown error decompressing bzip2 file");
-	} else {
-		BZ2_bzReadClose(&bzerror, b);
-	}
+        ZSTD_inBuffer input = { buffIn, read, 0 };
+        while (input.pos < input.size) {
+            ZSTD_outBuffer output = { buffOut, buffOutSize, 0 };
+            size_t const result = ZSTD_decompressStream(dstream, &output, &input);
+            if (ZSTD_isError(result)) {
+                fclose(f);
+                fclose(fout);
+                free(buffIn);
+                free(buffOut);
+                ZSTD_freeDStream(dstream);
+                RETURN_ERROR(MPORT_ERR_FATAL, "Error decompressing zstd file");
+            }
+            fwrite(buffOut, 1, output.pos, fout);
+        }
+    }
 
-	fclose(f);
-	fclose(fout);
+    fclose(f);
+    fclose(fout);
+    free(buffIn);
+    free(buffOut);
+    ZSTD_freeDStream(dstream);
 
-	return (MPORT_OK);
+    return (MPORT_OK);
 }
 
 MPORT_PUBLIC_API char *

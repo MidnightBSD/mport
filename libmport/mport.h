@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <sys/param.h>
+#include "tllist.h"
 
 typedef void (*mport_msg_cb)(const char *);
 typedef void (*mport_progress_init_cb)(const char *);

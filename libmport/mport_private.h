@@ -44,7 +44,7 @@
 #include <ohash.h>
 #include <sqlite3.h>
 #include <ucl.h>
-#include "bzlib.h"
+#include <zstd.h>
 
 #define MPORT_PUBLIC_API 
 
@@ -113,7 +113,7 @@ int mport_chdir(mportInstance *, const char *);
 int mport_xsystem(mportInstance *, const char *, ...);
 int mport_run_asset_exec(mportInstance *, const char *, const char *, const char *);
 void mport_free_vec(void *);
-int mport_decompress_bzip2(const char *, const char *);
+int mport_decompress_zstd(const char *, const char *);
 int mport_shell_register(const char *);
 int mport_shell_unregister(const char *);
 char * mport_str_remove(const char *str, const char ch);
@@ -187,11 +187,11 @@ int mport_set_errx(int , const char *, ...);
 #define MPORT_INST_DIR 		"/var/db/mport"
 #define MPORT_MASTER_DB_FILE        MPORT_INST_DIR "/master.db"
 #define MPORT_INST_INFRA_DIR        MPORT_INST_DIR "/infrastructure"
-#define MPORT_INDEX_COMPRESS_EXT    ".bz2"
+#define MPORT_INDEX_COMPRESS_EXT    ".zst"
 #define MPORT_INDEX_FILE_NAME      "index.db"
 #define MPORT_INDEX_FILE_SOURCE     MPORT_INDEX_FILE_NAME MPORT_INDEX_COMPRESS_EXT
 #define MPORT_INDEX_FILE            MPORT_INST_DIR MPORT_INDEX_FILE_NAME
-#define MPORT_INDEX_FILE_BZ2        MPORT_INST_DIR MPORT_INDEX_FILE_NAME MPORT_INDEX_COMPRESS_EXT
+#define MPORT_INDEX_FILE_COMPRESSED        MPORT_INST_DIR MPORT_INDEX_FILE_NAME MPORT_INDEX_COMPRESS_EXT
 #define MPORT_INDEX_FILE_HASH       MPORT_INST_DIR MPORT_INDEX_FILE_NAME MPORT_INDEX_COMPRESS_EXT ".md5"
 #define MPORT_FETCH_STAGING_DIR     MPORT_INST_DIR "/downloads"
 
