@@ -12,7 +12,7 @@ SRCS=	asset.c bundle_write.c bundle_read.c plist.c create_primative.c db.c \
    		autoremove.c audit.c ping.c message.c service.c list.c
 INCS=	mport.h
 
-CFLAGS+=	-I${.CURDIR} -I/usr/include/private/ucl -I/usr/include/ucl -I/usr/include/private/zstd
+CFLAGS+=	-I${.CURDIR} -I${.CURDIR}/../external/tlllist/ -I/usr/include/private/ucl -I/usr/include/ucl -I/usr/include/private/zstd
 SHLIB_MAJOR=	2
 MAN=	mport.3
 

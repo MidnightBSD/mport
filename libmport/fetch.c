@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2011 Lucas Holt
+ * Copyright (c) 2011, 2025 Lucas Holt
  * Copyright (c) 2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -83,8 +83,8 @@ mport_fetch_index(mportInstance *mport)
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 		}
 
-		if (fetch(mport, url, MPORT_INDEX_FILE_BZ2) == MPORT_OK) {
-			mport_decompress_bzip2(MPORT_INDEX_FILE_BZ2, mport_index_file_path());
+		if (fetch(mport, url, MPORT_INDEX_FILE_COMPRESSED) == MPORT_OK) {
+			mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
 			free(url);
 			for (int mi = 0; mi < mirrorCount; mi++)
 				free(mirrors[mi]);
@@ -125,8 +125,8 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 
 	asprintf(&url, "%s/%s/%s/%s", MPORT_BOOTSTRAP_INDEX_URL, MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE);
 
-	result = fetch(mport, url, MPORT_INDEX_FILE_BZ2);
-	mport_decompress_bzip2(MPORT_INDEX_FILE_BZ2, mport_index_file_path());
+	result = fetch(mport, url, MPORT_INDEX_FILE_COMPRESSED);
+	mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
 
 	free(url);
 	free(osrel);
