@@ -692,8 +692,6 @@ mport_decompress_zstd(const char *input, const char *output)
 {
     FILE *f;
     FILE *fout;
-    size_t nBuf;
-    char buf[4096];
     size_t const buffInSize = ZSTD_DStreamInSize();
     size_t const buffOutSize = ZSTD_DStreamOutSize();
     void* const buffIn = malloc(buffInSize);
