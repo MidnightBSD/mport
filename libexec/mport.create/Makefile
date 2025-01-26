@@ -1,6 +1,6 @@
 PROG= mport.create
 
-CFLAGS+=	-I${.CURDIR}/../../libmport/ -I/usr/include/private/ucl -I ../external/tllist/ -I/usr/include/private/zstd 
+CFLAGS+=	-I${.CURDIR}/../../libmport/ -I/usr/include/private/ucl -I ../../external/tllist/ -I/usr/include/private/zstd 
 WARNS?= 	6
 
 MK_MAN= no
