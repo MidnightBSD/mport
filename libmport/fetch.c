@@ -143,7 +143,7 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 	osrel = mport_get_osrelease(mport);
 
 	asprintf(&url, "%s/%s/%s/%s", MPORT_BOOTSTRAP_INDEX_URL, MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE);
-	asprintf(&hashUrl, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE ".sha256");
+	asprintf(&hashUrl, "%s/%s/%s/%s", MPORT_BOOTSTRAP_INDEX_URL,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE ".sha256");
 
 	result = fetch(mport, url, MPORT_INDEX_FILE_COMPRESSED);
 	if (result == MPORT_OK && fetch(mport, hashUrl, MPORT_INDEX_FILE_HASH) == MPORT_OK) {
@@ -153,15 +153,15 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 #ifdef DEBUGGING 
 			fprintf(stderr, "Index hash failed verification: %s\n", hash);
 #endif 
-        } else {
+        	} else {
 			mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
 		}
+		free(hash);
 	} else {
 		result = MPORT_ERR_FATAL;
 	}
 
 	free(hashUrl);
-	free(hash);
 	free(url);
 	free(osrel);
 
