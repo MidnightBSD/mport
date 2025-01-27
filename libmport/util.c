@@ -127,11 +127,17 @@ mport_verify_hash(const char *filename, const char *hash)
 {
 	char *filehash;
 
+	if (filename == NULL || hash == NULL)
+		return 0;
+
 	filehash = mport_hash_file(filename);
-#ifdef DEBUG
+	if (filehash == NULL)
+		return 0;
+
+#ifdef DEBUGGING
 	printf("gen: '%s'\nsql: '%s'\n", filehash, hash);
 #endif
-	if (strncmp(filehash, hash, 65) == 0) {
+	if (strncmp(filehash, hash, 64) == 0) {
 		free(filehash);
 		return 1;
 	}
@@ -139,6 +145,49 @@ mport_verify_hash(const char *filename, const char *hash)
 	free(filehash);
 	return 0;
 }
+
+char* 
+mport_extract_hash_from_file(const char *filename)
+{
+
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Failed to open file");
+        return NULL;
+    }
+
+    char *hash = calloc(65, sizeof(char)); // SHA256 hash is 64 characters + null terminator
+    if (!hash) {
+        perror("Failed to allocate memory");
+        fclose(file);
+        return NULL;
+    }
+
+    char buffer[256];
+    if (fgets(buffer, sizeof(buffer), file) == NULL) {
+        perror("Failed to read hash from file");
+        free(hash);
+        fclose(file);
+        return NULL;
+    }
+
+    fclose(file);
+
+    // Extract the hash from the format "SHA256 (index.db.zst) = <hash>"
+    char *hash_start = strchr(buffer, '=');
+    if (hash_start == NULL) {
+        perror("Invalid hash format");
+        free(hash);
+        return NULL;
+    }
+
+    hash_start += 2; // Skip the "= " part
+    strlcpy(hash, hash_start, 65);
+
+    return hash;
+}
+
+
 
 bool
 mport_starts_with(const char *pre, const char *str)
@@ -153,6 +202,7 @@ mport_starts_with(const char *pre, const char *str)
 char *
 mport_hash_file(const char *filename)
 {
+
 	return SHA256_File(filename, NULL);
 }
 

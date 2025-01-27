@@ -100,6 +100,7 @@ int mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, servi
 /* Utils */
 bool mport_starts_with(const char *, const char *);
 char* mport_hash_file(const char *);
+char* mport_extract_hash_from_file(const char *);
 int mport_copy_file(const char *, const char *);
 uid_t mport_get_uid(const char *);
 gid_t mport_get_gid(const char *);
@@ -190,9 +191,9 @@ int mport_set_errx(int , const char *, ...);
 #define MPORT_INDEX_COMPRESS_EXT    ".zst"
 #define MPORT_INDEX_FILE_NAME      "index.db"
 #define MPORT_INDEX_FILE_SOURCE     MPORT_INDEX_FILE_NAME MPORT_INDEX_COMPRESS_EXT
-#define MPORT_INDEX_FILE            MPORT_INST_DIR MPORT_INDEX_FILE_NAME
-#define MPORT_INDEX_FILE_COMPRESSED        MPORT_INST_DIR MPORT_INDEX_FILE_NAME MPORT_INDEX_COMPRESS_EXT
-#define MPORT_INDEX_FILE_HASH       MPORT_INST_DIR MPORT_INDEX_FILE_NAME MPORT_INDEX_COMPRESS_EXT ".md5"
+#define MPORT_INDEX_FILE            MPORT_INST_DIR "/" MPORT_INDEX_FILE_NAME
+#define MPORT_INDEX_FILE_COMPRESSED        MPORT_INST_DIR "/" MPORT_INDEX_FILE_NAME MPORT_INDEX_COMPRESS_EXT
+#define MPORT_INDEX_FILE_HASH       MPORT_INST_DIR "/" MPORT_INDEX_FILE_NAME MPORT_INDEX_COMPRESS_EXT ".sha256"
 #define MPORT_FETCH_STAGING_DIR     MPORT_INST_DIR "/downloads"
 
 
