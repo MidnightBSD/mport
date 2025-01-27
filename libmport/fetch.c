@@ -79,7 +79,7 @@ mport_fetch_index(mportInstance *mport)
 		asprintf(&url, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE);
 		asprintf(&hashUrl, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE ".sha256");
 
-		if (url == NULL) {
+		if (url == NULL || hashUrl == NULL) {
 			for (int mi = 0; mi < mirrorCount; mi++)
 				free(mirrors[mi]);
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
@@ -89,14 +89,15 @@ mport_fetch_index(mportInstance *mport)
 			if (fetch(mport, hashUrl, MPORT_INDEX_FILE_HASH) == MPORT_OK) {
 				char *hash = mport_extract_hash_from_file(MPORT_INDEX_FILE_HASH);
 				free(hashUrl);
-				if (mport_verify_hash(MPORT_INDEX_FILE_SOURCE, hash) != MPORT_OK) {
+
+				if (hash == NULL || mport_verify_hash(MPORT_INDEX_FILE_COMPRESSED, hash) == 0) {
 #ifdef DEBUGGING 
 					fprintf(stderr, "Index hash failed verification: %s\n", hash);
 #endif
-                    free(hash);
+					free(hash);
 					free(url);
-                    continue;
-                } else {
+					continue;
+				} else {
 					mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
 					free(url);
 					free(hash);
@@ -147,9 +148,10 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 
 	result = fetch(mport, url, MPORT_INDEX_FILE_COMPRESSED);
 	if (result == MPORT_OK && fetch(mport, hashUrl, MPORT_INDEX_FILE_HASH) == MPORT_OK) {
-		char *hash = mport_extract_hash_from_file(MPORT_INDEX_FILE_HASH);
 		free(hashUrl);
-		if (mport_verify_hash(MPORT_INDEX_FILE_SOURCE, hash) != MPORT_OK) {
+		char *hash = mport_extract_hash_from_file(MPORT_INDEX_FILE_HASH);
+
+		if (hash == NULL || mport_verify_hash(MPORT_INDEX_FILE_COMPRESSED, hash) == 0) {
 #ifdef DEBUGGING 
 			fprintf(stderr, "Index hash failed verification: %s\n", hash);
 #endif 
@@ -318,7 +320,7 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local, bool progress)
 			double val = ((double)got / (double) ustat.size) * 100;
 			if (val > dlpercent) {
 				dlpercent = val;
-             	snprintf(msg, 1024, "Downloading %s (%.2f%%)", pkg, dlpercent);
+				snprintf(msg, 1024, "Downloading %s (%.2f%%)", pkg, dlpercent);
 			}
 			(mport->progress_step_cb)(got, ustat.size, msg);
 		}
