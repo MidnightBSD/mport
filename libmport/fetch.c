@@ -86,8 +86,6 @@ mport_fetch_index(mportInstance *mport)
 		}
 
 		if (fetch(mport, url, MPORT_INDEX_FILE_COMPRESSED) == MPORT_OK) {
-
-			/* check the hash file if it exists. don't fail if it doesn't yet (TODO: server side) */
 			if (fetch(mport, hashUrl, MPORT_INDEX_FILE_HASH) == MPORT_OK) {
 				char *hash = mport_extract_hash_from_file(MPORT_INDEX_FILE_HASH);
 				free(hashUrl);
@@ -98,17 +96,17 @@ mport_fetch_index(mportInstance *mport)
                     free(hash);
 					free(url);
                     continue;
-                }
-				free(hash);
+                } else {
+					mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
+					free(url);
+					free(hash);
+					for (int mi = 0; mi < mirrorCount; mi++)
+						free(mirrors[mi]);
+					return MPORT_OK;
+				}
 			} else {
 				free(hashUrl);
 			}
-
-			mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
-			free(url);
-			for (int mi = 0; mi < mirrorCount; mi++)
-				free(mirrors[mi]);
-			return MPORT_OK;
 		}
 		free(url);
 		mirrorsPtr++;
@@ -139,15 +137,31 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 {
 	int result;
 	char *url;
+	char *hashUrl;
 	char *osrel;
 
 	osrel = mport_get_osrelease(mport);
 
 	asprintf(&url, "%s/%s/%s/%s", MPORT_BOOTSTRAP_INDEX_URL, MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE);
+	asprintf(&hashUrl, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE ".sha256");
 
 	result = fetch(mport, url, MPORT_INDEX_FILE_COMPRESSED);
-	mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
+	if (result == MPORT_OK && fetch(mport, hashUrl, MPORT_INDEX_FILE_HASH) == MPORT_OK) {
+		char *hash = mport_extract_hash_from_file(MPORT_INDEX_FILE_HASH);
+		free(hashUrl);
+		if (mport_verify_hash(MPORT_INDEX_FILE_SOURCE, hash) != MPORT_OK) {
+#ifdef DEBUGGING 
+			fprintf(stderr, "Index hash failed verification: %s\n", hash);
+#endif 
+        } else {
+			mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
+		}
+	} else {
+		result = MPORT_ERR_FATAL;
+	}
 
+	free(hashUrl);
+	free(hash);
 	free(url);
 	free(osrel);
 

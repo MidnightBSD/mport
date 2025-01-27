@@ -156,7 +156,8 @@ mport_extract_hash_from_file(const char *filename)
         return NULL;
     }
 
-    if (fgets(hash, 65, file) == NULL) {
+    char buffer[256];
+    if (fgets(buffer, sizeof(buffer), file) == NULL) {
         perror("Failed to read hash from file");
         free(hash);
         fclose(file);
@@ -164,6 +165,19 @@ mport_extract_hash_from_file(const char *filename)
     }
 
     fclose(file);
+
+    // Extract the hash from the format "SHA256 (index.db.zst) = <hash>"
+    char *hash_start = strchr(buffer, '=');
+    if (hash_start == NULL) {
+        perror("Invalid hash format");
+        free(hash);
+        return NULL;
+    }
+
+    hash_start += 2; // Skip the "= " part
+    strncpy(hash, hash_start, 64);
+    hash[64] = '\0'; // Null-terminate the hash
+
     return hash;
 }
 
