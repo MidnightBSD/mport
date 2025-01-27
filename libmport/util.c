@@ -140,6 +140,35 @@ mport_verify_hash(const char *filename, const char *hash)
 	return 0;
 }
 
+char* 
+mport_extract_hash_from_file(const char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Failed to open file");
+        return NULL;
+    }
+
+    char *hash = malloc(65); // SHA256 hash is 64 characters + null terminator
+    if (!hash) {
+        perror("Failed to allocate memory");
+        fclose(file);
+        return NULL;
+    }
+
+    if (fgets(hash, 65, file) == NULL) {
+        perror("Failed to read hash from file");
+        free(hash);
+        fclose(file);
+        return NULL;
+    }
+
+    fclose(file);
+    return hash;
+}
+
+
+
 bool
 mport_starts_with(const char *pre, const char *str)
 {

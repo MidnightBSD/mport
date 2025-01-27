@@ -57,6 +57,7 @@ mport_fetch_index(mportInstance *mport)
 	char **mirrors = NULL;
 	char **mirrorsPtr = NULL;
 	char *url = NULL;
+	char *hashUrl = NULL;
 	char *osrel;
 	int mirrorCount = 0;
 	
@@ -76,6 +77,7 @@ mport_fetch_index(mportInstance *mport)
 		if (*mirrorsPtr == NULL)
 			break;
 		asprintf(&url, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE);
+		asprintf(&hashUrl, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE ".sha256");
 
 		if (url == NULL) {
 			for (int mi = 0; mi < mirrorCount; mi++)
@@ -84,6 +86,24 @@ mport_fetch_index(mportInstance *mport)
 		}
 
 		if (fetch(mport, url, MPORT_INDEX_FILE_COMPRESSED) == MPORT_OK) {
+
+			/* check the hash file if it exists. don't fail if it doesn't yet (TODO: server side) */
+			if (fetch(mport, hashUrl, MPORT_INDEX_FILE_HASH) == MPORT_OK) {
+				char *hash = mport_extract_hash_from_file(MPORT_INDEX_FILE_HASH);
+				free(hashUrl);
+				if (mport_verify_hash(MPORT_INDEX_FILE_SOURCE, hash) != MPORT_OK) {
+#ifdef DEBUGGING 
+					fprintf(stderr, "Index hash failed verification: %s\n", hash);
+#endif
+                    free(hash);
+					free(url);
+                    continue;
+                }
+				free(hash);
+			} else {
+				free(hashUrl);
+			}
+
 			mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
 			free(url);
 			for (int mi = 0; mi < mirrorCount; mi++)
