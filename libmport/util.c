@@ -31,6 +31,7 @@
 
 #include <sys/types.h>
 #include <sys/sysctl.h>
+#include <ctype.h>
 #include <pwd.h>
 #include <grp.h>
 #include <sha256.h>
@@ -317,6 +318,26 @@ mport_copy_file(const char *fromName, const char *toName)
 	fclose(fdest);
 
 	return (MPORT_OK);
+}
+
+
+int
+mport_copy_fd(int from_fd, int to_fd)
+{
+    char buf[BUFSIZ];
+    ssize_t size;
+
+    while ((size = read(from_fd, buf, BUFSIZ)) > 0) {
+        if (write(to_fd, buf, size) != size) {
+            RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't write to destination file descriptor: %s", strerror(errno));
+        }
+    }
+
+    if (size < 0) {
+        RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't read from source file descriptor: %s", strerror(errno));
+    }
+
+    return (MPORT_OK);
 }
 
 /*
@@ -1048,5 +1069,20 @@ mport_string_replace(const char *str, const char *old, const char *new)
 	}
 	strcpy(r, p);
 
-	return ret;
+	return (ret);
+}
+
+int
+mport_count_spaces(const char *str)
+{
+	int spaces;
+	const char *p;
+
+	for (spaces = 0, p = str; *p != '\0'; p++) {
+		if (isspace(*p)) {
+			spaces++;
+		}
+	}
+
+	return (spaces);
 }

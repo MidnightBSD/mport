@@ -7,6 +7,9 @@
 #include "mport.h"
 #include "mport_private.h"
 
+#define RELATIVE_PATH(p) (p + (*p == '/' ? 1 : 0))
+#define STREQ(s1, s2) (strcmp ((s1), (s2)) == 0)
+
 typedef enum {
 	MPORT_LUA_PRE_INSTALL = 0,
 	MPORT_LUA_POST_INSTALL,

@@ -51,6 +51,9 @@
 
 extern char **environ;
 
+int set_attrsat(int fd, const char *path, mode_t perm, uid_t uid, gid_t gid, const struct timespec *ats, const struct timespec *mts);
+int checkflags(const char *mode, int *optr);
+
 lua_CFunction
 stack_dump(lua_State *L)
 {
@@ -152,7 +155,7 @@ lua_exec(lua_State *L)
 	}
 #endif
 	if (pipe(stdin_pipe) < 0)
-		return (EPKG_FATAL);
+		return (MPORT_ERR_FATAL);
 
 	posix_spawn_file_actions_init(&action);
 	posix_spawn_file_actions_adddup2(&action, stdin_pipe[0], STDIN_FILENO);
@@ -227,7 +230,7 @@ lua_pkg_copy(lua_State *L)
 		return (1);
 	}
 
-	if (!pkg_copy_file(fd1, fd2)) {
+	if (mport_copy_fd(fd1, fd2) != MPORT_OK) {
 		lua_pushinteger(L, 2);
 		return (1);
 	}
@@ -256,7 +259,7 @@ lua_pkg_copy(lua_State *L)
 #endif
 
 	if (set_attrsat(rootfd, RELATIVE_PATH(dst), s1.st_mode, s1.st_uid,
-	  s1.st_gid, &ts[0], &ts[1]) != EPKG_OK) {
+	  s1.st_gid, &ts[0], &ts[1]) != MPORT_OK) {
 		lua_pushinteger(L, -1);
 		return (1);
 	}
@@ -358,7 +361,7 @@ lua_prefix_path(lua_State *L)
 	    "pkg.prefix_path takes exactly one argument");
 	const char *str = luaL_checkstring(L, 1);
 	lua_getglobal(L, "package");
-	struct pkg *p = lua_touserdata(L, -1);
+	mportPackageMeta *p = lua_touserdata(L, -1);
 
 	char path[MAXPATHLEN];
 	path[0] = '\0';
@@ -573,3 +576,133 @@ lua_readdir(lua_State *L)
 	}
 	return 1;
 }
+
+int
+set_attrsat(int fd, const char *path, mode_t perm, uid_t uid, gid_t gid,
+    const struct timespec *ats, const struct timespec *mts)
+{
+	struct stat st;
+	struct timespec times[2];
+
+	times[0] = *ats;
+	times[1] = *mts;
+	if (utimensat(fd, RELATIVE_PATH(path), times,
+	    AT_SYMLINK_NOFOLLOW) == -1 && errno != EOPNOTSUPP){
+		fprintf(stderr, "Fail to set time on %s", path);
+	}
+
+	if (getenv("INSTALL_AS_USER") == NULL) {
+		if (fchownat(fd, RELATIVE_PATH(path), uid, gid,
+				AT_SYMLINK_NOFOLLOW) == -1) {
+			if (errno == ENOTSUP) {
+				if (fchownat(fd, RELATIVE_PATH(path), uid, gid, 0) == -1) {
+					fprintf(stderr, "Fail to chown(fallback) %s", path);
+				}
+			}
+			else {
+				fprintf(stderr, "Fail to chown %s", path);
+			}
+		}
+	}
+
+	/* zfs drops the setuid on fchownat */
+	if (fchmodat(fd, RELATIVE_PATH(path), perm, AT_SYMLINK_NOFOLLOW) == -1) {
+		if (errno == ENOTSUP) {
+			/*
+			 * Executing fchmodat on a symbolic link results in
+			 * ENOENT (file not found) on platforms that do not
+			 * support AT_SYMLINK_NOFOLLOW. The file mode of
+			 * symlinks cannot be modified via file descriptor
+			 * reference on these systems. The lchmod function is
+			 * also not an option because it is not a posix
+			 * standard, nor is implemented everywhere. Since
+			 * symlink permissions have never been evaluated and
+			 * thus cosmetic, just skip them on these systems.
+			 */
+			if (fstatat(fd, RELATIVE_PATH(path), &st, AT_SYMLINK_NOFOLLOW) == -1) {
+				fprintf(stderr, "Fail to get file status %s", path);
+			}
+			if (!S_ISLNK(st.st_mode)) {
+				if (fchmodat(fd, RELATIVE_PATH(path), perm, 0) == -1) {
+					fprintf(stderr, "Fail to chmod(fallback) %s", path);
+				}
+			}
+		}
+		else {
+			fprintf(stderr, "Fail to chmod %s", path);
+		}
+	}
+
+	return (MPORT_OK);
+}
+
+/*
+ * Return the (stdio) flags for a given mode.  Store the flags
+ * to be passed to an _open() syscall through *optr.
+ * Return 1 on error.
+ */
+int
+checkflags(const char *mode, int *optr)
+{
+	int ret, m, o, known;
+	ret = 0;
+
+	switch (*mode++) {
+
+	case 'r':	/* open for reading */
+		ret = 1;
+		m = O_RDONLY;
+		o = 0;
+		break;
+
+	case 'w':	/* open for writing */
+		ret = 1;
+		m = O_WRONLY;
+		o = O_CREAT | O_TRUNC;
+		break;
+
+	case 'a':	/* open for appending */
+		ret = 1;
+		m = O_WRONLY;
+		o = O_CREAT | O_APPEND;
+		break;
+
+	default:	/* illegal mode */
+		errno = EINVAL;
+		return (0);
+	}
+
+	do {
+		known = 1;
+		switch (*mode++) {
+		case 'b':
+			/* 'b' (binary) is ignored */
+			break;
+		case '+':
+			/* [rwa][b]\+ means read and write */
+			ret = 1;
+			m = O_RDWR;
+			break;
+		case 'x':
+			/* 'x' means exclusive (fail if the file exists) */
+			o |= O_EXCL;
+			break;
+		case 'e':
+			/* set close-on-exec */
+			o |= O_CLOEXEC;
+			break;
+		default:
+			known = 0;
+			break;
+		}
+	} while (known);
+
+	if ((o & O_EXCL) != 0 && m == O_RDONLY) {
+		errno = EINVAL;
+		return (1);
+	}
+
+	*optr = m | o;
+	return (ret);
+}
+

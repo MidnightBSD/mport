@@ -28,6 +28,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <errno.h>
@@ -45,10 +46,10 @@ extern char **environ;
 
 #include "mport_lua.h"
 
-int get_socketpair(int *);
+static int get_socketpair(int *);
 int mport_script_run_child(mportInstance *, int, int *, int, const char*);
 
-int
+static int
 get_socketpair(int *pipe)
 {
 	int r;
@@ -175,24 +176,24 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 			lua_override_ios(L, true);
 
 			/* parse and set arguments of the line is in the comments */
-			if (STARTS_WITH(s->item, "-- args: ")) {
+			if (mport_starts_with("-- args: ", s->item)) {
 				char *walk, *begin, *line = NULL;
 				int spaces, argc = 0;
 				char **args = NULL;
 
 				walk = strchr(s->item, '\n');
 				begin = s->item + strlen("-- args: ");
-				line = xstrndup(begin, walk - begin);
-				spaces = pkg_utils_count_spaces(line);
-				args = xmalloc((spaces + 1)* sizeof(char *));
-				walk = xstrdup(line);
+				line = strndup(begin, walk - begin);
+				spaces = mport_count_spaces(line);
+				args = malloc((spaces + 1)* sizeof(char *));
+				walk = strdup(line);
 				while (walk != NULL) {
 					args[argc++] = pkg_utils_tokenize(&walk);
 				}
 				lua_args_table(L, args, argc);
 			}
 
-			pkg_debug(3, "Scripts: executing lua\n--- BEGIN ---\n%s\nScripts: --- END ---", s->item);
+			//pkg_debug(3, "Scripts: executing lua\n--- BEGIN ---\n%s\nScripts: --- END ---", s->item);
 			if (luaL_dostring(L, s->item)) {
                 SET_ERRORX(MPORT_ERR_FATAL, "Failed to execute lua script: %s", lua_tostring(L, -1));
 				lua_close(L);

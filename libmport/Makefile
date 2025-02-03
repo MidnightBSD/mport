@@ -13,7 +13,7 @@ SRCS=	asset.c bundle_write.c bundle_read.c plist.c create_primative.c db.c \
 		lua.c lua_scripts.c
 INCS=	mport.h
 
-CFLAGS+=	-I${.CURDIR} -I ../external/tllist/ -I/usr/include/private/ucl -I/usr/include/ucl -I/usr/include/private/zstd
+CFLAGS+=	-I${.CURDIR} -I ../external/tllist/ -I ../external/lua/src/ -I/usr/include/private/ucl -I/usr/include/ucl -I/usr/include/private/zstd 
 SHLIB_MAJOR=	2
 MAN=	mport.3
 

@@ -104,6 +104,7 @@ bool mport_starts_with(const char *, const char *);
 char* mport_hash_file(const char *);
 char* mport_extract_hash_from_file(const char *);
 int mport_copy_file(const char *, const char *);
+int mport_copy_fd(int, int);
 uid_t mport_get_uid(const char *);
 gid_t mport_get_gid(const char *);
 char* mport_directory(const char *path);
@@ -122,6 +123,7 @@ int mport_shell_unregister(const char *);
 char * mport_str_remove(const char *str, const char ch);
 time_t mport_get_time(void);
 bool mport_check_answer_bool(char *answer);
+int mport_count_spaces(const char *str);
 
 /* Mport Bundle (a file containing packages) */
 typedef struct {
@@ -246,8 +248,5 @@ char * mport_index_file_path(void);
 #define MPORT_CHROOT_BIN	"/usr/sbin/chroot"
 
 #define MPORT_URL_MAX		512
-
-typedef tll(char *) stringlist_t;
-
 
 #endif /* _MPORT_PRIV_H_ */
