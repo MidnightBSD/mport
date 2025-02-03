@@ -46,6 +46,8 @@
 #include <ucl.h>
 #include <zstd.h>
 
+#include <tllist.h>
+
 #define MPORT_PUBLIC_API 
 
 #define MPORT_MASTER_VERSION 12
@@ -244,6 +246,8 @@ char * mport_index_file_path(void);
 #define MPORT_CHROOT_BIN	"/usr/sbin/chroot"
 
 #define MPORT_URL_MAX		512
+
+typedef tll(char *) stringlist_t;
 
 
 #endif /* _MPORT_PRIV_H_ */

@@ -47,6 +47,8 @@ typedef void (*mport_progress_step_cb)(int, int, const char *);
 typedef void (*mport_progress_free_cb)(void);
 typedef int (*mport_confirm_cb)(const char *, const char *, const char *, int);
 
+typedef tll(char *) stringlist_t;
+
 /* Mport Instance (an installed copy of the mport system) */
 #define MPORT_INST_HAVE_INDEX 1
 #define MPORT_LOCAL_PKG_PATH "/var/db/mport/downloads"
@@ -150,6 +152,8 @@ enum _Type{
 };
 typedef enum _Type mportType;
 
+#define MPORT_NUM_LUA_SCRIPTS 5
+
 /* Package Meta-data structure */
 typedef struct {
     char *name;
@@ -174,6 +178,7 @@ typedef struct {
     mportAction action; // not populated from package table
     mportType type;
     int64_t flatsize;
+    stringlist_t	 lua_scripts[MPORT_NUM_LUA_SCRIPTS];
 } __attribute__ ((aligned (16)))  mportPackageMeta;
 
 int mport_asset_get_assetlist(mportInstance *, mportPackageMeta *, mportAssetList **);

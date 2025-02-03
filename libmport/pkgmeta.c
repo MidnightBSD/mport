@@ -61,6 +61,8 @@ mport_pkgmeta_new(void)
 
 	pack->action = MPORT_ACTION_UNKNOWN;
 
+	pack->lua_scripts = tll_init();
+
 	return pack;
 }
 
@@ -116,6 +118,11 @@ mport_pkgmeta_free(mportPackageMeta *pack)
 	}
 	free(pack->categories);
 	pack->categories = NULL;
+
+	if (tll_length(pack->lua_scripts) != 0) {
+		tll_free_and_free(pack->lua_scripts, free);
+	}
+
 	free(pack);
 }
 
