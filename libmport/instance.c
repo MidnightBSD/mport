@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -230,7 +231,7 @@ mport_instance_free(mportInstance *mport) {
 	close(mport->rootfd);
 	free(mport->root);
 	mport->root = NULL;
-	
+
 	free(mport->outputPath);
 	mport->outputPath = NULL;
 	free(mport);
