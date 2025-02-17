@@ -41,6 +41,6 @@ SRCS=	lapi.c \
 	loadlib.c \
 	linit.c
 
-CFLAGS+=	-I ../external/lua/src
+CFLAGS+=	-I ../external/lua/src -fPIC
 
 .include <bsd.lib.mk>

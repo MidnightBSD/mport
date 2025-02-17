@@ -61,12 +61,14 @@ mport_instance_init(mportInstance *mport, const char *root, const char *outputPa
 
 	if (root != NULL) {
 		mport->root = strdup(root);
+        	if ((mport->rootfd = open(mport->root, O_DIRECTORY|O_RDONLY|O_CLOEXEC)) < 0) {
+			RETURN_ERROR(MPORT_ERR_FATAL, "unable to open root directory");
+        	}
 	} else {
 		mport->root = strdup("");
-	}
-
-	if ((mport->rootfd = open(mport->root, O_DIRECTORY|O_RDONLY|O_CLOEXEC)) < 0) {
-		RETURN_ERROR(MPORT_ERR_FATAL, "unable to open root directory");
+		if ((mport->rootfd = open("/", O_DIRECTORY|O_RDONLY|O_CLOEXEC)) < 0) {
+			RETURN_ERROR(MPORT_ERR_FATAL, "unable to open root directory");
+		}
 	}
 
 	if (outputPath == NULL) {
