@@ -124,6 +124,16 @@ char * mport_str_remove(const char *str, const char ch);
 time_t mport_get_time(void);
 bool mport_check_answer_bool(char *answer);
 int mport_count_spaces(const char *str);
+char * mport_tokenize(char **args);
+
+enum parse_states {
+	START,
+	ORDINARY_TEXT,
+	OPEN_SINGLE_QUOTES,
+	IN_SINGLE_QUOTES,
+	OPEN_DOUBLE_QUOTES,
+	IN_DOUBLE_QUOTES,
+};
 
 /* Mport Bundle (a file containing packages) */
 typedef struct {

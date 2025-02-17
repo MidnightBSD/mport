@@ -1086,3 +1086,82 @@ mport_count_spaces(const char *str)
 
 	return (spaces);
 }
+
+/* 
+ * A bit like strsep(), except it accounts for "double" and 'single' quotes.
+ * Unlike strsep(), this function returns the next argument string, trimmed of 
+ * whitespace or enclosing quotes, and updates **args to point at the character 
+ * after that. 
+ * 
+ * Sets *args to NULL when it has been processed.
+ * 
+ * Quoted strings run from the first quote mark to the next one of 
+ * the same type or the terminating NULL. Quoted strings can contain the other 
+ * type of quote mark, which loses any special meaning. 
+ * 
+ * There is no escape character.
+ */
+char *
+mport_tokenize(char **args)
+{
+	char *p, *p_start;
+	enum parse_states parse_state = START;
+
+	assert(args != NULL && *args != NULL);
+
+	for (p = p_start = *args; *p != '\0'; p++) {
+		switch (parse_state) {
+		case START:
+			if (!isspace(*p)) {
+				if (*p == '"')
+					parse_state = OPEN_DOUBLE_QUOTES;
+				else if (*p == '\'')
+					parse_state = OPEN_SINGLE_QUOTES;
+				else {
+					parse_state = ORDINARY_TEXT;
+					p_start = p;
+				}
+			} else
+				p_start = p;
+			break;
+		case ORDINARY_TEXT:
+			if (isspace(*p))
+				goto finish;
+			break;
+		case OPEN_SINGLE_QUOTES:
+			p_start = p;
+			if (*p == '\'')
+				goto finish;
+
+			parse_state = IN_SINGLE_QUOTES;
+			break;
+		case IN_SINGLE_QUOTES:
+			if (*p == '\'')
+				goto finish;
+			break;
+		case OPEN_DOUBLE_QUOTES:
+			p_start = p;
+			if (*p == '"')
+				goto finish;
+			parse_state = IN_DOUBLE_QUOTES;
+			break;
+		case IN_DOUBLE_QUOTES:
+			if (*p == '"')
+				goto finish;
+			break;
+		}
+	}
+
+finish:
+	if (*p == '\0')
+		*args = NULL;
+	else {
+		*p = '\0';
+		p++;
+		if (*p == '\0' || parse_state == START)
+			*args = NULL;
+		else
+			*args = p;
+	}
+	return (p_start);
+}

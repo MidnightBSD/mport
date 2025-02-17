@@ -65,7 +65,6 @@ mport_script_run_child(mportInstance *mport, int pid, int *pstat, int inputfd, c
 	bool wait_for_child;
 	char msgbuf[16384+1];
 
-
 	memset(&pfd, 0, sizeof(pfd));
 	pfd.events = POLLIN | POLLERR | POLLHUP;
 	pfd.fd = inputfd;
@@ -161,7 +160,7 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 			lua_setglobal(L, "msgfd");
 			lua_pushlightuserdata(L, pkg);
 			lua_setglobal(L, "package");
-			lua_pushinteger(L, pkg->rootfd);
+			lua_pushinteger(L, mport->rootfd);
 			lua_setglobal(L, "rootfd");
 			lua_pushstring(L, pkg->prefix);
 			lua_setglobal(L, "pkg_prefix");
@@ -188,7 +187,7 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 				args = malloc((spaces + 1)* sizeof(char *));
 				walk = strdup(line);
 				while (walk != NULL) {
-					args[argc++] = pkg_utils_tokenize(&walk);
+					args[argc++] = mport_tokenize(&walk);
 				}
 				lua_args_table(L, args, argc);
 			}

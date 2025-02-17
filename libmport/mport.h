@@ -66,6 +66,7 @@ typedef struct {
   int flags;
   sqlite3 *db;
   char *root;
+  int rootfd; /* Root directory file descriptor */
   char *outputPath; /* Download directory */
   bool noIndex; /* Do not fetch mport index */
   bool offline; /* Installing packages from local files, etc. */
