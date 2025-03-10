@@ -78,6 +78,8 @@ static int mport_bundle_read_get_assetlist(mportInstance *mport, mportPackageMet
 
 static int copy_metafile(mportInstance *, mportBundleRead *, mportPackageMeta *, char *);
 
+static bool is_linux_module_loaded();
+
 /**
  * This is a wrapper for all bundle read install operations
  */
@@ -925,6 +927,20 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 				}
 				break;
 			case ASSET_LDCONFIG_LINUX:
+				if (!is_linux_module_loaded()) {
+					/* load the linux module */
+					mport->msg_cb(mport, "Loading Linux kernel module.  To make this permanent, follow instructions in man LINUX(4)");
+#if defined(__amd64__)
+					if (mport_xsystem(mport, "/sbin/kldload linux64") != MPORT_OK) {
+						goto ERROR;
+					}
+#elif defined(__i386__)
+					if (mport_xsystem(mport, "/sbin/kldload linux") != MPORT_OK) {
+                        goto ERROR;
+                    }
+#endif
+				}
+
 				if (e->data == NULL) {
 					if (mport_xsystem(mport, "/compat/linux/sbin/ldconfig") != MPORT_OK) {
 						goto ERROR;
@@ -975,6 +991,17 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 	ERROR:
 	// TODO: asset list free
 	RETURN_CURRENT_ERROR;
+}
+
+static bool 
+is_linux_module_loaded() {
+    size_t len;
+
+    if (sysctlbyname("compat.linux.osrelease", NULL, &len, NULL, 0) == -1) {
+		return false;
+    }
+
+	return true;
 }
 
 
