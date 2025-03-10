@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2023 Lucas Holt
  * Copyright (c) 2009 Chris Reinhardt
@@ -520,30 +520,42 @@ mport_index_lookup_pkgname(mportInstance *mport, const char *pkgname, mportIndex
  * Simplified version of mport_index_search();
  */
 MPORT_PUBLIC_API int
-mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char *term) {
+mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char *search_term) {
 
 	sqlite3_stmt *stmt;
 	int ret = MPORT_OK;
 	int len;
 	int i = 0, step;
 	mportIndexEntry **e;
+	char *term;
 
 
 	if (mport == NULL) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
 	}
 
+	if (search_term == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "search term is undefined");
+
+	if (strstr(search_term, "*") != NULL)
+		term = strdup(search_term);
+	else 
+		asprintf(&term, "*%s*", search_term);
+
 	if (mport_db_count(mport->db, &len, "SELECT count(*) FROM idx.packages WHERE pkg glob %Q or comment glob %Q", term, term) != MPORT_OK) {
+		free(term);
 		RETURN_CURRENT_ERROR;
 	}
 
 	e = (mportIndexEntry **) calloc((size_t) len + 1, sizeof(mportIndexEntry *));
 	if (e == NULL) {
+		free(term);
 		RETURN_ERROR(MPORT_ERR_FATAL, "Could not allocate memory");
 	}
 	*entry_vec = e;
 
 	if (len == 0) {
+		free(term);
 		return MPORT_OK;
 	}
 
@@ -551,6 +563,7 @@ mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char
 	                     "SELECT pkg, version, comment, bundlefile, license, hash, type FROM idx.packages WHERE pkg glob %Q or comment glob %Q", term, term) !=
 	    MPORT_OK) {
 		sqlite3_finalize(stmt);
+		free(term);
 		RETURN_CURRENT_ERROR;
 	}
 
@@ -582,6 +595,7 @@ mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char
 	}
 
 	sqlite3_finalize(stmt);
+	free(term);
 
 	return ret;
 }

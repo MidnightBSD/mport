@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011, 2025 Lucas Holt
  * Copyright (c) 2009 Chris Reinhardt
@@ -442,6 +442,12 @@ getfile:
 				if (retryCount < 2)
 					goto getfile;
 			}
+		} else {
+			/* the index might be stale. re-fetch it */
+			mport_index_get(mport);
+			retryCount++;
+			if (retryCount < 2)
+				goto getfile;
 		}
 		free(*path);
 		path = NULL;

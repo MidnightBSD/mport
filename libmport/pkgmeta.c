@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010, 2021, 2023 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
@@ -61,6 +61,9 @@ mport_pkgmeta_new(void)
 
 	pack->action = MPORT_ACTION_UNKNOWN;
 
+//	for (int i = 0; i < MPORT_NUM_LUA_SCRIPTS; i++)
+//		pack->lua_scripts[i] = tll_init();	
+
 	return pack;
 }
 
@@ -116,6 +119,10 @@ mport_pkgmeta_free(mportPackageMeta *pack)
 	}
 	free(pack->categories);
 	pack->categories = NULL;
+
+	for (int i = 0; i < MPORT_NUM_LUA_SCRIPTS; i++)
+		tll_free_and_free(pack->lua_scripts[i], free);
+
 	free(pack);
 }
 

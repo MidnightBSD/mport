@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010-2018, 2021 Lucas Holt
  * All rights reserved.
@@ -245,7 +245,7 @@ main(int argc, char *argv[])
 		}
 		loadIndex(mport);
 
-        if (strchr(argv[1], '*') != NULL) {
+		if (strchr(argv[1], '*') != NULL) {
 			mportPackageMeta **packs = NULL;
 			mportPackageMeta **packs_orig = NULL;
 			char *pkg = mport_string_replace(argv[1], "*", "%");

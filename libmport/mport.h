@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  * 
  * Copyright (c) 2013, 2014, 2021, 2024 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
@@ -47,6 +47,8 @@ typedef void (*mport_progress_step_cb)(int, int, const char *);
 typedef void (*mport_progress_free_cb)(void);
 typedef int (*mport_confirm_cb)(const char *, const char *, const char *, int);
 
+typedef tll(char *) stringlist_t;
+
 /* Mport Instance (an installed copy of the mport system) */
 #define MPORT_INST_HAVE_INDEX 1
 #define MPORT_LOCAL_PKG_PATH "/var/db/mport/downloads"
@@ -64,6 +66,7 @@ typedef struct {
   int flags;
   sqlite3 *db;
   char *root;
+  int rootfd; /* Root directory file descriptor */
   char *outputPath; /* Download directory */
   bool noIndex; /* Do not fetch mport index */
   bool offline; /* Installing packages from local files, etc. */
@@ -150,6 +153,8 @@ enum _Type{
 };
 typedef enum _Type mportType;
 
+#define MPORT_NUM_LUA_SCRIPTS 5
+
 /* Package Meta-data structure */
 typedef struct {
     char *name;
@@ -174,6 +179,7 @@ typedef struct {
     mportAction action; // not populated from package table
     mportType type;
     int64_t flatsize;
+    stringlist_t	 lua_scripts[MPORT_NUM_LUA_SCRIPTS];
 } __attribute__ ((aligned (16)))  mportPackageMeta;
 
 int mport_asset_get_assetlist(mportInstance *, mportPackageMeta *, mportAssetList **);
@@ -275,6 +281,10 @@ typedef struct {
   size_t conflicts_count;  
   char *pkginstall;
   char *pkgdeinstall;
+  char *luapkgpreinstall;
+  char *luapkgpredeinstall;
+  char *luapkgpostinstall;
+  char *luapkgpostdeinstall;
   char *pkgmessage;
   bool is_backup;
 } mportCreateExtras;  

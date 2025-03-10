@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013-2015, 2021, 2023 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
@@ -31,6 +31,7 @@
 
 #include "mport.h"
 #include "mport_private.h"
+#include "mport_lua.h"
 
 #include <sys/stat.h>
 #include <libgen.h>
@@ -114,6 +115,15 @@ do_pre_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *
 
 	/* run mtree */
 	if (run_mtree(mport, bundle, pkg) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	/* lua */
+	copy_metafile(mport, bundle, pkg, MPORT_LUA_PRE_INSTALL_FILE);
+	copy_metafile(mport, bundle, pkg, MPORT_LUA_POST_INSTALL_FILE);
+	copy_metafile(mport, bundle, pkg, MPORT_LUA_POST_DEINSTALL_FILE);
+	copy_metafile(mport, bundle, pkg, MPORT_LUA_PRE_DEINSTALL_FILE);
+	mport_lua_script_load(mport, pkg);
+	if (mport_lua_script_run(mport, pkg, MPORT_LUA_PRE_INSTALL) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	/* run pkg-install PRE-INSTALL */
@@ -858,6 +868,9 @@ do_post_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta 
 		RETURN_CURRENT_ERROR;
 
 	if (mport_pkg_message_display(mport, pkg) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	if (mport_lua_script_run(mport, pkg, MPORT_LUA_POST_INSTALL) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	if (run_pkg_install(mport, bundle, pkg, "POST-INSTALL") != MPORT_OK)

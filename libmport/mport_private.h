@@ -1,5 +1,5 @@
 /*
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011, 2013, 2015, 2021-2024 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
@@ -45,6 +45,8 @@
 #include <sqlite3.h>
 #include <ucl.h>
 #include <zstd.h>
+
+#include <tllist.h>
 
 #define MPORT_PUBLIC_API 
 
@@ -102,6 +104,7 @@ bool mport_starts_with(const char *, const char *);
 char* mport_hash_file(const char *);
 char* mport_extract_hash_from_file(const char *);
 int mport_copy_file(const char *, const char *);
+int mport_copy_fd(int, int);
 uid_t mport_get_uid(const char *);
 gid_t mport_get_gid(const char *);
 char* mport_directory(const char *path);
@@ -120,6 +123,17 @@ int mport_shell_unregister(const char *);
 char * mport_str_remove(const char *str, const char ch);
 time_t mport_get_time(void);
 bool mport_check_answer_bool(char *answer);
+int mport_count_spaces(const char *str);
+char * mport_tokenize(char **args);
+
+enum parse_states {
+	START,
+	ORDINARY_TEXT,
+	OPEN_SINGLE_QUOTES,
+	IN_SINGLE_QUOTES,
+	OPEN_DOUBLE_QUOTES,
+	IN_DOUBLE_QUOTES,
+};
 
 /* Mport Bundle (a file containing packages) */
 typedef struct {
@@ -183,6 +197,10 @@ int mport_set_errx(int , const char *, ...);
 #define MPORT_INSTALL_FILE 	"pkg-install"
 #define MPORT_DEINSTALL_FILE	"pkg-deinstall"
 #define MPORT_MESSAGE_FILE	"pkg-message"
+#define MPORT_LUA_PRE_INSTALL_FILE "pkg-pre-install.lua"
+#define MPORT_LUA_POST_INSTALL_FILE "pkg-post-install.lua"
+#define MPORT_LUA_PRE_DEINSTALL_FILE "pkg-pre-deinstall.lua"
+#define MPORT_LUA_POST_DEINSTALL_FILE "pkg-post-deinstall.lua"
 
 /* Instance files */
 #define MPORT_INST_DIR 		"/var/db/mport"
@@ -244,6 +262,5 @@ char * mport_index_file_path(void);
 #define MPORT_CHROOT_BIN	"/usr/sbin/chroot"
 
 #define MPORT_URL_MAX		512
-
 
 #endif /* _MPORT_PRIV_H_ */

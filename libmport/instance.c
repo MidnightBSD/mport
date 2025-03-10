@@ -1,7 +1,7 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2013, 2015 Lucas Holt
+ * Copyright (c) 2013, 2015, 2025 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -60,8 +61,14 @@ mport_instance_init(mportInstance *mport, const char *root, const char *outputPa
 
 	if (root != NULL) {
 		mport->root = strdup(root);
+    	if ((mport->rootfd = open(mport->root, O_DIRECTORY|O_RDONLY|O_CLOEXEC)) < 0) {
+			RETURN_ERROR(MPORT_ERR_FATAL, "unable to open root directory");
+    	}
 	} else {
 		mport->root = strdup("");
+		if ((mport->rootfd = open("/", O_DIRECTORY|O_RDONLY|O_CLOEXEC)) < 0) {
+			RETURN_ERROR(MPORT_ERR_FATAL, "unable to open root directory");
+		}
 	}
 
 	if (outputPath == NULL) {
@@ -223,8 +230,10 @@ mport_instance_free(mportInstance *mport) {
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 	}
 
+	close(mport->rootfd);
 	free(mport->root);
 	mport->root = NULL;
+
 	free(mport->outputPath);
 	mport->outputPath = NULL;
 	free(mport);

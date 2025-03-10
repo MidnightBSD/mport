@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015, 2022, 2023 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
@@ -572,6 +572,30 @@ archive_metafiles(mportBundleWrite *bundle, mportPackageMeta *pack, mportCreateE
 	if (extra->pkgmessage != NULL && mport_file_exists(extra->pkgmessage)) {
 		(void) snprintf(filename, FILENAME_MAX, "%s/%s", dir, MPORT_MESSAGE_FILE);
 		if (mport_bundle_write_add_file(bundle, extra->pkgmessage, filename) != MPORT_OK)
+			RETURN_CURRENT_ERROR;
+	}
+
+	if (extra->luapkgpreinstall != NULL && mport_file_exists(extra->luapkgpreinstall)) {
+		(void) snprintf(filename, FILENAME_MAX, "%s/%s", dir, MPORT_LUA_PRE_INSTALL_FILE);
+		if (mport_bundle_write_add_file(bundle, extra->luapkgpreinstall, filename) != MPORT_OK)
+			RETURN_CURRENT_ERROR;
+	}
+
+	if (extra->luapkgpostinstall != NULL && mport_file_exists(extra->luapkgpostinstall)) {
+		(void) snprintf(filename, FILENAME_MAX, "%s/%s", dir, MPORT_LUA_POST_INSTALL_FILE);
+		if (mport_bundle_write_add_file(bundle, extra->luapkgpostinstall, filename) != MPORT_OK)
+			RETURN_CURRENT_ERROR;
+	}
+
+	if (extra->luapkgpredeinstall != NULL && mport_file_exists(extra->luapkgpredeinstall)) {
+		(void) snprintf(filename, FILENAME_MAX, "%s/%s", dir, MPORT_LUA_PRE_DEINSTALL_FILE);
+		if (mport_bundle_write_add_file(bundle, extra->luapkgpredeinstall, filename) != MPORT_OK)
+			RETURN_CURRENT_ERROR;
+	}
+
+	if (extra->luapkgpostdeinstall != NULL && mport_file_exists(extra->luapkgpostdeinstall)) {
+		(void) snprintf(filename, FILENAME_MAX, "%s/%s", dir, MPORT_LUA_POST_DEINSTALL_FILE);
+		if (mport_bundle_write_add_file(bundle, extra->luapkgpostdeinstall, filename) != MPORT_OK)
 			RETURN_CURRENT_ERROR;
 	}
 
