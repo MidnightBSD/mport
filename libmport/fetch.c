@@ -442,6 +442,12 @@ getfile:
 				if (retryCount < 2)
 					goto getfile;
 			}
+		} else {
+			/* the index might be stale. re-fetch it */
+			mport_index_get(mport);
+			retryCount++;
+			if (retryCount < 2)
+				goto getfile;
 		}
 		free(*path);
 		path = NULL;
