@@ -245,7 +245,7 @@ main(int argc, char *argv[])
 		}
 		loadIndex(mport);
 
-        if (strchr(argv[1], '*') != NULL) {
+		if (strchr(argv[1], '*') != NULL) {
 			mportPackageMeta **packs = NULL;
 			mportPackageMeta **packs_orig = NULL;
 			char *pkg = mport_string_replace(argv[1], "*", "%");

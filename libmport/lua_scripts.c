@@ -255,14 +255,16 @@ mport_lua_script_from_ucl(mportInstance *mport, mportPackageMeta *pkg, const ucl
 int
 mport_lua_script_load(mportInstance *mport, mportPackageMeta *pkg)
 {
-	mport_lua_script_read_file(mport, pkg, MPORT_LUA_PRE_INSTALL, MPORT_PRE_INSTALL_FILE);
-	mport_lua_script_read_file(mport, pkg, MPORT_LUA_POST_INSTALL, MPORT_POST_INSTALL_FILE);
-	mport_lua_script_read_file(mport, pkg, MPORT_LUA_PRE_DEINSTALL, MPORT_PRE_DEINSTALL_FILE);
-	mport_lua_script_read_file(mport, pkg, MPORT_LUA_POST_DEINSTALL, MPORT_POST_DEINSTALL_FILE);
+	mport_lua_script_read_file(mport, pkg, MPORT_LUA_PRE_INSTALL, MPORT_LUA_PRE_INSTALL_FILE);
+	mport_lua_script_read_file(mport, pkg, MPORT_LUA_POST_INSTALL, MPORT_LUA_POST_INSTALL_FILE);
+	mport_lua_script_read_file(mport, pkg, MPORT_LUA_PRE_DEINSTALL, MPORT_LUA_PRE_DEINSTALL_FILE);
+	mport_lua_script_read_file(mport, pkg, MPORT_LUA_POST_DEINSTALL, MPORT_LUA_POST_DEINSTALL_FILE);
+
+	return (MPORT_OK);
 }
 
 int
-mport_lua_script_read_file(mportInstance *mport, mportPackageMeta *pkg, mport_lua_script type, char *filename)
+mport_lua_script_read_file(mportInstance *mport, mportPackageMeta *pkg, mport_lua_script type, char *luafile)
 {
 	char filename[FILENAME_MAX];
 	char *buf;
@@ -273,7 +275,7 @@ mport_lua_script_read_file(mportInstance *mport, mportPackageMeta *pkg, mport_lu
 
 	/* Assumes copy_metafile has run on install already */
 	(void)snprintf(filename, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_INST_INFRA_DIR,
-	    pkg->name, pkg->version, filename);
+	    pkg->name, pkg->version, luafile);
 
 	if (stat(filename, &st) == -1) {
 		/* if we couldn't stat the file, we assume there isn't a lua file*/
@@ -313,5 +315,5 @@ mport_lua_script_read_file(mportInstance *mport, mportPackageMeta *pkg, mport_lu
 		ucl_parser_free(parser);
 	}
 
-	return MPORT_OK;
+	return (MPORT_OK);
 }

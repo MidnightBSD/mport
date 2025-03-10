@@ -72,7 +72,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 
 	mport_start_stop_service(mport, pack, SERVICE_STOP);
 
-	mport_lua_script_load(mport, pkg);
+	mport_lua_script_load(mport, pack);
 
 	/* get the file count for the progress meter */
 	if (mport_db_prepare(mport->db, &stmt,
@@ -109,7 +109,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	if (run_unldconfig(mport, pack) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	if (mport_lua_script_run(mport, pkg, MPORT_LUA_PRE_DEINSTALL) != MPORT_OK)
+	if (mport_lua_script_run(mport, pack, MPORT_LUA_PRE_DEINSTALL) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	if (run_pkg_deinstall(mport, pack, "DEINSTALL") != MPORT_OK)
@@ -305,7 +305,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (mport_lua_script_run(mport, pkg, MPORT_LUA_POST_DEINSTALL) != MPORT_OK)
+	if (mport_lua_script_run(mport, pack, MPORT_LUA_POST_DEINSTALL) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	if (run_pkg_deinstall(mport, pack, "POST-DEINSTALL") != MPORT_OK)
