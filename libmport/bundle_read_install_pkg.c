@@ -28,6 +28,8 @@
  */
 
 #include <sys/cdefs.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
 
 #include "mport.h"
 #include "mport_private.h"
@@ -78,7 +80,7 @@ static int mport_bundle_read_get_assetlist(mportInstance *mport, mportPackageMet
 
 static int copy_metafile(mportInstance *, mportBundleRead *, mportPackageMeta *, char *);
 
-static bool is_linux_module_loaded();
+static bool is_linux_module_loaded(void);
 
 /**
  * This is a wrapper for all bundle read install operations
@@ -929,7 +931,7 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 			case ASSET_LDCONFIG_LINUX:
 				if (!is_linux_module_loaded()) {
 					/* load the linux module */
-					mport->msg_cb(mport, "Loading Linux kernel module.  To make this permanent, follow instructions in man LINUX(4)");
+					mport_call_msg_cb(mport, "Loading Linux kernel module.  To make this permanent, follow instructions in man LINUX(4)");
 #if defined(__amd64__)
 					if (mport_xsystem(mport, "/sbin/kldload linux64") != MPORT_OK) {
 						goto ERROR;
