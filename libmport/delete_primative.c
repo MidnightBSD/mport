@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2015 Lucas Holt
+ * Copyright (c) 2015, 2025 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -43,6 +43,7 @@
 
 #include "mport.h"
 #include "mport_private.h"
+#include "mport_lua.h"
 
 static int run_unexec(mportInstance *, mportPackageMeta *, mportAssetListEntryType);
 static int run_unldconfig(mportInstance *, mportPackageMeta *);
@@ -70,6 +71,8 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	mport_call_progress_init_cb(mport, "Deleting %s-%s", pack->name, pack->version);
 
 	mport_start_stop_service(mport, pack, SERVICE_STOP);
+
+	mport_lua_script_load(mport, pkg);
 
 	/* get the file count for the progress meter */
 	if (mport_db_prepare(mport->db, &stmt,
@@ -104,6 +107,9 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 		RETURN_CURRENT_ERROR;
 
 	if (run_unldconfig(mport, pack) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	if (mport_lua_script_run(mport, pkg, MPORT_LUA_PRE_DEINSTALL) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	if (run_pkg_deinstall(mport, pack, "DEINSTALL") != MPORT_OK)
@@ -298,6 +304,9 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	if (run_special_unexec(mport, pack) != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
+
+	if (mport_lua_script_run(mport, pkg, MPORT_LUA_POST_DEINSTALL) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
 
 	if (run_pkg_deinstall(mport, pack, "POST-DEINSTALL") != MPORT_OK)
 		RETURN_CURRENT_ERROR;
@@ -628,6 +637,24 @@ delete_pkg_infra(mportInstance *mport, mportPackageMeta *pack)
 	if (mport_file_exists(file) && unlink(file) != 0)
 		mport_call_msg_cb(
 		    mport, "Could not unlink %s: %s", file, strerror(errno));
+
+	/* delete lua files */
+	(void) snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR, pack->name,
+		pack->version, MPORT_LUA_POST_INSTALL_FILE);
+	if (mport_file_exists(file) && unlink(file) != 0)
+		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));
+	(void) snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR, pack->name,
+		pack->version, MPORT_LUA_PRE_INSTALL_FILE);
+	if (mport_file_exists(file) && unlink(file) != 0)
+		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));
+	(void) snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR, pack->name,
+		pack->version, MPORT_LUA_POST_DEINSTALL_FILE);
+	if (mport_file_exists(file) && unlink(file) != 0)
+		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));
+	(void) snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR, pack->name,
+		pack->version, MPORT_LUA_PRE_DEINSTALL_FILE);
+	if (mport_file_exists(file) && unlink(file) != 0)
+		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));	
 
 	(void)snprintf(dir, FILENAME_MAX, "%s%s/%s-%s", mport->root, MPORT_INST_INFRA_DIR,
 	    pack->name, pack->version);

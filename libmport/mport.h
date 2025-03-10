@@ -281,6 +281,10 @@ typedef struct {
   size_t conflicts_count;  
   char *pkginstall;
   char *pkgdeinstall;
+  char *luapkgpreinstall;
+  char *luapkgpredeinstall;
+  char *luapkgpostinstall;
+  char *luapkgpostdeinstall;
   char *pkgmessage;
   bool is_backup;
 } mportCreateExtras;  

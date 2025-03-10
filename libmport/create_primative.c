@@ -575,6 +575,30 @@ archive_metafiles(mportBundleWrite *bundle, mportPackageMeta *pack, mportCreateE
 			RETURN_CURRENT_ERROR;
 	}
 
+	if (extra->luapkgpreinstall != NULL && mport_file_exists(extra->luapkgpreinstall)) {
+		(void) snprintf(filename, FILENAME_MAX, "%s/%s", dir, MPORT_LUA_PRE_INSTALL_FILE);
+		if (mport_bundle_write_add_file(bundle, extra->luapkgpreinstall, filename) != MPORT_OK)
+			RETURN_CURRENT_ERROR;
+	}
+
+	if (extra->luapkgpostinstall != NULL && mport_file_exists(extra->luapkgpostinstall)) {
+		(void) snprintf(filename, FILENAME_MAX, "%s/%s", dir, MPORT_LUA_POST_INSTALL_FILE);
+		if (mport_bundle_write_add_file(bundle, extra->luapkgpostinstall, filename) != MPORT_OK)
+			RETURN_CURRENT_ERROR;
+	}
+
+	if (extra->luapkgpredeinstall != NULL && mport_file_exists(extra->luapkgpredeinstall)) {
+		(void) snprintf(filename, FILENAME_MAX, "%s/%s", dir, MPORT_LUA_PRE_DEINSTALL_FILE);
+		if (mport_bundle_write_add_file(bundle, extra->luapkgpredeinstall, filename) != MPORT_OK)
+			RETURN_CURRENT_ERROR;
+	}
+
+	if (extra->luapkgpostdeinstall != NULL && mport_file_exists(extra->luapkgpostdeinstall)) {
+		(void) snprintf(filename, FILENAME_MAX, "%s/%s", dir, MPORT_LUA_POST_DEINSTALL_FILE);
+		if (mport_bundle_write_add_file(bundle, extra->luapkgpostdeinstall, filename) != MPORT_OK)
+			RETURN_CURRENT_ERROR;
+	}
+
 	return MPORT_OK;
 }
 

@@ -21,6 +21,8 @@ typedef enum {
 ucl_object_t * mport_lua_script_to_ucl(stringlist_t *scripts);
 int mport_lua_script_from_ucl(mportInstance *mport, mportPackageMeta *pkg, const ucl_object_t *obj, mport_lua_script type);
 int mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_script type);
+int mport_lua_script_load(mportInstance *mport, mportPackageMeta *pkg);
+int mport_lua_script_read_file(mportInstance *mport, mportPackageMeta *pkg, mport_lua_script type, char *filename);
 
 lua_CFunction stack_dump(lua_State *L);
 int lua_print_msg(lua_State *L);

@@ -251,3 +251,67 @@ mport_lua_script_from_ucl(mportInstance *mport, mportPackageMeta *pkg, const ucl
 	}
 	return (MPORT_OK);
 }
+
+int
+mport_lua_script_load(mportInstance *mport, mportPackageMeta *pkg)
+{
+	mport_lua_script_read_file(mport, pkg, MPORT_LUA_PRE_INSTALL, MPORT_PRE_INSTALL_FILE);
+	mport_lua_script_read_file(mport, pkg, MPORT_LUA_POST_INSTALL, MPORT_POST_INSTALL_FILE);
+	mport_lua_script_read_file(mport, pkg, MPORT_LUA_PRE_DEINSTALL, MPORT_PRE_DEINSTALL_FILE);
+	mport_lua_script_read_file(mport, pkg, MPORT_LUA_POST_DEINSTALL, MPORT_POST_DEINSTALL_FILE);
+}
+
+int
+mport_lua_script_read_file(mportInstance *mport, mportPackageMeta *pkg, mport_lua_script type, char *filename)
+{
+	char filename[FILENAME_MAX];
+	char *buf;
+	struct stat st;
+	FILE *file;
+	struct ucl_parser *parser;
+	ucl_object_t *obj;
+
+	/* Assumes copy_metafile has run on install already */
+	(void)snprintf(filename, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_INST_INFRA_DIR,
+	    pkg->name, pkg->version, filename);
+
+	if (stat(filename, &st) == -1) {
+		/* if we couldn't stat the file, we assume there isn't a lua file*/
+		return MPORT_OK;
+	}
+
+	if ((file = fopen(filename, "re")) == NULL)
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open %s: %s", filename, strerror(errno));
+
+	if ((buf = (char *)calloc((size_t)(st.st_size + 1), sizeof(char))) == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+
+	if (fread(buf, sizeof(char), (size_t)st.st_size, file) != (size_t)st.st_size) {
+		free(buf);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Read error: %s", strerror(errno));
+	}
+
+	buf[st.st_size] = '\0';
+
+	if (buf[0] == '[') {
+		parser = ucl_parser_new(0);
+		// remove leading/trailing array entries
+		buf[0] = ' ';
+		buf[st.st_size - 1] = '\0';
+
+		if (ucl_parser_add_chunk(parser, (const unsigned char *)buf, st.st_size)) {
+			obj = ucl_parser_get_object(parser);
+		    int ret = mport_lua_script_from_ucl(mport, pkg, obj, type);
+			ucl_parser_free(parser);
+			free(buf);
+
+			ucl_object_unref(obj);
+
+			return ret;
+		}
+
+		ucl_parser_free(parser);
+	}
+
+	return MPORT_OK;
+}

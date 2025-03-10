@@ -197,6 +197,10 @@ int mport_set_errx(int , const char *, ...);
 #define MPORT_INSTALL_FILE 	"pkg-install"
 #define MPORT_DEINSTALL_FILE	"pkg-deinstall"
 #define MPORT_MESSAGE_FILE	"pkg-message"
+#define MPORT_LUA_PRE_INSTALL_FILE "pkg-pre-install.lua"
+#define MPORT_LUA_POST_INSTALL_FILE "pkg-post-install.lua"
+#define MPORT_LUA_PRE_DEINSTALL_FILE "pkg-pre-deinstall.lua"
+#define MPORT_LUA_POST_DEINSTALL_FILE "pkg-post-deinstall.lua"
 
 /* Instance files */
 #define MPORT_INST_DIR 		"/var/db/mport"

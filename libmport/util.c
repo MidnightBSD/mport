@@ -67,8 +67,14 @@ mport_createextras_new(void)
 	extra->pkg_filename[0] = '\0';
 	extra->sourcedir[0] = '\0';
 	extra->mtree = NULL;
+	
 	extra->pkginstall = NULL;
 	extra->pkgdeinstall = NULL;
+	extra->luapkgpostdeinstall = NULL;
+	extra->luapkgpostinstall = NULL;
+	extra->luapkgpreinstall = NULL;
+	extra->luapkgpredeinstall = NULL;
+
 	extra->pkgmessage = NULL;
 	extra->conflicts = NULL;
 	extra->depends = NULL;
@@ -92,6 +98,15 @@ mport_createextras_free(mportCreateExtras *extra)
 	extra->pkgdeinstall = NULL;
 	free(extra->pkgmessage);
 	extra->pkgmessage = NULL;
+
+	free(extra->luapkgpostdeinstall);
+	extra->luapkgpostdeinstall = NULL;
+	free(extra->luapkgpostinstall);
+	extra->luapkgpostinstall = NULL;
+	free(extra->luapkgpreinstall);
+	extra->luapkgpreinstall = NULL;
+	free(extra->luapkgpredeinstall);
+	extra->luapkgpredeinstall = NULL;
 
 	if (extra->conflicts_count > 0 && extra->conflicts != NULL) {
 		for (i = 0; i < extra->conflicts_count; i++) {
