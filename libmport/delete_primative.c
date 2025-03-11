@@ -52,6 +52,16 @@ static int run_pkg_deinstall(mportInstance *, mportPackageMeta *, const char *);
 static int delete_pkg_infra(mportInstance *, mportPackageMeta *);
 static int check_for_upwards_depends(mportInstance *, mportPackageMeta *);
 static bool is_safe_to_delete_dir(mportInstance *, mportPackageMeta *, const char *);
+static bool is_system_dir(const char *path);
+
+static const char *system_dirs[] = {
+    "/usr/lib", "/usr/bin", "/usr/sbin", "/usr/local/bin", "/usr/local/sbin",
+    "/usr/share", "/usr/local/share", "/usr/local/lib", "/usr/local/libexec",
+    "/usr/local/include", "/boot", "/etc", "/etc/rc.d", "/root", "/var",
+    "/var/lib", "/var/log", "/var/run", "/var/tmp", "/var/spool", "/var/mail",
+    "/var/empty"
+};
+
 
 MPORT_PUBLIC_API int
 mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
@@ -345,6 +355,15 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	return (MPORT_OK);
 }
 
+static bool is_system_dir(const char *path) {
+    for (size_t i = 0; i < sizeof(system_dirs) / sizeof(system_dirs[0]); i++) {
+        if (strcmp(path, system_dirs[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool is_safe_to_delete_dir(mportInstance *mport, mportPackageMeta *pack, const char *path) 
 {
 	sqlite3_stmt *stmt;
@@ -363,6 +382,12 @@ bool is_safe_to_delete_dir(mportInstance *mport, mportPackageMeta *pack, const c
 		mport_call_msg_cb(mport, "Skipping removal of package prefix directory: '%s'", path);
 		return false;
 	}
+
+	/* Check if the path is a system directory */
+	if (pack->type == MPORT_TYPE_APP && is_system_dir(path)) {
+		mport_call_msg_cb(mport, "Skipping removal of system directory: '%s'", path);
+		return false;
+	}	
 
 	if (mport_db_prepare(mport->db, &stmt,
 		"SELECT count(*) from assets where pkg!=%Q and type in (%d, %d, %d, %d) and data=%Q",
