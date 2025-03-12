@@ -77,8 +77,12 @@ mport_update_primative(mportInstance *mport, const char *filename)
             continue;
         }
 
+        int flag = MPORT_PRECHECK_CONFLICTS|MPORT_PRECHECK_DEPENDS;
+        if !(mport->force)
+            flag = flag | MPORT_PRECHECK_UPGRADEABLE;
+
         if (
-            (mport_check_preconditions(mport, pkg, MPORT_PRECHECK_UPGRADEABLE|MPORT_PRECHECK_CONFLICTS|MPORT_PRECHECK_DEPENDS) != MPORT_OK) ||
+            (mport_check_preconditions(mport, pkg, flag) != MPORT_OK) ||
             (set_prefix_to_installed(mport, pkg) != MPORT_OK) ||
             (mport_bundle_read_update_pkg(mport, bundle, pkg) != MPORT_OK)
         ) {
