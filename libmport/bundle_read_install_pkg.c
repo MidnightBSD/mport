@@ -820,10 +820,11 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 	return (MPORT_OK);
 
 	ERROR:
-	sqlite3_finalize(insert);
-	(mport->progress_free_cb)();
-	free(orig_cwd);
-	mport_assetlist_free(alist);
+		sqlite3_finalize(insert);
+		(mport->progress_free_cb)();
+		free(orig_cwd);
+		mport_assetlist_free(alist);
+
 	RETURN_CURRENT_ERROR;
 }
 
@@ -1012,18 +1013,36 @@ run_mtree(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg)
 {
 	char file[FILENAME_MAX];
 	int ret;
+	pid_t pid;
 
 	(void) snprintf(file, FILENAME_MAX, "%s/%s/%s-%s/%s", bundle->tmpdir, MPORT_STUB_INFRA_DIR, pkg->name,
-	                pkg->version,
-	                MPORT_MTREE_FILE);
+		pkg->version, MPORT_MTREE_FILE);
+
+	char *const args[] = {MPORT_MTREE_BIN, "-U", "-f", file, "-d", "-e", "-p", pkg->prefix, NULL};
+	char *const envp[] = {NULL};
 
 	if (mport_file_exists(file)) {
-		if ((ret = mport_xsystem(mport, "%s -U -f %s -d -e -p %s >/dev/null", MPORT_MTREE_BIN, file,
-		                         pkg->prefix)) != 0)
+		ret = posix_spawn(&pid, MPORT_MTREE_BIN, NULL, NULL, args, envp);
+
+		if (ret == 0) {
+			int status;
+			if (waitpid(pid, &status, 0) == -1) {
+				RETURN_ERRORX(MPORT_ERR_FATAL, "waitpid failed: %s", strerror(errno));
+			}
+			if (WIFEXITED(status)) {
+                ret = WEXITSTATUS(status);
+                if (ret != 0) {
+                    RETURN_ERRORX(MPORT_ERR_FATAL, "%s returned non-zero: %i", MPORT_MTREE_BIN, ret);
+                }
+            } else {
+                RETURN_ERRORX(MPORT_ERR_FATAL, "%s terminated abnormally", MPORT_MTREE_BIN);
+            }
+		} else {
 			RETURN_ERRORX(MPORT_ERR_FATAL, "%s returned non-zero: %i", MPORT_MTREE_BIN, ret);
+		}
 	}
 
-	return MPORT_OK;
+	return (MPORT_OK);
 }
 
 
@@ -1034,16 +1053,15 @@ run_pkg_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta 
 	int ret;
 
 	(void) snprintf(file, FILENAME_MAX, "%s/%s/%s-%s/%s", bundle->tmpdir, MPORT_STUB_INFRA_DIR, pkg->name,
-	                pkg->version,
-	                MPORT_INSTALL_FILE);
+	                pkg->version, MPORT_INSTALL_FILE);
 
 	if (mport_file_exists(file)) {
-		if (chmod(file, 755) != 0)
-			RETURN_ERRORX(MPORT_ERR_FATAL, "chmod(%s, 755): %s", file, strerror(errno));
+		if (chmod(file, 750) != 0)
+			RETURN_ERRORX(MPORT_ERR_FATAL, "chmod(%s, 750): %s", file, strerror(errno));
 
 		if ((ret = mport_xsystem(mport, "PKG_PREFIX=%s %s %s %s", pkg->prefix, file, pkg->name, mode)) != 0)
 			RETURN_ERRORX(MPORT_ERR_FATAL, "%s %s returned non-zero: %i", MPORT_INSTALL_FILE, mode, ret);
 	}
 
-	return MPORT_OK;
+	return (MPORT_OK);
 }
