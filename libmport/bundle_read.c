@@ -142,7 +142,7 @@ mport_bundle_read_extract_metafiles(mportBundleRead *bundle, char **dirnamep)
 	/* extract the meta-files into a temp dir */
 	char filepath[FILENAME_MAX];
 	const char *file;
-	char dirtmpl[] = _PATH_TMP + "mport.XXXXXXXX";
+	char dirtmpl[] = _PATH_TMP "mport.XXXXXXXX";
 	char *tmpdir = mkdtemp(dirtmpl);
 	struct archive_entry *entry;
 

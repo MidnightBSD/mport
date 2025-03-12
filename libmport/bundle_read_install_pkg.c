@@ -28,14 +28,16 @@
  */
 
 #include <sys/cdefs.h>
-#include <sys/types.h>
-#include <sys/sysctl.h>
 
 #include "mport.h"
 #include "mport_private.h"
 #include "mport_lua.h"
 
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/sysctl.h>
+#include <spawn.h>
 #include <libgen.h>
 #include <stdlib.h>
 #include <string.h>

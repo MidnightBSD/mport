@@ -238,7 +238,7 @@ mport_fetch_cves(mportInstance *mport, char *cpe)
 	int result;
 	char *url;
 
-	char tmpfile2[] = _PATH_TMP + "mport.cve.XXXXXXXX";
+	char tmpfile2[] = _PATH_TMP "mport.cve.XXXXXXXX";
 	int fd;
 
 	if ((fd = mkstemp(tmpfile2)) == -1) {
