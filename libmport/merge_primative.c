@@ -73,7 +73,7 @@ mport_merge_primative(mportInstance *mport, const char **filenames, const char *
   sqlite3 *db = NULL;
   mportBundleWrite *bundle = NULL;
   struct table_entry **table = NULL;
-  char tmpdir[] = _PATH_TMP + "mport.XXXXXXXX";
+  char tmpdir[] = _PATH_TMP "mport.XXXXXXXX";
   char *dbfile = NULL;
   
   if ((table = (struct table_entry **)calloc(TABLE_SIZE, sizeof(struct table_entry *))) == NULL)

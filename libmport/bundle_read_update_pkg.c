@@ -44,7 +44,7 @@ static int build_create_extras_depends(mportInstance *, mportPackageMeta *, mpor
 
 int mport_bundle_read_update_pkg(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg)
 {
-	char tmpfile2[] = _PATH_TMP + "mport.XXXXXXXX";
+	char tmpfile2[] = _PATH_TMP "mport.XXXXXXXX";
 	int fd;
 
 	mport_pkgmeta_logevent(mport, pkg, "Begining update");
