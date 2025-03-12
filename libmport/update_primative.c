@@ -42,6 +42,7 @@ mport_update_primative(mportInstance *mport, const char *filename)
     mportPackageMeta **pkgs = NULL;
     mportPackageMeta *pkg = NULL;
     mportPackageMeta **packs_start = NULL;
+    mportPackageMeta **already_installed = NULL;
 
     if ((bundle = mport_bundle_read_new()) == NULL)
         RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
@@ -59,6 +60,14 @@ mport_update_primative(mportInstance *mport, const char *filename)
     for (int i = 0; *(pkgs + i) != NULL; i++) {
         pkg = pkgs[i];
 		pkg->install_date = mport_get_time();
+
+        /* retain automatic flag from previous install. */
+        if (mport_pkgmeta_search_master(mport, &already_installed, "pkg=%Q", pkg->name) == MPORT_OK) {
+            if (already_installed != NULL && already_installed[0] != NULL) {
+              pkg->automatic = already_installed[0]->automatic;
+              pkg->locked = already_installed[0]->locked;
+            }
+        }
 
         if (mport_lock_islocked(pkg) == MPORT_LOCKED) {
             mport_call_msg_cb(mport, "Unable to update %s-%s: package is locked.", pkg->name, pkg->version);

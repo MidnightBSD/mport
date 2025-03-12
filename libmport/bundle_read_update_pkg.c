@@ -67,8 +67,8 @@ int mport_bundle_read_update_pkg(mportInstance *mport, mportBundleRead *bundle, 
         (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)
 	) 
 	{
-    		if (install_backup_bundle(mport, tmpfile2) == MPORT_OK) {
-			(void)mport_rmtree(tmpfile2);
+    	if (install_backup_bundle(mport, tmpfile2) == MPORT_OK) {
+          (void)mport_rmtree(tmpfile2);
 		} else {
 			mport_call_msg_cb(mport, "Error restoring backup package %s", pkg->name);
 		}
