@@ -437,7 +437,7 @@ mport_shell_register(const char *shell_file)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Shell to register is invalid.");
 
 	FILE *fp;
-	fp = fopen("/etc/shells", "a");
+	fp = fopen(_PATH_SHELLS, "a");
 	if (fp == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Unable to open shell file.");
 
@@ -454,8 +454,8 @@ mport_shell_unregister(const char *shell_file)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Shell to unregister is invalid.");
 
 	return mport_xsystem(NULL,
-	    "grep -v %s /etc/shells > /etc/shells.bak && mv /etc/shells.bak /etc/shells",
-	    shell_file);
+	    "/usr/bin/grep -v %s %s > %s.bak && mv %s.bak %s",
+	    shell_file, _PATH_SHELLS, _PATH_SHELLS, _PATH_SHELLS, _PATH_SHELLS);
 }
 
 /**
