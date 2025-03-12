@@ -70,7 +70,7 @@ mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPac
 
 	sqlite3 *db = NULL;
 
-	char dirtmpl[] = "/tmp/mport.XXXXXXXX";
+	char dirtmpl[] = _PATH_TMP + "mport.XXXXXXXX";
 	char *tmpdir = mkdtemp(dirtmpl);
 
 	if (tmpdir == NULL) {

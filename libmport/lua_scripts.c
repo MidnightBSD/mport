@@ -46,10 +46,7 @@ extern char **environ;
 
 #include "mport_lua.h"
 
-static int get_socketpair(int *);
-int mport_script_run_child(mportInstance *, int, int *, int, const char*);
-
-static int
+int
 get_socketpair(int *pipe)
 {
 	int r;
@@ -59,7 +56,7 @@ get_socketpair(int *pipe)
 }
 
 int
-mport_script_run_child(mportInstance *mport, int pid, int *pstat, int inputfd, const char* script_name) 
+mport_script_run_child(mportInstance *mport, int pid, int *pstat, int inputfd, const char *script_name) 
 {
 	struct pollfd pfd;
 	bool wait_for_child;

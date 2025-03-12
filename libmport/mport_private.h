@@ -249,6 +249,10 @@ char * mport_fetch_cves(mportInstance *mport, char *cpe);
 int mport_index_get_mirror_list(mportInstance *, char ***, int *);
 char * mport_index_file_path(void);
 
+/* script things */
+int get_socketpair(int *);
+int mport_script_run_child(mportInstance *, int, int *, int, const char*);
+
 #define MPORT_CHECK_FOR_INDEX(mport, func) if (!(mport->flags & MPORT_INST_HAVE_INDEX)) RETURN_ERRORX(MPORT_ERR_FATAL, "Attempt to use %s before loading index.", (func));
 #define MPORT_DAY (3600 * 24)
 #define MPORT_MAX_INDEX_AGE (MPORT_DAY * 7) /* one week */
@@ -258,7 +262,6 @@ char * mport_index_file_path(void);
 
 /* Binaries we use */
 #define MPORT_MTREE_BIN		"/usr/sbin/mtree"
-#define MPORT_SH_BIN		"/bin/sh"
 #define MPORT_CHROOT_BIN	"/usr/sbin/chroot"
 
 #define MPORT_URL_MAX		512

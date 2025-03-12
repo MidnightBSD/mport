@@ -55,11 +55,17 @@ static bool is_safe_to_delete_dir(mportInstance *, mportPackageMeta *, const cha
 static bool is_system_dir(const char *path);
 
 static const char *system_dirs[] = {
-    "/usr/lib", "/usr/bin", "/usr/sbin", "/usr/local/bin", "/usr/local/sbin",
-    "/usr/share", "/usr/local/share", "/usr/local/lib", "/usr/local/libexec",
-    "/usr/local/include", "/boot", "/etc", "/etc/rc.d", "/root", "/var",
-    "/var/lib", "/var/log", "/var/run", "/var/tmp", "/var/spool", "/var/mail",
-    "/var/empty"
+	"/boot", 
+	_PATH_ETC, "/etc/rc.d", 
+	"/root",
+	_PATH_TMP,
+    "/usr/lib", "/usr/bin", "/usr/sbin", _PATH_MAN, _PATH_LOCALE, _PATH_FIRMWARE,
+    "/usr/share", 
+	"/usr/local", "/usr/local/bin", "/usr/local/sbin",
+	"/usr/local/share", "/usr/local/lib", "/usr/local/libexec",
+    "/usr/local/include", 
+	"/var", "/var/lib", "/var/log", "/var/spool", "/var/empty", 
+	_PATH_VARDB, _PATH_VARRUN, _PATH_VARTMP, _PATH_MAILDIR,
 };
 
 

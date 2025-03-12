@@ -34,6 +34,7 @@
 
 #include <sys/cdefs.h>
 #include <archive.h>
+#include <paths.h>
 #include <sqlite3.h>
 #include <sys/queue.h>
 #include <stdio.h>
