@@ -66,6 +66,8 @@ mport_update_primative(mportInstance *mport, const char *filename)
             if (already_installed != NULL && already_installed[0] != NULL) {
               pkg->automatic = already_installed[0]->automatic;
               pkg->locked = already_installed[0]->locked;
+
+              mport_pkgmeta_vec_free(already_installed);
             }
         }
 
