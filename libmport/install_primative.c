@@ -138,6 +138,9 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		if (mport_pkgmeta_read_stub(mport, &pkgs) != MPORT_OK)
 			RETURN_CURRENT_ERROR;
 
+		/* if we previously installed it and want to force, allow it.  
+		   In this case, automatic flag from previous install not honored 
+		*/
 		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_INSTALLED) != MPORT_OK) {
 			if (mport->force) {
 				mport_delete_primative(mport, pkgs[0], 1);
@@ -195,7 +198,8 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		if (mport_pkgmeta_search_master(mport, &already_installed, "pkg=%Q", pkg->name) == MPORT_OK) {
 			if (already_installed != NULL && already_installed[0] != NULL) {
 				if (mport->force) {
-					mport_delete_primative(mport, pkgs[0], 1);
+					pkg->automatic = already_installed[0]->automatic; // honor old flag
+					mport_delete_primative(mport, already_installed[0], 1);
 				}
 				mport_pkgmeta_vec_free(already_installed);
 			}
