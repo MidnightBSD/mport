@@ -150,12 +150,12 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 			}
 		}
 
-		if (mport_check_preconditions(mport, pkg[0], MPORT_PRECHECK_CONFLICTS) != MPORT_OK) {
+		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_CONFLICTS) != MPORT_OK) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name, pkg->version,
 			                  mport_err_string());
 			return MPORT_ERR_FATAL;
 		}
-		dependencies = get_dependencies(mport, pkg[0]);
+		dependencies = get_dependencies(mport, pkgs[0]);
 
 		// close so we can safely process depdendencies.
 		if (mport_bundle_read_finish(mport, bundle) != MPORT_OK)
