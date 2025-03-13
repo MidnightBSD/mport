@@ -269,8 +269,10 @@ main(int argc, char *argv[])
 		} else { 
 			for (i = 1; i < argc; i++) {
 				tempResultCode = mport_update(mport, argv[i]);
-				if (tempResultCode != 0)
+				if (tempResultCode != MPORT_OK) {
 					resultCode = tempResultCode;
+					mport_call_msg_cb(mport, "Error updating package %s: %s", argv[i], mport_err_string());
+				}
 			}
 		}
 	} else if (!strcmp(cmd, "download")) {
