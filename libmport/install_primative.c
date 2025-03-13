@@ -199,7 +199,6 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 			if (already_installed != NULL && already_installed[0] != NULL) {
 				if (mport->force) {
 					pkg->automatic = already_installed[0]->automatic; // honor old flag
-					mport_delete_primative(mport, already_installed[0], 1);
 				}
 				mport_pkgmeta_vec_free(already_installed);
 			}
