@@ -177,7 +177,7 @@ mport_install_depends(mportInstance *mport, const char *packageName, const char 
     depends_orig = NULL;
     depends = NULL;
 
-		if (mport->force || mport_check_preconditions(mport, packs[0], MPORT_PRECHECK_UPGRADEABLE) == MPORT_OK) {
+		if (mport_check_preconditions(mport, packs[0], MPORT_PRECHECK_UPGRADEABLE) == MPORT_OK) {
 			if (mport_update(mport, packageName) != MPORT_OK) {
 				mport_call_msg_cb(mport, "%s", mport_err_string());
 				mport_pkgmeta_vec_free(packs);
