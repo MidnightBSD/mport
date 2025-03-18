@@ -73,15 +73,23 @@ mport_merge_primative(mportInstance *mport, const char **filenames, const char *
   sqlite3 *db = NULL;
   mportBundleWrite *bundle = NULL;
   struct table_entry **table = NULL;
-  char tmpdir[] = _PATH_TMP "mport.XXXXXXXX";
   char *dbfile = NULL;
+	char dirtmpl[MAXPATHLEN];
+	char *tmpdir;
+
+	tmpdir = getenv("TMPDIR");
+	if (tmpdir == NULL)
+		tmpdir = "/tmp";
+
+	strlcpy(dirtmpl, tmpdir, sizeof(dirtmpl));
+	strlcat(dirtmpl, "/mport.XXXXXXXX", sizeof(dirtmpl));
   
   if ((table = (struct table_entry **)calloc(TABLE_SIZE, sizeof(struct table_entry *))) == NULL)
     RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate hash table.");
   
   DIAG("mport_merge_primative(%p, %s)", filenames, outfile)
   
-  if (mkdtemp(tmpdir) == NULL)
+  if (tmpdir = mkdtemp(dirtmpl) == NULL)
     RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't make temp directory.");
   if (asprintf(&dbfile, "%s/%s", tmpdir, "merged.db") == -1)
     RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't build merge database name.");
@@ -120,8 +128,8 @@ mport_merge_primative(mportInstance *mport, const char **filenames, const char *
   if (mport_bundle_write_finish(bundle) != MPORT_OK)
     RETURN_CURRENT_ERROR;
  
- /*if (mport_rmtree(tmpdir) != MPORT_OK)
-   RETURN_CURRENT_ERROR; */
+  /* attempt removal of tmpdir, ignore errors. */
+  mport_rmtree(tmpdir);
  
  return MPORT_OK;
 }

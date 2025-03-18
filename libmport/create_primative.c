@@ -67,11 +67,17 @@ MPORT_PUBLIC_API int
 mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPackageMeta *pack, mportCreateExtras *extra)
 {
 	int error_code = MPORT_OK;
-
 	sqlite3 *db = NULL;
+	char dirtmpl[MAXPATHLEN];
+	char *tmpdir;
 
-	char dirtmpl[] = _PATH_TMP "mport.XXXXXXXX";
-	char *tmpdir = mkdtemp(dirtmpl);
+	tmpdir = getenv("TMPDIR");
+	if (tmpdir == NULL)
+		tmpdir = "/tmp";
+
+	strlcpy(dirtmpl, tmpdir, sizeof(dirtmpl));
+	strlcat(dirtmpl, "/mport.XXXXXXXX", sizeof(dirtmpl));
+	tmpdir = mkdtemp(dirtmpl);
 
 	if (tmpdir == NULL) {
 		error_code = SET_ERROR(MPORT_ERR_FATAL, strerror(errno));
