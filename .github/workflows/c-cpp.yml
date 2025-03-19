@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bsdmake libarchive-dev xz-utils libsqlite3-dev libzstd-dev
+          sudo apt-get install -y bmake libarchive-dev xz-utils libsqlite3-dev libzstd-dev
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
@@ -37,8 +37,8 @@ jobs:
           languages: ${{ matrix.language }}
           queries: +security-and-quality
 
-      - name: Build using bsdmake
-        run: bsdmake
+      - name: Build using bmake
+        run: bmake
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
