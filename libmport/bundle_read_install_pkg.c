@@ -965,8 +965,11 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 				}
 				break;
 			case ASSET_INFO:
-				if (mport_file_exists("/usr/local/bin/indexinfo") && 
-					mport_xsystem(mport, "/usr/local/bin/indexinfo %s", e->data == NULL ? pkg->prefix : e->data) != MPORT_OK) {
+			    // TODO: Package prefix + share/info? 
+			    char *abs_path = realpath(e->data == NULL ? "/usr/local/share/info" : e->data, NULL);
+				char *info_dir = dirname(abs_path);
+				if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") && 
+					mport_xsystem(mport, "/usr/local/bin/indexinfo %s", info_dir) != MPORT_OK) {
 					goto ERROR;
 				}
 				break;
