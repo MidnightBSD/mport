@@ -92,9 +92,9 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 
 	/* get the file count for the progress meter */
 	if (mport_db_prepare(mport->db, &stmt,
-		"SELECT COUNT(*) FROM assets WHERE (type=%i or type=%i or type=%i or type=%i or type=%i) AND pkg=%Q",
+		"SELECT COUNT(*) FROM assets WHERE (type=%i or type=%i or type=%i or type=%i or type=%i or type=%i) AND pkg=%Q",
 		ASSET_FILE, ASSET_SAMPLE, ASSET_SAMPLE_OWNER_MODE, ASSET_SHELL,
-		ASSET_FILE_OWNER_MODE, pack->name) != MPORT_OK)
+		ASSET_FILE_OWNER_MODE, ASSET_INFO, pack->name) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	switch (sqlite3_step(stmt)) {
@@ -191,6 +191,8 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 		case ASSET_SHELL:
 		/* falls through */
 		case ASSET_SAMPLE:
+			/* falls through */
+		case ASSET_INFO:
 			/* falls through */
 		case ASSET_SAMPLE_OWNER_MODE:
 			(mport->progress_step_cb)(++current, total, file);

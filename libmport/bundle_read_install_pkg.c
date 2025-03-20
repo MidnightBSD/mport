@@ -192,8 +192,8 @@ get_file_count(mportInstance *mport, char *pkg_name, int *file_total)
 	char *err;
 
 	if (mport_db_prepare(mport->db, &count,
-	                     "SELECT COUNT(*) FROM stub.assets WHERE (type=%i or type=%i or type=%i or type=%i or type=%i) AND pkg=%Q",
-	                     ASSET_FILE, ASSET_SAMPLE, ASSET_SHELL, ASSET_FILE_OWNER_MODE, ASSET_SAMPLE_OWNER_MODE,
+	                     "SELECT COUNT(*) FROM stub.assets WHERE (type=%i or type=%i or type=%i or type=%i or type=%i or type=%i) AND pkg=%Q",
+	                     ASSET_FILE, ASSET_SAMPLE, ASSET_SHELL, ASSET_FILE_OWNER_MODE, ASSET_SAMPLE_OWNER_MODE, ASSET_INFO, 
 	                     pkg_name) != MPORT_OK) {
 		sqlite3_finalize(count);
 		RETURN_CURRENT_ERROR;
@@ -542,6 +542,8 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 				/* FALLS THROUGH */
 			case ASSET_SAMPLE:
 				/* FALLS THROUGH */
+			case ASSET_INFO:
+				/* FALLS THROUGH */
 			case ASSET_SAMPLE_OWNER_MODE:
 				if (mport_bundle_read_next_entry(bundle, &entry) != MPORT_OK)
 					goto ERROR;
@@ -689,7 +691,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 			goto ERROR;
 		}
 		if (e->type == ASSET_FILE || e->type == ASSET_SAMPLE || e->type == ASSET_SHELL ||
-		    e->type == ASSET_FILE_OWNER_MODE || e->type == ASSET_SAMPLE_OWNER_MODE) {
+		    e->type == ASSET_FILE_OWNER_MODE || e->type == ASSET_SAMPLE_OWNER_MODE || e-type == ASSET_INFO) {
 			/* don't put the root in the database! */
 			if (sqlite3_bind_text(insert, 2, filePtr + strlen(mport->root), -1, SQLITE_STATIC) !=
 			    SQLITE_OK) {

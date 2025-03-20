@@ -178,7 +178,8 @@ insert_assetlist(sqlite3 *db, mportAssetList *assetlist, mportPackageMeta *pack,
 		}
 
 		if (e->type == ASSET_FILE || e->type == ASSET_SAMPLE || e->type == ASSET_SHELL ||
-		    e->type == ASSET_FILE_OWNER_MODE || e->type == ASSET_SAMPLE_OWNER_MODE) {
+		    e->type == ASSET_FILE_OWNER_MODE || e->type == ASSET_SAMPLE_OWNER_MODE ||
+		    e->type == ASSET_INFO) {
 			/* Don't prepend cwd onto absolute file paths (this is useful for update) */
 			if (e->data[0] == '/') {
 				(void) snprintf(file, FILENAME_MAX, "%s%s", extra->sourcedir, e->data);
