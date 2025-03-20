@@ -70,10 +70,10 @@ static uint32_t SuperFastHash(const char *);
 MPORT_PUBLIC_API int
 mport_merge_primative(mportInstance *mport, const char **filenames, const char *outfile)
 {
-  sqlite3 *db = NULL;
-  mportBundleWrite *bundle = NULL;
-  struct table_entry **table = NULL;
-  char *dbfile = NULL;
+	sqlite3 *db = NULL;
+	mportBundleWrite *bundle = NULL;
+	struct table_entry **table = NULL;
+	char *dbfile = NULL;
 	char dirtmpl[MAXPATHLEN];
 	char *tmpdir;
 
@@ -89,7 +89,7 @@ mport_merge_primative(mportInstance *mport, const char **filenames, const char *
   
   DIAG("mport_merge_primative(%p, %s)", filenames, outfile)
   
-  if (tmpdir = mkdtemp(dirtmpl) == NULL)
+  if ((tmpdir = mkdtemp(dirtmpl)) == NULL)
     RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't make temp directory.");
   if (asprintf(&dbfile, "%s/%s", tmpdir, "merged.db") == -1)
     RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't build merge database name.");

@@ -691,7 +691,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 			goto ERROR;
 		}
 		if (e->type == ASSET_FILE || e->type == ASSET_SAMPLE || e->type == ASSET_SHELL ||
-		    e->type == ASSET_FILE_OWNER_MODE || e->type == ASSET_SAMPLE_OWNER_MODE || e-type == ASSET_INFO) {
+		    e->type == ASSET_FILE_OWNER_MODE || e->type == ASSET_SAMPLE_OWNER_MODE || e->type == ASSET_INFO) {
 			/* don't put the root in the database! */
 			if (sqlite3_bind_text(insert, 2, filePtr + strlen(mport->root), -1, SQLITE_STATIC) !=
 			    SQLITE_OK) {
@@ -897,6 +897,7 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 	mportAssetList *alist;
 	mportAssetListEntry *e = NULL;
 	char cwd[FILENAME_MAX];
+	char in[FILENAME_MAX];
 
 	/* Process @postexec steps */
 	if (mport_bundle_read_get_assetlist(mport, pkg, &alist, POSTINSTALL) != MPORT_OK)
@@ -965,8 +966,12 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 				}
 				break;
 			case ASSET_INFO:
-			    // TODO: Package prefix + share/info? 
-			    char *abs_path = realpath(e->data == NULL ? "/usr/local/share/info" : e->data, NULL);
+				if (e->data != NULL) {
+					strlcpy(in, e->data, sizeof(in));
+				} else {
+					strlcpy(in, "/usr/local/share/info", sizeof(in));
+				}
+				char *abs_path = realpath(in, NULL);
 				char *info_dir = dirname(abs_path);
 				if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") && 
 					mport_xsystem(mport, "/usr/local/bin/indexinfo %s", info_dir) != MPORT_OK) {
