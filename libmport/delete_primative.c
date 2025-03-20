@@ -491,6 +491,7 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg)
 {
 	int ret;
 	char cwd[FILENAME_MAX];
+	char in[FILENAME_MAX];
 	sqlite3_stmt *assets = NULL;
 	sqlite3 *db;
 	const char *data;
@@ -532,9 +533,15 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg)
 			}
 			break;
 		case ASSET_INFO:
-			if (mport_file_exists("/usr/local/bin/indexinfo") &&
-			    mport_xsystem(mport, "/usr/local/bin/indexinfo %s",
-				data == NULL ? pkg->prefix : data) != MPORT_OK) {
+			if (data != NULL) {
+				strlcpy(in, data, sizeof(in));
+			} else {
+				strlcpy(in, "/usr/local/share/info", sizeof(in));
+			}
+			char *abs_path = realpath(in, NULL);
+			char *info_dir = dirname(abs_path);
+			if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") &&
+			    mport_xsystem(mport, "/usr/local/bin/indexinfo %s",info_dir) != MPORT_OK) {
 				goto SPECIAL_ERROR;
 			}
 			break;
