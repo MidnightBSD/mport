@@ -623,7 +623,7 @@ archive_assetlistfiles(mportBundleWrite *bundle, mportPackageMeta *pack, mportCr
 			cwd = e->data == NULL ? pack->prefix : e->data;
 
 		if (e->type != ASSET_FILE && e->type != ASSET_SAMPLE && e->type != ASSET_SAMPLE_OWNER_MODE &&
-		    e->type != ASSET_SHELL && e->type != ASSET_FILE_OWNER_MODE) {
+		    e->type != ASSET_SHELL && e->type != ASSET_FILE_OWNER_MODE && e->type != ASSET_INFO) {
 			continue;
 		}
 
