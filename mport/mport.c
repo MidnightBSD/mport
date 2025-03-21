@@ -222,9 +222,27 @@ main(int argc, char *argv[])
 			mport_instance_free(mport);
 			usage();
 		}
+
+		int local_argc = argc;
+		char *const *local_argv = argv;
+		int aflag = 0;
+
+		if (local_argc > 1) {
+			int ch2;
+			while ((ch2 = getopt(local_argc, local_argv, "A")) != -1) {
+				switch (ch2) {
+				case 'A':
+					aflag = 1;
+					break;
+				}
+			}
+			local_argc -= optind;
+			local_argv += optind;
+		}
+
 		loadIndex(mport);
 		for (i = 1; i < argc; i++) {
-			tempResultCode = install(mport, argv[i]);
+			tempResultCode = install(mport, argv[i], aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
 			if (tempResultCode != 0)
 				resultCode = tempResultCode;
 		}
@@ -536,6 +554,7 @@ usage(void)
 
 	fprintf(stderr,
 	    "usage: mport [-c chroot dir] [-o output] [-fqUVv] <command> args:\n"
+		"       mport add [-A] [package file] \n"
 	    "       mport audit\n"
 	    "       mport autoremove\n"
 	    "       mport clean\n"
@@ -814,7 +833,7 @@ add(mportInstance *mport, const char *filename, mportAutomatic automatic) {
 }
 
 int
-install(mportInstance *mport, const char *packageName)
+install(mportInstance *mport, const char *packageName, mportAutomatic automatic)
 {
 	mportIndexEntry **indexEntry = NULL;
 	mportIndexEntry **ie = NULL;
@@ -873,7 +892,7 @@ install(mportInstance *mport, const char *packageName)
 	}
 
 	if (indexEntry != NULL && *indexEntry != NULL) {
-		resultCode = mport_install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version, MPORT_EXPLICIT);
+		resultCode = mport_install_depends(mport, (*indexEntry)->pkgname, (*indexEntry)->version, automatic);
 	}
 
 	mport_index_entry_free_vec(ie);

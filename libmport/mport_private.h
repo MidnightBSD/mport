@@ -214,6 +214,8 @@ int mport_set_errx(int , const char *, ...);
 #define MPORT_INDEX_FILE_HASH       MPORT_INST_DIR "/" MPORT_INDEX_FILE_NAME MPORT_INDEX_COMPRESS_EXT ".sha256"
 #define MPORT_FETCH_STAGING_DIR     MPORT_INST_DIR "/downloads"
 
+#define MPORT_INSTALL_MEDIA_DIR     "/packages"
+#define MPORT_INSTALL_MEDIA_INDEX_FILE  MPORT_INSTALL_MEDIA_DIR "/" MPORT_INDEX_FILE_NAME
 
 #if defined(__i386__)
 #define MPORT_ARCH "i386"

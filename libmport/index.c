@@ -56,8 +56,16 @@ char *
 mport_index_file_path() {
 	char *envIndexFile = getenv("PKG_DB");
 
-	if (envIndexFile == NULL || strlen(envIndexFile) == 0)
+	if (envIndexFile == NULL || strlen(envIndexFile) == 0) {
+		if (!mport_file_exists(MPORT_INDEX_FILE) && mport_file_exists(MPORT_INSTALL_MEDIA_INDEX_FILE)) {
+			/* copy install media index to local as a starting point. */
+			mport_copy_file(MPORT_INSTALL_MEDIA_INDEX_FILE, indexFile);
+			/* we don't want to update the install media index when installing from usb/optical */
+			mport->noIndex = true;
+		}
+
 		return MPORT_INDEX_FILE;
+	}
 
 	/*
 	 * Reject any ".." components in the path.  This is a security
@@ -85,8 +93,8 @@ mport_index_file_path() {
 MPORT_PUBLIC_API int
 mport_index_load(mportInstance *mport)
 {
-	bool noIndex = mport->noIndex;
 	char *indexFile = mport_index_file_path();
+	bool noIndex = mport->noIndex; /* must come after index file path call */
 
 	char *autoupdate = mport_setting_get(mport, MPORT_SETTING_REPO_AUTOUPDATE);
 	if (autoupdate != NULL && (strcmp("FALSE", autoupdate) == 0 || strcmp("false", autoupdate) == 0 ||
