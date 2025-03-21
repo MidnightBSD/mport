@@ -1,4 +1,4 @@
-.\" Copyright (c) 2010, 2011, 2015, 2021, 2022 Lucas Holt
+.\" Copyright (c) 2010, 2011, 2015, 2021, 2022, 2025 Lucas Holt
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"
-.Dd Januar 25, 2024
+.Dd March 21, 2025
 .Dt MPORT 1
 .Os
 .Sh NAME
@@ -58,6 +58,7 @@
 .Cm audit
 .Nm
 .Cm cpe
+.Op Ar name ...
 .Nm
 .Cm list
 .Nm
@@ -88,6 +89,7 @@
 .Cm mirror select
 .Nm
 .Cm purl
+.Op Ar name ...
 .Nm
 .Cm search
 .Op Ar name ...
@@ -150,6 +152,8 @@ Displays the value of a configuration setting
 Sets the value of the configuration setting. 
 .It Cm cpe
 List all CPE information for each installed package
+.It Cm cpe Ao name Ac
+List CPE information for a specific package
 .It Cm list
 List all currently installed packages
 .It Cm list updates
@@ -179,6 +183,8 @@ Lists all available package mirrors.
 Pings various mirrors to attempt to select the closest and sets it as default.
 .It Cm purl
 Lists PURL for each installed package
+.it Cm purl Ao name Ac
+Lists PURL for a specific package
 .It Cm search
 Search package names and descriptions.  Supports globbing queries such as 
 "*php*".

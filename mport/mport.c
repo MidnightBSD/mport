@@ -55,7 +55,9 @@ static int add(mportInstance *mport, const char *filename, mportAutomatic automa
 static int install(mportInstance *, const char *);
 
 static int cpeList(mportInstance *);
+static int cpeGet(mportInstance *mport, const char *packageName);
 static int purlList(mportInstance *);
+static int purlGet(mportInstance *mport, const char *packageName);
 
 static int configGet(mportInstance *, const char *);
 
@@ -475,9 +477,25 @@ main(int argc, char *argv[])
 			resultCode = selectMirror(mport);	
 		}
 	} else if (!strcmp(cmd, "cpe")) {
+		if (argc == 1) {
 		resultCode = cpeList(mport);
+		} else {
+			for (i = 1; i < argc; i++) {
+                tempResultCode = cpeGet(mport, argv[i]);
+                if (tempResultCode!= 0)
+                    resultCode = tempResultCode;
+            }
+		}
 	} else if (!strcmp(cmd, "purl")) {
-		resultCode = purlList(mport);
+		if (argc == 1) {
+			resultCode = purlList(mport);
+		} else {
+			for (i = 1; i < argc; i++) {
+				tempResultCode = purlGet(mport, argv[i]);
+				if (tempResultCode != 0)
+					resultCode = tempResultCode;
+			}
+		}
 	} else if (!strcmp(cmd, "deleteall")) {
 		resultCode = deleteAll(mport);
 	} else if (!strcmp(cmd, "autoremove")) {
@@ -904,29 +922,31 @@ int
 delete(mportInstance *mport, const char *packageName)
 {
 	mportPackageMeta **packs = NULL;
+	mportPackageMeta **packs_orig = NULL;
 
-	if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", packageName) != MPORT_OK) {
+	if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", packageName) != MPORT_OK) {
 		warnx("%s", mport_err_string());
-		mport_pkgmeta_vec_free(packs);
+		mport_pkgmeta_vec_free(packs_orig);
 		return (MPORT_ERR_FATAL);
 	}
 
-	if (packs == NULL) {
+	if (packs_orig == NULL) {
 		warnx("No packages installed matching '%s'", packageName);
 		return (MPORT_ERR_FATAL);
 	}
 
+	packs = packs_orig;
 	while (*packs != NULL) {
 		(*packs)->action = MPORT_ACTION_DELETE;
 		if (mport_delete_primative(mport, *packs, mport->force) != MPORT_OK) {
 			warnx("%s", mport_err_string());
-			mport_pkgmeta_vec_free(packs);
+			mport_pkgmeta_vec_free(packs_orig);
 			return (MPORT_ERR_FATAL);
 		}
 		packs++;
 	}
 
-	mport_pkgmeta_vec_free(packs);
+	mport_pkgmeta_vec_free(packs_orig);
 
 	return (MPORT_OK);
 }
@@ -963,36 +983,109 @@ configSet(mportInstance *mport, const char *settingName, const char *val)
 }
 
 int
+purlGet(mportInstance *mport, const char *packageName)
+{
+	mportPackageMeta **packs = NULL;
+	mportPackageMeta **packs_orig = NULL;
+	int purl_total = 0;
+
+	if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", packageName) != MPORT_OK) {
+		mport_pkgmeta_vec_free(packs_orig);
+		return (MPORT_ERR_FATAL);
+	}
+
+	if (packs == NULL) {
+		return (MPORT_ERR_WARN);
+	}
+
+    packs = packs_orig;
+	while (*packs != NULL) {
+		if ((*packs)->purl!= NULL && strlen((*packs)->purl) > 0) {
+			printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->name,
+		    	(*packs)->version, MPORT_ARCH, (*packs)->os_release);
+			purl_total++;
+		}
+		packs++;
+	}
+
+	mport_pkgmeta_vec_free(packs_orig);
+
+	if (purl_total == 0) {
+		return (MPORT_ERR_WARN);
+	}
+
+	return (MPORT_OK);
+}
+
+int
 purlList(mportInstance *mport)
 {
 	mportPackageMeta **packs = NULL;
+	mportPackageMeta **packs_orig = NULL;
 	int purl_total = 0;
 
-	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
+	if (mport_pkgmeta_list(mport, &packs_orig) != MPORT_OK) {
 		warnx("%s", mport_err_string());
 		return mport_err_code();
 	}
 
 	mport_drop_privileges();
 
-	if (packs == NULL) {
+	if (packs_orig == NULL) {
 		warnx("No packages installed.");
 		return (1);
 	}
 
+    packs = packs_orig;
 	while (*packs != NULL) {
-		printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->name,
-		    (*packs)->version, MPORT_ARCH, (*packs)->os_release);
-		purl_total++;
+		if ((*packs)->purl!= NULL && strlen((*packs)->purl) > 0) {
+			printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->name,
+		    	(*packs)->version, MPORT_ARCH, (*packs)->os_release);
+			purl_total++;
+		}
 		packs++;
 	}
-	mport_pkgmeta_vec_free(packs);
+	mport_pkgmeta_vec_free(packs_orig);
 
 	if (purl_total == 0) {
 		errx(EX_SOFTWARE, "No packages contained PURL information.");
 	}
 
 	return (0);
+}
+
+int
+cpeGet(mportInstance *mport, const char *packageName)
+{
+	mportPackageMeta **packs = NULL;
+	mportPackageMeta **packs_orig = NULL;
+	int purl_total = 0;
+
+	if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", packageName) != MPORT_OK) {
+		mport_pkgmeta_vec_free(packs_orig);
+		return (MPORT_ERR_FATAL);
+	}
+
+	if (packs == NULL) {
+		return (MPORT_ERR_WARN);
+	}
+
+    packs = packs_orig;
+	while (*packs != NULL) {
+		if ((*packs)->cpe != NULL && strlen((*packs)->cpe) > 0) {
+			printf("%s\n", (*packs)->cpe);
+			cpe_total++;
+		}
+		packs++;
+	}
+
+	mport_pkgmeta_vec_free(packs_orig);
+
+	if (purl_total == 0) {
+		return (MPORT_ERR_WARN);
+	}
+
+	return (MPORT_OK);
 }
 
 int
@@ -1034,7 +1127,8 @@ cpeList(mportInstance *mport)
 int
 verify(mportInstance *mport)
 {
-	mportPackageMeta **packs, **ref;
+	mportPackageMeta **packs = NULL;
+	mportPackageMeta **ref = NULL;
 	int total = 0;
 
 	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
