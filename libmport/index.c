@@ -59,9 +59,7 @@ mport_index_file_path() {
 	if (envIndexFile == NULL || strlen(envIndexFile) == 0) {
 		if (!mport_file_exists(MPORT_INDEX_FILE) && mport_file_exists(MPORT_INSTALL_MEDIA_INDEX_FILE)) {
 			/* copy install media index to local as a starting point. */
-			mport_copy_file(MPORT_INSTALL_MEDIA_INDEX_FILE, indexFile);
-			/* we don't want to update the install media index when installing from usb/optical */
-			mport->noIndex = true;
+			mport_copy_file(MPORT_INSTALL_MEDIA_INDEX_FILE, MPORT_INDEX_FILE);
 		}
 
 		return MPORT_INDEX_FILE;
