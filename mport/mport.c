@@ -65,6 +65,8 @@ static int configSet(mportInstance *, const char *, const char *);
 
 static int delete(mportInstance *, const char *);
 
+static int deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst);
+
 static int deleteAll(mportInstance *);
 
 static int info(mportInstance *, const char *);
@@ -253,11 +255,7 @@ main(int argc, char *argv[])
 			mport_instance_free(mport);
 			usage();
 		}
-		for (i = 1; i < argc; i++) {
-			tempResultCode = delete(mport, argv[i]);
-			if (tempResultCode != 0)
-				resultCode = tempResultCode;
-		}
+		resultCode = deleteMany(mport, argc, argv, true);
 	} else if (!strcmp(cmd, "update")) {
 		if (argc == 1) {
 			mport_instance_free(mport);
@@ -918,6 +916,79 @@ install(mportInstance *mport, const char *packageName, mportAutomatic automatic)
 	return (resultCode);
 }
 
+int
+deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
+{
+    mportPackageMeta **packs = NULL;
+    mportPackageMeta **packs_orig = NULL;
+    int start = skipFirst ? 1 : 0;
+    int package_count = 0;
+    long long total_flatsize = 0;
+    char flatsize_str[8];
+	int resultCode = MPORT_OK;
+
+    // First pass: count packages and calculate total flatsize
+    for (int i = start; i < argc; i++) {
+        if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", argv[i]) != MPORT_OK) {
+            warnx("%s", mport_err_string());
+            continue;
+        }
+
+        if (packs_orig == NULL) {
+            warnx("No packages installed matching '%s'", argv[i]);
+            continue;
+        }
+
+        packs = packs_orig;
+        while (*packs != NULL) {
+            package_count++;
+            total_flatsize += (*packs)->flatsize;
+            packs++;
+        }
+
+        mport_pkgmeta_vec_free(packs_orig);
+        packs_orig = NULL;
+    }
+
+    // Convert total_flatsize to human-readable format
+    humanize_number(flatsize_str, sizeof(flatsize_str), total_flatsize, "B", HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
+
+    // Display information and ask for confirmation
+    printf("Packages to be deleted: %d\n", package_count);
+    printf("Total disk space to be freed: %s\n", flatsize_str);
+
+	if (!(mport->confirm_cb)("Proceed with deinstalling packages?", "Delete", "Don't delete", 0) == MPORT_OK) {
+        return (MPORT_ERR_WARN); // User chose not to proceed
+    }
+
+    // Second pass: actually delete the packages
+    for (int i = start; i < argc; i++) {
+        if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", argv[i]) != MPORT_OK) {
+            warnx("%s", mport_err_string());
+            continue;
+        }
+
+        if (packs_orig == NULL) {
+            warnx("No packages installed matching '%s'", argv[i]);
+            continue;
+        }
+
+        packs = packs_orig;
+        while (*packs != NULL) {
+            (*packs)->action = MPORT_ACTION_DELETE;
+            if (mport_delete_primative(mport, *packs, mport->force) != MPORT_OK) {
+                warnx("%s", mport_err_string());
+            }
+            packs++;
+        }
+
+        mport_pkgmeta_vec_free(packs_orig);
+        packs_orig = NULL;
+    }
+
+    return (resultCode);
+}
+
 int 
 delete(mportInstance *mport, const char *packageName)
 {
@@ -1168,6 +1239,10 @@ deleteAll(mportInstance *mport)
 		fprintf(stderr, "No packages installed.\n");
 		return (1);
 	}
+
+	if (!(mport->confirm_cb)("Proceed with removing all packages on the system?", "Delete", "Don't delete", 0) == MPORT_OK) {
+        return (MPORT_ERR_WARN); // User chose not to proceed
+    }
 
 	while (1) {
 		skip = 0;
