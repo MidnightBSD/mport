@@ -957,7 +957,7 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
     printf("Packages to be deleted: %d\n", package_count);
     printf("Total disk space to be freed: %s\n", flatsize_str);
 
-	if (!(mport->confirm_cb)("Proceed with deinstalling packages?", "Delete", "Don't delete", 0) == MPORT_OK) {
+    if ((mport->confirm_cb)("Proceed with deinstalling packages?", "Delete", "Don't delete", 0) != MPORT_OK) {
         return (MPORT_ERR_WARN); // User chose not to proceed
     }
 
@@ -1240,9 +1240,9 @@ deleteAll(mportInstance *mport)
 		return (1);
 	}
 
-	if (!(mport->confirm_cb)("Proceed with removing all packages on the system?", "Delete", "Don't delete", 0) == MPORT_OK) {
-        return (MPORT_ERR_WARN); // User chose not to proceed
-    }
+	if ((mport->confirm_cb)("Proceed with removing all packages on the system?", "Delete", "Don't delete", 0) != MPORT_OK) {
+		return (MPORT_ERR_WARN); // User chose not to proceed
+	}
 
 	while (1) {
 		skip = 0;
