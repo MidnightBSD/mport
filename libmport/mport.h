@@ -176,7 +176,7 @@ typedef struct {
     int no_provide_shlib;
     char *flavor;
     mportAutomatic automatic;
-	  time_t install_date;
+    time_t install_date;
     mportAction action; // not populated from package table
     mportType type;
     int64_t flatsize;
