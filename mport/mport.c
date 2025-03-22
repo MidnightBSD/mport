@@ -478,13 +478,13 @@ main(int argc, char *argv[])
 		}
 	} else if (!strcmp(cmd, "cpe")) {
 		if (argc == 1) {
-		resultCode = cpeList(mport);
+			resultCode = cpeList(mport);
 		} else {
 			for (i = 1; i < argc; i++) {
-                tempResultCode = cpeGet(mport, argv[i]);
-                if (tempResultCode!= 0)
-                    resultCode = tempResultCode;
-            }
+				tempResultCode = cpeGet(mport, argv[i]);
+				if (tempResultCode!= 0)
+					resultCode = tempResultCode;
+			}
 		}
 	} else if (!strcmp(cmd, "purl")) {
 		if (argc == 1) {
@@ -994,7 +994,7 @@ purlGet(mportInstance *mport, const char *packageName)
 		return (MPORT_ERR_FATAL);
 	}
 
-	if (packs == NULL) {
+	if (packs_orig == NULL) {
 		return (MPORT_ERR_WARN);
 	}
 
@@ -1062,7 +1062,7 @@ cpeGet(mportInstance *mport, const char *packageName)
 		return (MPORT_ERR_FATAL);
 	}
 
-	if (packs == NULL) {
+	if (packs_orig == NULL) {
 		return (MPORT_ERR_WARN);
 	}
 
