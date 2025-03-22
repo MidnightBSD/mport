@@ -52,7 +52,7 @@ static void loadIndex(mportInstance *);
 static mportIndexEntry **lookupIndex(mportInstance *, const char *);
 
 static int add(mportInstance *mport, const char *filename, mportAutomatic automatic);
-static int install(mportInstance *, const char *);
+static int install(mportInstance *, const char *, mportAutomatic);
 
 static int cpeList(mportInstance *);
 static int cpeGet(mportInstance *mport, const char *packageName);
@@ -998,13 +998,11 @@ purlGet(mportInstance *mport, const char *packageName)
 		return (MPORT_ERR_WARN);
 	}
 
-    packs = packs_orig;
+	packs = packs_orig;
 	while (*packs != NULL) {
-		if ((*packs)->purl!= NULL && strlen((*packs)->purl) > 0) {
-			printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->name,
+		printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->name,
 		    	(*packs)->version, MPORT_ARCH, (*packs)->os_release);
 			purl_total++;
-		}
 		packs++;
 	}
 
@@ -1036,13 +1034,11 @@ purlList(mportInstance *mport)
 		return (1);
 	}
 
-    packs = packs_orig;
+	packs = packs_orig;
 	while (*packs != NULL) {
-		if ((*packs)->purl!= NULL && strlen((*packs)->purl) > 0) {
-			printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->name,
+		printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->name,
 		    	(*packs)->version, MPORT_ARCH, (*packs)->os_release);
 			purl_total++;
-		}
 		packs++;
 	}
 	mport_pkgmeta_vec_free(packs_orig);
@@ -1059,7 +1055,7 @@ cpeGet(mportInstance *mport, const char *packageName)
 {
 	mportPackageMeta **packs = NULL;
 	mportPackageMeta **packs_orig = NULL;
-	int purl_total = 0;
+	int cpe_total = 0;
 
 	if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", packageName) != MPORT_OK) {
 		mport_pkgmeta_vec_free(packs_orig);
@@ -1070,7 +1066,7 @@ cpeGet(mportInstance *mport, const char *packageName)
 		return (MPORT_ERR_WARN);
 	}
 
-    packs = packs_orig;
+	packs = packs_orig;
 	while (*packs != NULL) {
 		if ((*packs)->cpe != NULL && strlen((*packs)->cpe) > 0) {
 			printf("%s\n", (*packs)->cpe);
@@ -1081,7 +1077,7 @@ cpeGet(mportInstance *mport, const char *packageName)
 
 	mport_pkgmeta_vec_free(packs_orig);
 
-	if (purl_total == 0) {
+	if (cpe_total == 0) {
 		return (MPORT_ERR_WARN);
 	}
 
