@@ -927,7 +927,7 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
     char flatsize_str[8];
 	int resultCode = MPORT_OK;
 
-	printf("Installed packages to be REMOVED:\n");
+	printf("Installed packages to be REMOVED:\n\n");
 
     // First pass: count packages and calculate total flatsize
     for (int i = start; i < argc; i++) {
@@ -948,11 +948,12 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
                 printf(",%s", (*packs)->flavor);
             }
             printf("\n");
-			
+
             package_count++;
             total_flatsize += (*packs)->flatsize;
             packs++;
         }
+		printf("\n");
 
         mport_pkgmeta_vec_free(packs_orig);
         packs_orig = NULL;
