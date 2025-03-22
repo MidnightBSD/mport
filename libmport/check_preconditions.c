@@ -49,8 +49,6 @@ static int check_if_older_os(mportInstance *, mportPackageMeta *);
  *   MPORT_PRECHECK_CONFLICTS  -- Fail if the package has a conflict
  *   MPORT_PRECHECK_DEPENDS    -- Fail if the dependencies are not resolved
  *   MPORT_PRECHECK_OS	       -- Fail if the os version of the installed is older
- *   MPORT_PRECHECK_MOVED      -- Fail if the package has been moved to another location
- *   MPORT_PRECHECK_DEPRECATED -- Fail if the package has been deprecated and print the expiration date
  *
  * The checks are run in the order listed above.  The first failure
  * encountered is the one reported.   
