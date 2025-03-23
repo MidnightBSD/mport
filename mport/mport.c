@@ -295,7 +295,7 @@ main(int argc, char *argv[])
 						(void)asprintf(
 							&msg, "Package %s not found in index, but we found a similar one %s. Do you want to replace it?", argv[i], indexEntry[0]->pkgname);
 						if ((mport->confirm_cb)(msg, "Replace", "Don't replace", 0) != MPORT_OK) {
-							mport_delete_primative(mport, argv[i], mport->force);
+							mport_delete(mport, argv[i]);
 							tempResultCode = mport_install(mport, indexEntry[0]->pkgname, NULL, NULL, MPORT_EXPLICIT);
 						}
 						free(msg);
