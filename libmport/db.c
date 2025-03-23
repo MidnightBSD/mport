@@ -434,9 +434,9 @@ mport_upgrade_master_schema_10to11(sqlite3 *db)
 static int
 mport_upgrade_master_schema_11to12(sqlite3 *db)
 {
-	RUN_SQL(db, "INSERT INTO settings VALUES (\"" MPORT_SETTING_HANDLE_RC_SCRIPTS "\", \"yes\")");
-	RUN_SQL(db, "INSERT INTO settings VALUES (\"" MPORT_SETTING_REPO_AUTOUPDATE "\", \"yes\")");
-		
+	RUN_SQL(db, "INSERT OR IGNORE INTO settings VALUES (\"" MPORT_SETTING_HANDLE_RC_SCRIPTS "\", \"yes\")");
+	RUN_SQL(db, "INSERT OR IGNORE INTO settings VALUES (\"" MPORT_SETTING_REPO_AUTOUPDATE "\", \"yes\")");
+
 	return (MPORT_OK);
 }
 
@@ -445,7 +445,14 @@ mport_upgrade_master_schema_12to13(sqlite3 *db)
 {
 	RUN_SQL(db, "CREATE TABLE IF NOT EXISTS conflicts (pkg text NOT NULL, conflict_pkg text NOT NULL, conflict_version text NOT NULL)");
 	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS conflicts_pkg ON conflicts (pkg, conflict_pkg)");
-	
+	RUN_SQL(db, "DROP INDEX IF EXISTS settings_name");
+	RUN_SQL(db, "BEGIN TRANSACTION;");
+	RUN_SQL(db, "CREATE TABLE temp_settings AS SELECT MIN(rowid) as rowid, name, val FROM settings GROUP BY name;");
+	RUN_SQL(db, "DELETE FROM settings WHERE rowid NOT IN (SELECT rowid FROM temp_settings);");
+	RUN_SQL(db, "DROP TABLE temp_settings;");
+	RUN_SQL(db, "COMMIT;");
+	RUN_SQL(db, "CREATE UNIQUE INDEX IF NOT EXISTS settings_name_unique ON settings (name)");
+
 	return (MPORT_OK);
 }
 
@@ -478,10 +485,10 @@ mport_generate_master_schema(sqlite3 *db)
 	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS conflicts_pkg ON conflicts (pkg, conflict_pkg)");
 
 	RUN_SQL(db, "CREATE TABLE IF NOT EXISTS settings (name text NOT NULL, val text NOT NULL)");
-	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS settings_name ON settings (name)");
+	RUN_SQL(db, "CREATE UNIQUE INDEX IF NOT EXISTS settings_name_unique ON settings (name)");
 
-	RUN_SQL(db, "INSERT INTO settings VALUES (\"" MPORT_SETTING_HANDLE_RC_SCRIPTS "\", \"yes\")");
-	RUN_SQL(db, "INSERT INTO settings VALUES (\"" MPORT_SETTING_REPO_AUTOUPDATE "\", \"yes\")");
+	RUN_SQL(db, "INSERT OR IGNORE INTO settings VALUES (\"" MPORT_SETTING_HANDLE_RC_SCRIPTS "\", \"yes\")");
+	RUN_SQL(db, "INSERT OR IGNORE INTO settings VALUES (\"" MPORT_SETTING_REPO_AUTOUPDATE "\", \"yes\")");
 
 	mport_set_database_version(db);
 
