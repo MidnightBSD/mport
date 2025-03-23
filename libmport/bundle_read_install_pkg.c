@@ -603,7 +603,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 						if (e->owner != NULL && e->group != NULL && e->owner[0] != '\0' &&
 						    e->group[0] != '\0') {
 #ifdef DEBUG
-							fprintf(stderr, "owner %s and group %s\n", e->owner, e->group);
+							mport_call_msg_cb(mport, "owner %s and group %s\n", e->owner, e->group);
 #endif
 							if (chown(file, mport_get_uid(e->owner),
 							          mport_get_gid(e->group)) == -1) {
@@ -612,7 +612,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 							}
 						} else if (e->owner != NULL && e->owner[0] != '\0') {
 #ifdef DEBUG
-							fprintf(stderr, "owner %s\n", e->owner);
+							mport_call_msg_cb(mport, "owner %s\n", e->owner);
 #endif
 							if (chown(file, mport_get_uid(e->owner), group) == -1) {
 								SET_ERROR(MPORT_ERR_FATAL, "Unable to change owner");
@@ -620,7 +620,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 							}
 						} else if (e->group != NULL && e->group[0] != '\0') {
 #ifdef DEBUG
-							fprintf(stderr, "group %s\n", e->group);
+							mport_call_msg_cb(mport, "group %s\n", e->group);
 #endif
 							if (chown(file, owner, mport_get_gid(e->group)) == -1) {
 								SET_ERROR(MPORT_ERR_FATAL, "Unable to change owner");
@@ -652,7 +652,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 						if ((e->type == ASSET_SAMPLE_OWNER_MODE || e->type == ASSET_FILE_OWNER_MODE)
 						    && e->mode != NULL && e->mode[0] != '\0') {
 #ifdef DEBUG
-							fprintf(stderr, "sample or file owner mode %s\n", e->mode);
+							mport_call_msg_cb(mport, "sample or file owner mode %s\n", e->mode);
 #endif
 							if ((set = setmode(e->mode)) == NULL) {
 								SET_ERROR(MPORT_ERR_FATAL, "Unable to set mode");
@@ -660,7 +660,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 							}
 						} else {
 #ifdef DEBUG
-							fprintf(stderr, "mode %s\n", e->mode);
+							mport_call_msg_cb(mport, "mode %s\n", e->mode);
 #endif
 							if ((set = setmode(mode)) == NULL) {
 								SET_ERROR(MPORT_ERR_FATAL, "Unable to set mode");
