@@ -284,7 +284,7 @@ main(int argc, char *argv[])
 				packs++;
 			}
 			mport_pkgmeta_free(*packs_orig);
-		} else { 
+		} else {
 			for (i = 1; i < argc; i++) {
 				mportIndexEntry **indexEntry = lookupIndex(mport, argv[i]);
 				if (indexEntry != NULL) {
@@ -292,20 +292,28 @@ main(int argc, char *argv[])
 						tempResultCode = mport_update(mport, argv[i]);
 					} else {
 						char *msg;
-						(void)asprintf(
-							&msg, "Package %s not found in index, but we found a similar one %s. Do you want to replace it?", argv[i], indexEntry[0]->pkgname);
-						if ((mport->confirm_cb)(msg, "Replace", "Don't replace", 0) != MPORT_OK) {
-							mport_delete_primative(mport, argv[i], mport->force);
-							tempResultCode = mport_install(mport, indexEntry[0]->pkgname, NULL, NULL, MPORT_EXPLICIT);
+						(void)asprintf(&msg,
+						    "Package %s not found in index, but we found a similar one %s. Do you want to replace it?",
+						    argv[i], indexEntry[0]->pkgname);
+						if ((mport->confirm_cb)(msg, "Replace",
+							"Don't replace", 0) != MPORT_OK) {
+							delete (mport, argv[i]);
+							tempResultCode = mport_install(mport,
+							    indexEntry[0]->pkgname, NULL, NULL,
+							    MPORT_EXPLICIT);
 						}
 						free(msg);
 					}
-				if (tempResultCode != MPORT_OK) {
-					resultCode = tempResultCode;
-					mport_call_msg_cb(mport, "Error updating package %s: %s", argv[i], mport_err_string());
+					if (tempResultCode != MPORT_OK) {
+						resultCode = tempResultCode;
+						mport_call_msg_cb(mport,
+						    "Error updating package %s: %s", argv[i],
+						    mport_err_string());
+					}
+				} else {
+					mport_call_msg_cb(
+					    mport, "No update for %s found in the index.", argv[i]);
 				}
-			} else {
-				mport_call_msg_cb(mport, "No update for %s found in the index.", argv[i]);
 			}
 		}
 	} else if (!strcmp(cmd, "download")) {
