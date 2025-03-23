@@ -40,6 +40,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <assert.h>
+#include <regex.h>
 #include "mport.h"
 #include "mport_private.h"
 
@@ -379,58 +380,85 @@ insert_categories(sqlite3 *db, mportPackageMeta *pkg)
 }
 
 
+	/* conflict examples:
+	apache-1.4
+	viewvc-1.[12].[0-9]*
+	subversion-1.[0-9].[0-9]*
+	subversion-1.[^9].[0-9]* 
+	p5-Moo-[01]* 
+	p5-Moo-2.00[0-2]*
+	py*-ipython5
+	py311-django[0-9][0-9]
+	p5-HTTP-Server-Simple-PSGI-0.16
+	p5-HTTP-Server-Simple-PSGI
+	*/
 static int
 insert_conflicts(sqlite3 *db, mportPackageMeta *pack, mportCreateExtras *extra)
 {
 	int error_code = MPORT_OK;
 	sqlite3_stmt *stmnt = NULL;
+	regex_t regex;
+	regmatch_t matches[3];
+	char *pkg_name, *pkg_version;
+
 	assert(extra != NULL);
-	char **conflict = extra->conflicts;
 
 	/* we're done if there are no conflicts to record. */
-	if (conflict == NULL)
+	if (extra->conflicts == NULL || tll_length(extra->conflicts) == 0)
 		return MPORT_OK;
 
-	if (mport_db_prepare(db, &stmnt, "INSERT INTO conflicts (pkg, conflict_pkg, conflict_version) VALUES (?,?,?)") !=
+	if (mport_db_prepare(db, &stmnt,
+		"INSERT INTO conflicts (pkg, conflict_pkg, conflict_version) VALUES (?,?,?)") !=
 	    MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	/* we have a conflict like apache-1.4.  We want to do a m/(.*)-(.*)/ */
-	while (*conflict != NULL) {
+	/* Compile the regex pattern */
+	if (regcomp(&regex, "^([^-]+[*]?-?[^-]*)-?(.*)$", REG_EXTENDED) != 0) {
+		SET_ERROR(MPORT_ERR_FATAL, "Failed to compile regex");
+		return MPORT_ERR_FATAL;
+	}
 
-		char *version = rindex(*conflict, '-');
+	tll_foreach(*extra->conflicts, s)
+	{
+		if (regexec(&regex, s->item, 3, matches, 0) == 0) {
+			pkg_name = strndup(
+			    s->item + matches[1].rm_so, matches[1].rm_eo - matches[1].rm_so);
+			pkg_version = (matches[2].rm_so != -1) ?
+			    strndup(
+				s->item + matches[2].rm_so, matches[2].rm_eo - matches[2].rm_so) :
+			    strdup("*");
 
-		if (sqlite3_bind_text(stmnt, 1, pack->name, -1, SQLITE_STATIC) != SQLITE_OK) {
-			error_code = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-			return error_code;
-		}
-		if (sqlite3_bind_text(stmnt, 2, *conflict, -1, SQLITE_STATIC) != SQLITE_OK) {
-			error_code = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-			return error_code;
-		}
-		if (version != NULL) {
-			*version = '\0';
-			version++;
-			if (sqlite3_bind_text(stmnt, 3, version, -1, SQLITE_STATIC) != SQLITE_OK) {
+			if (sqlite3_bind_text(stmnt, 1, pack->name, -1, SQLITE_STATIC) !=
+				SQLITE_OK ||
+			    sqlite3_bind_text(stmnt, 2, pkg_name, -1, SQLITE_STATIC) != SQLITE_OK ||
+			    sqlite3_bind_text(stmnt, 3, pkg_version, -1, SQLITE_STATIC) !=
+				SQLITE_OK) {
 				error_code = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-				return error_code;
+				free(pkg_name);
+				free(pkg_version);
+				break;
 			}
+
+			if (sqlite3_step(stmnt) != SQLITE_DONE) {
+				error_code = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
+				free(pkg_name);
+				free(pkg_version);
+				break;
+			}
+
+			sqlite3_clear_bindings(stmnt);
+			sqlite3_reset(stmnt);
+			free(pkg_name);
+			free(pkg_version);
 		} else {
-			if (sqlite3_bind_text(stmnt, 3, "*", -1, SQLITE_STATIC) != SQLITE_OK) {
-				error_code = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-				return error_code;
-			}
+			error_code =
+			    SET_ERRORX(MPORT_ERR_FATAL, "Failed to parse conflict: %s", s->item);
+			break;
 		}
-		if (sqlite3_step(stmnt) != SQLITE_DONE) {
-			error_code = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-			return error_code;
-		}
-		sqlite3_clear_bindings(stmnt);
-		sqlite3_reset(stmnt);
-		conflict++;
 	}
 
 	sqlite3_finalize(stmnt);
+	regfree(&regex);
 
 	return error_code;
 }

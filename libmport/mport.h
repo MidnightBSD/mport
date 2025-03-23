@@ -180,7 +180,9 @@ typedef struct {
     mportAction action; // not populated from package table
     mportType type;
     int64_t flatsize;
-    stringlist_t	 lua_scripts[MPORT_NUM_LUA_SCRIPTS];
+    stringlist_t  lua_scripts[MPORT_NUM_LUA_SCRIPTS]; // not populated from package table
+    stringlist_t  conflicts; // not populated from package table
+    // TODO: conflicts should be a structure
 } __attribute__ ((aligned (16)))  mportPackageMeta;
 
 int mport_asset_get_assetlist(mportInstance *, mportPackageMeta *, mportAssetList **);
@@ -277,9 +279,8 @@ typedef struct {
   char sourcedir[FILENAME_MAX];
   char **depends;
   size_t depends_count;
-  char *mtree;
-  char **conflicts;
-  size_t conflicts_count;  
+  char *mtree; 
+  stringlist_t conflicts;
   char *pkginstall;
   char *pkgdeinstall;
   char *luapkgpreinstall;
@@ -349,6 +350,7 @@ char ** mport_setting_list(mportInstance *);
 
 /* Utils */
 void mport_parselist(char *, char ***, size_t *);
+void mport_parselist_tll(char *, stringlist_t *);
 int mport_verify_hash(const char *, const char *);
 int mport_file_exists(const char *);
 char * mport_version(mportInstance *);

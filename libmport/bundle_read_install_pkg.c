@@ -70,6 +70,8 @@ static int create_package_row(mportInstance *, mportPackageMeta *);
 
 static int create_categories(mportInstance *mport, mportPackageMeta *pkg);
 
+static int create_conflicts(mportInstance *mport, mportPackageMeta *pkg);
+
 static int create_depends(mportInstance *mport, mportPackageMeta *pkg);
 
 static int create_sample_file(mportInstance *mport, char *cwd, const char *file);
@@ -254,6 +256,19 @@ create_categories(mportInstance *mport, mportPackageMeta *pkg)
 
 	return MPORT_OK;
 }
+
+static int
+create_conflicts(mportInstance *mport, mportPackageMeta *pkg)
+{
+	/* Insert the conflicts into the master table */
+	if (mport_db_do(mport->db,
+	                "INSERT INTO conflicts (pkg, conflict_pkg, conflict_version) SELECT pkg, conflict_pkg, conflict_version FROM stub.conflicts WHERE pkg=%Q",
+	                pkg->name) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	return MPORT_OK;
+}
+
 
 static char **
 parse_sample(char *input)
@@ -453,6 +468,9 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 		goto ERROR;
 
 	if (create_categories(mport, pkg) != MPORT_OK)
+		goto ERROR;
+
+	if (create_conflicts(mport, pkg) != MPORT_OK)
 		goto ERROR;
 
 	/* Insert the assets into the master table. We do this one by one because we want to insert file assets as absolute paths. */

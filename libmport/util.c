@@ -76,7 +76,7 @@ mport_createextras_new(void)
 	extra->luapkgpredeinstall = NULL;
 
 	extra->pkgmessage = NULL;
-	extra->conflicts = NULL;
+	extra->conflicts = tll_init();
 	extra->depends = NULL;
 
 	return extra;
@@ -108,19 +108,6 @@ mport_createextras_free(mportCreateExtras *extra)
 	free(extra->luapkgpredeinstall);
 	extra->luapkgpredeinstall = NULL;
 
-	if (extra->conflicts_count > 0 && extra->conflicts != NULL) {
-		for (i = 0; i < extra->conflicts_count; i++) {
-			if (extra->conflicts[i] == NULL) {
-				break;
-			}
-			free(extra->conflicts[i]);
-			extra->conflicts[i] = NULL;
-		}
-		
-		free(extra->conflicts);
-		extra->conflicts = NULL;
-	}
-
 	if (extra->depends_count > 0 && extra->depends != NULL) {
 		for (i = 0; i < extra->depends_count; i++) {
 			if (extra->depends[i] == NULL) {
@@ -133,6 +120,8 @@ mport_createextras_free(mportCreateExtras *extra)
 		free(extra->depends);
 		extra->depends = NULL;
 	}
+
+	tll_free_and_free(extra->conflicts, free);
 
 	free(extra);
 	extra = NULL;
@@ -656,6 +645,45 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 	free(input);
 	input = NULL;
 }
+
+/*
+ * mport_parselist(input, string_array_pointer)
+ *
+ * hacks input into sub strings by whitespace.  Allocates a chunk or memory
+ * for an array of those strings, and sets the pointer you pass to reference
+ * that memory
+ *
+ * char input[] = "foo bar baz"
+ * stringlist_t list;
+ * size_t list_size;
+ *
+ * mport_parselist(input, &list);
+ * list = {"foo", "bar", "baz"};
+ */
+void
+mport_parselist_tll(char *opt, stringlist_t *list)
+{
+	char *input;
+	char *field;
+	size_t list_size = 0;
+
+	if (opt == NULL || list == NULL)
+		return;
+
+	if ((input = strdup(opt)) == NULL) {
+		return;
+	}
+
+	size_t loc = 0;
+	while ((field = strsep(&input, " \t\n")) != NULL) {
+		if (field != NULL && *field != '\0')
+			tll_push_back(*list, strdup(field));
+	}
+
+	free(input);
+	input = NULL;
+}
+
 
 /*
  * mport_run_asset_exec(fmt, cwd, last_file)

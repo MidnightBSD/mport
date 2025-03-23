@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
 				}
 				break;
 			case 'C':
-				mport_parselist(optarg, &(extra->conflicts), &(extra->conflicts_count));
+				mport_parselist_tll(optarg, &(extra->conflicts));
 				break;
 			case 'E':
 				strptime(optarg, "%Y-%m-%d", &expDate);

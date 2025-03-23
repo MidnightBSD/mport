@@ -291,6 +291,7 @@ mport_upgrade_master_schema(sqlite3 *db, int databaseVersion)
 			mport_upgrade_master_schema_9to10(db);
 			mport_upgrade_master_schema_10to11(db);
 			mport_upgrade_master_schema_11to12(db);
+			mport_upgrade_master_schema_12to13(db);
 			mport_set_database_version(db);
 			break;
 		case 2:
@@ -322,9 +323,12 @@ mport_upgrade_master_schema(sqlite3 *db, int databaseVersion)
 		case 11:
 			/* falls through */
             mport_upgrade_master_schema_11to12(db);
-            mport_set_database_version(db);
 		case 12:
-		    break;
+		    /* falls through */
+			mport_upgrade_master_schema_12to13(db);
+			mport_set_database_version(db);
+		case 13:
+			break;
 		default:
 			RETURN_ERROR(MPORT_ERR_FATAL, "Invalid master database version");
 	}
@@ -436,6 +440,15 @@ mport_upgrade_master_schema_11to12(sqlite3 *db)
 	return (MPORT_OK);
 }
 
+static int
+mport_upgrade_master_schema_12to13(sqlite3 *db)
+{
+	RUN_SQL(db, "CREATE TABLE IF NOT EXISTS conflicts (pkg text NOT NULL, conflict_pkg text NOT NULL, conflict_version text NOT NULL)");
+	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS conflicts_pkg ON conflicts (pkg, conflict_pkg)");
+	
+	return (MPORT_OK);
+}
+
 int
 mport_generate_master_schema(sqlite3 *db)
 {
@@ -460,6 +473,9 @@ mport_generate_master_schema(sqlite3 *db)
 
 	RUN_SQL(db, "CREATE TABLE IF NOT EXISTS categories (pkg text NOT NULL, category text NOT NULL)");
 	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS categories_pkg ON categories (pkg, category)");
+
+	RUN_SQL(db, "CREATE TABLE IF NOT EXISTS conflicts (pkg text NOT NULL, conflict_pkg text NOT NULL, conflict_version text NOT NULL)");
+	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS conflicts_pkg ON conflicts (pkg, conflict_pkg)");
 
 	RUN_SQL(db, "CREATE TABLE IF NOT EXISTS settings (name text NOT NULL, val text NOT NULL)");
 	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS settings_name ON settings (name)");
