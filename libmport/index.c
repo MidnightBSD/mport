@@ -910,7 +910,7 @@ lookup_alias(mportInstance *mport, const char *query, char **result)
 	int ret = MPORT_OK;
 
 	// assumes that query is an alias|pkg maps to origin|pkgname e.g. www/py-qt5-webkit|py27-qt5-webkit
-	if (mport_db_prepare(mport->db, &stmt, "SELECT pkg FROM idx.aliases WHERE alias=%Q", query) != MPORT_OK)
+	if (mport_db_prepare(mport->db, &stmt, "SELECT pkg FROM idx.aliases WHERE alias=%Q ORDER BY pkg desc", query) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	switch (sqlite3_step(stmt)) {
