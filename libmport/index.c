@@ -193,40 +193,63 @@ mport_index_get(mportInstance *mport)
 	return (MPORT_OK);
 }
 
+/**
+ * @brief Check if a package needs to be updated based on the index.
+ *
+ * This function compares the version of the given package against the versions
+ * available in the index. It also checks OS compatibility if versions match.
+ *
+ * @param mport Pointer to the mportInstance. Must not be NULL.
+ * @param pack Pointer to the mportPackageMeta containing package information. Must not be NULL.
+ * @return int Returns 1 if an update is available or if the current version is compatible
+ *             with the system, 2 if matched on origin, 0 otherwise.
+ */
 MPORT_PUBLIC_API int
 mport_index_check(mportInstance *mport, mportPackageMeta *pack) {
-	mportIndexEntry **indexEntries, **indexEntries_orig;
-	int ret = 0;
+    mportIndexEntry **indexEntries, **indexEntries_orig;
+    int ret = 0;
+	bool used_origin = false;
 
-	if (mport == NULL) {
-		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
-	}
+    if (mport == NULL) {
+        RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
+    }
 
-	if (pack == NULL)
-		RETURN_ERROR(MPORT_ERR_FATAL, "pack not defined");
+    if (pack == NULL)
+        RETURN_ERROR(MPORT_ERR_FATAL, "pack not defined");
 
-	if (mport_index_lookup_pkgname(mport, pack->name, &indexEntries_orig) != MPORT_OK) {
-		SET_ERRORX(MPORT_ERR_WARN, "Error Looking up package name %s", pack->name); /* TODO: is this needed. */
-		return (0);
-	}
+    if (mport_index_lookup_pkgname(mport, pack->name, &indexEntries_orig) != MPORT_OK) {
+        SET_ERRORX(MPORT_ERR_WARN, "Error Looking up package name %s", pack->name);
+    }
 
-	if (indexEntries_orig != NULL) {
-		indexEntries = indexEntries_orig;
-		while (*indexEntries != NULL) {
-			int osflag = mport_check_preconditions(mport, pack, MPORT_PRECHECK_OS);
-			if ((*indexEntries)->version != NULL && pack->version != NULL && (mport_version_cmp(pack->version, (*indexEntries)->version) < 0 ||
-			                                         (mport_version_cmp(pack->version, (*indexEntries)->version) == 0 && osflag == MPORT_OK))) {
-				ret = 1;
-				break;
-			}
-			indexEntries++;
+	if (indexEntries == NULL) {
+		// not found in the index.  Could be a version upgrade like py38->py39
+		if (mport_index_lookup_pkgname(mport, pack->origin, &indexEntries_orig) != MPORT_OK) {
+			SET_ERRORX(MPORT_ERR_WARN, "Error Looking up package origin %s", pack->origin);
+			return (0);
 		}
-		mport_index_entry_free_vec(indexEntries_orig);
-		indexEntries_orig = NULL;
-		indexEntries = NULL;
+		used_origin = true;
 	}
 
-	return (ret);
+    if (indexEntries_orig != NULL) {
+        indexEntries = indexEntries_orig;
+        while (*indexEntries != NULL) {
+            int osflag = mport_check_preconditions(mport, pack, MPORT_PRECHECK_OS);
+			// if the pacakge was built for an older os, update it.  if the package version is less than the index version, update it.
+			// if the origin had to be matched, and the package name does not match the index, update it. (py38->py39)
+            if ((*indexEntries)->version != NULL && pack->version != NULL && (mport_version_cmp(pack->version, (*indexEntries)->version) < 0 ||
+                                                     (mport_version_cmp(pack->version, (*indexEntries)->version) == 0 && osflag == MPORT_OK)) ||
+													 (used_origin && strcmp(pack->name, (*indexEntries)->pkgname) != 0)) {
+                ret = used_origin ? 2 : 1;
+                break;
+            }
+            indexEntries++;
+        }
+        mport_index_entry_free_vec(indexEntries_orig);
+        indexEntries_orig = NULL;
+        indexEntries = NULL;
+    }
+
+    return (ret);
 }
 
 
@@ -386,7 +409,7 @@ mport_index_mirror_list(mportInstance *mport, mportMirrorEntry ***entry_vec)
 		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
 	}
 
-	MPORT_CHECK_FOR_INDEX(mport, "mport_index_lookup_pkgname()")
+	MPORT_CHECK_FOR_INDEX(mport, "mport_index_mirror_list()")
 
 
 	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM idx.mirrors") != MPORT_OK) {
@@ -886,6 +909,7 @@ lookup_alias(mportInstance *mport, const char *query, char **result)
 	sqlite3_stmt *stmt;
 	int ret = MPORT_OK;
 
+	// assumes that query is an alias|pkg maps to origin|pkgname e.g. www/py-qt5-webkit|py27-qt5-webkit
 	if (mport_db_prepare(mport->db, &stmt, "SELECT pkg FROM idx.aliases WHERE alias=%Q", query) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 

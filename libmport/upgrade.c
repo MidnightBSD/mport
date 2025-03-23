@@ -148,13 +148,38 @@ mport_upgrade(mportInstance *mport) {
 		key = ohash_find(&h, slot);
 		if (key == NULL) {
 		#endif
-			if (mport_index_check(mport, *packs)) {
+			int match = mport_index_check(mport, *packs);
+			if (match == 1) {
 				(*packs)->action = MPORT_ACTION_UPGRADE;
 				#if defined(__MidnightBSD__)
 				updated += mport_update_down(mport, *packs, &info, &h);
 				#else
 				updated += mport_update_down(mport, *packs, NULL, NULL);
 				#endif
+			} else if (match == 2) {
+				mportIndexEntry **ieUpdateMe;
+				if (mport_index_lookup_pkgname(mport, (*packs)->origin, &ieUpdateMe) != MPORT_OK) {
+					SET_ERRORX(MPORT_ERR_WARN, "Error Looking up package origin %s", (*packs)->origin);
+					return (0);
+				}
+
+				if (ieUpdateMe == NULL) {
+					packs++;
+					continue;
+				}
+
+				char *msg = NULL;
+				(void)asprintf(
+					&msg, "The package you have installed %s appears to have been replaced by %s. Do you want to update?",
+					 (*packs)->name, (*ieUpdateMe)->pkgname);
+				if ((mport->confirm_cb)(msg, "Update", "Don't Update", 0) != MPORT_OK) {
+					(*packs)->action = MPORT_ACTION_UPGRADE;
+					mport_delete_primative(mport, (*packs), true);
+					// TODO: how to mark this action as an update?
+					mport_install(mport, (*ieUpdateMe)->pkgname,  NULL, NULL, (*packs)->automatic);
+					updated++;
+				}
+				free(msg);
 			}
 		#if defined(__MidnightBSD__)
 		}
