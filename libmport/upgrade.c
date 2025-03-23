@@ -38,7 +38,10 @@
 #include <errno.h>
 #include <stddef.h>
 #include <err.h>
+
+#if defined(__MidnightBSD__)
 #include <ohash.h>
+#endif
 
 static void * ecalloc(size_t, void *);
 static void efree(void *, size_t, void *);
@@ -63,10 +66,12 @@ mport_upgrade(mportInstance *mport) {
 	mportPackageMeta **packs, **packs_orig = NULL;
 	int total = 0;
 	int updated = 0;
+	#if defined(__MidnightBSD__)
 	struct ohash_info info = { 0, NULL, ecalloc, efree, NULL };
 	struct ohash h;
+	#endif
 	unsigned int slot;
-	char *key;
+	char *key = NULL;
 	char *msg;
 
 	if (mport == NULL) {
@@ -83,19 +88,23 @@ mport_upgrade(mportInstance *mport) {
 		return (MPORT_ERR_FATAL);
 	}
 
+	#if defined(__MidnightBSD__)
 	ohash_init(&h, 6, &info);
+	#endif
 
 	// check for moved/expired packages first
 	packs = packs_orig;
 	while (*packs != NULL) {
 		mportIndexMovedEntry **movedEntries;
 
+		#if defined(__MidnightBSD__)
 		slot = ohash_qlookup(&h, (*packs)->name);
 		key = ohash_find(&h, slot);
 		if (key != NULL) {
 			packs++;
 			continue;
 		}
+		#endif
 
 		if (mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK ||
 		    movedEntries == NULL || *movedEntries == NULL) {
@@ -108,7 +117,9 @@ mport_upgrade(mportInstance *mport) {
 			if ((mport->confirm_cb)(msg, "Delete", "Don't delete", 1) == MPORT_OK) {
 				(*packs)->action = MPORT_ACTION_DELETE;
 				mport_delete_primative(mport, (*packs), true);
+				#if defined(__MidnightBSD__)
 				ohash_insert(&h, slot, (*packs)->name);
+				#endif
 			}	
 
 			packs++;
@@ -121,8 +132,10 @@ mport_upgrade(mportInstance *mport) {
 			mport_delete_primative(mport, (*packs), true);
 			// TODO: how to mark this action as an update?
 			mport_install(mport, (*movedEntries)->moved_to_pkgname,  NULL, NULL, (*packs)->automatic);
+			#if defined(__MidnightBSD__)
 			ohash_insert(&h, slot, (*packs)->name);
 			ohash_insert(&h, slot, (*movedEntries)->moved_to_pkgname);
+			#endif
 		}
 		packs++;
 	}
@@ -130,22 +143,31 @@ mport_upgrade(mportInstance *mport) {
     // update packages that haven't moved already
 	packs = packs_orig;
 	while (*packs != NULL) {
-
+		#if defined(__MidnightBSD__)
 		slot = ohash_qlookup(&h, (*packs)->name);
 		key = ohash_find(&h, slot);
 		if (key == NULL) {
+		#endif
 			if (mport_index_check(mport, *packs)) {
 				(*packs)->action = MPORT_ACTION_UPGRADE;
+				#if defined(__MidnightBSD__)
 				updated += mport_update_down(mport, *packs, &info, &h);
+				#else
+				updated += mport_update_down(mport, *packs, NULL, NULL);
+				#endif
 			}
+		#if defined(__MidnightBSD__)
 		}
+		#endif
 		packs++;
 		total++;
 	}
 	mport_pkgmeta_vec_free(packs_orig);
 	packs_orig = NULL;
 	packs = NULL;
+	#if defined(__MidnightBSD__)
 	ohash_delete(&h);
+	#endif
 
 	mport_call_msg_cb(mport, "Packages updated: %d\nTotal: %d\n", updated, total);
 	return (MPORT_OK);
@@ -156,13 +178,15 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 	mportPackageMeta **depends, **depends_orig;
 	int ret = 0;
 	unsigned int slot;
-	char *key;
+	char *key = NULL;
 
 	if (mport_pkgmeta_get_downdepends(mport, pack, &depends_orig) == MPORT_OK) {
 		if (depends_orig == NULL) {
 			
+			#if defined(__MidnightBSD__)
 			slot = ohash_qlookup(h, pack->name);
 			key = ohash_find(h, slot);
+			#endif
 			if (key == NULL) {
 				if (mport_index_check(mport, pack)) {
 					mport_call_msg_cb(mport, "Updating %s\n", pack->name);
@@ -172,7 +196,9 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 						ret = 0;
 					} else {
 						ret = 1;
+						#if defined(__MidnightBSD__)
 						ohash_insert(h, slot, pack->name);
+						#endif
 					}
 				} else
 					ret = 0;
@@ -182,8 +208,10 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 		} else {
 			depends = depends_orig;
 			while (*depends != NULL) {
+				#if defined(__MidnightBSD__)
 				slot = ohash_qlookup(h, (*depends)->name);
 				key = ohash_find(h, slot);
+				#endif
 				if (key == NULL) {
 					ret += mport_update_down(mport, (*depends), info, h);
 					if (mport_index_check(mport, *depends)) {
@@ -193,7 +221,9 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 							mport_call_msg_cb(mport, "Error updating %s\n", (*depends)->name);
 						} else {
 							ret++;
+							#if defined(__MidnightBSD__)
 							ohash_insert(h, slot, (*depends)->name);
+							#endif
 						}
 					}
 				}
@@ -204,10 +234,13 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 					mport_call_msg_cb(mport, "Error updating %s\n", pack->name);
 				} else {
 					ret++;
+
+					#if defined(__MidnightBSD__)
 					slot = ohash_qlookup(h, pack->name);
 					key = ohash_find(h, slot);
 					if (key == NULL)
 						ohash_insert(h, slot, pack->name);
+					#endif
 				}
 			}
 		}

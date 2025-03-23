@@ -40,8 +40,16 @@
 
 #if defined(__MidnightBSD__)
 #include <osreldate.h>
-#endif
 #include <ohash.h>
+#else
+struct ohash_info {
+
+};
+
+struct ohash {
+
+};
+#endif
 #include <sqlite3.h>
 #include <ucl.h>
 #include <zstd.h>
