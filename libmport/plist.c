@@ -130,18 +130,27 @@ mport_parse_plistfile(FILE *fp, mportAssetList *list) {
 		entry->checksum[0] = '\0'; /* checksum is only used by bundle read install */
 		entry->type = parse_command(cmnd);
 		if (entry->type == ASSET_FILE_OWNER_MODE)
-			parse_file_owner_mode(entry, cmnd);
+            if (parse_file_owner_mode(entry, cmnd) != MPORT_OK) {
+                free(entry);
+                RETURN_ERROR(MPORT_ERR_FATAL, "Failed to parse file owner mode");
+            }
 		if (entry->type == ASSET_DIR_OWNER_MODE) {
-			parse_file_owner_mode(entry, &cmnd[3]);
+            if (parse_file_owner_mode(entry, &cmnd[3]) != MPORT_OK) {
+                free(entry);
+                RETURN_ERROR(MPORT_ERR_FATAL, "Failed to parse dir owner mode");
+            }
 		}
 		if (entry->type == ASSET_SAMPLE_OWNER_MODE)
-			parse_file_owner_mode(entry, &cmnd[6]);
+            if (parse_file_owner_mode(entry, &cmnd[6]) != MPORT_OK) {
+                free(entry);
+                RETURN_ERROR(MPORT_ERR_FATAL, "Failed to parse sample owner mode");
+            }
         } else {
             /* command is backed by a file */
             entry->type = ASSET_FILE;
         }
 
-        if (*line == '\0') {
+        if (line == NULL || *line == '\0') {
             /* line was just a directive, no data */
             entry->data = NULL;
         } else {
@@ -186,12 +195,23 @@ mport_parse_plistfile(FILE *fp, mportAssetList *list) {
  * Parse the file owner, group and mode.
  */
 static int 
-parse_file_owner_mode(mportAssetListEntry *entry, char *cmdLine) {
+parse_file_owner_mode(mportAssetListEntry *entry, char *cmnd) {
 	char *start = NULL;
-	char *op = start = strdup(cmdLine);
+	char *op;
 	char *permissions[3] = {NULL, NULL, NULL};
 	char *tok = NULL;
 	int i = 0;
+
+    if (entry == NULL) {
+        RETURN_ERROR(MPORT_ERR_FATAL, "Entry is NULL");
+    }
+
+    if (cmnd == NULL)
+        RETURN_ERROR(MPORT_ERR_FATAL, "command is missing");
+    op = start = strdup(cmnd);
+    if (op == NULL) {
+        RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+    }
 
 	while((tok = strsep(&op, "(,)")) != NULL) {
 		if (i == 3)
