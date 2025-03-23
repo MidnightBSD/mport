@@ -31,7 +31,7 @@
 #ifndef _MPORT_PRIV_H_
 #define _MPORT_PRIV_H_
 
-#ifdef DEBUGGING
+#ifdef DEBUG
 #include <err.h>
 #define DIAG(fmt, ...) warnx(fmt, ## __VA_ARGS__);
 #else

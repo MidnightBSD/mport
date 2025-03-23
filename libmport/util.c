@@ -138,7 +138,7 @@ mport_verify_hash(const char *filename, const char *hash)
 	if (filehash == NULL)
 		return 0;
 
-#ifdef DEBUGGING
+#ifdef DEBUG
 	printf("gen: '%s'\nsql: '%s'\n", filehash, hash);
 #endif
 	if (strncmp(filehash, hash, 64) == 0) {
