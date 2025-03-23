@@ -118,7 +118,7 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 					|| ((*packs)->version != NULL && mport_version_cmp((*packs)->os_release, os_release) < 0)) {
 
 					if (mport->verbosity == MPORT_VVERBOSE) {
-						mport_call_msg_cb(mport,"%-25s %8s (%6s) < %-25s %-8s", (*packs)->name, (*packs)->version, (*packs)->os_release, (*indexEntries)->pkgname, (*indexEntries)->version);
+						mport_call_msg_cb(mport,"%-25s %8s (%4s) < %-25s %-8s", (*packs)->name, (*packs)->version, (*packs)->os_release, (*indexEntries)->pkgname, (*indexEntries)->version);
 					} else {
 						mport_call_msg_cb(mport,"%-25s %8s  <  %-8s", (*packs)->name, (*packs)->version, (*indexEntries)->version);
 					}
