@@ -90,7 +90,6 @@ mport_assetlist_free(mportAssetList *list) {
 MPORT_PUBLIC_API int
 mport_parse_plistfile(FILE *fp, mportAssetList *list) {
     size_t linecap = 0;
-    size_t entrylen;
     char *line = NULL;
     ssize_t read = 0;
     assert(fp != NULL);
