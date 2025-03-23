@@ -70,14 +70,14 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 
 			if (indexEntries == NULL || *indexEntries == NULL) {
 				if (mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK) {
-					mport_call_msg_cb(mport,"%-25s %8s     is not part of the package repository.", (*packs)->name, (*packs)->version);
+					mport_call_msg_cb(mport,"%-30s %8s     is not part of the package repository.", (*packs)->name, (*packs)->version);
 					packs++;
 					continue;
 				}
 
 				if (movedEntries != NULL && *movedEntries != NULL) {
 					if ((*movedEntries)->moved_to[0]!= '\0') {
-						mport_call_msg_cb(mport,"%-25s %8s     was moved to %s", (*packs)->name, (*packs)->version, (*movedEntries)->moved_to);
+						mport_call_msg_cb(mport,"%-30s %8s     was moved to %s", (*packs)->name, (*packs)->version, (*movedEntries)->moved_to);
 						free(movedEntries);
 						movedEntries = NULL;
 						packs++;
@@ -85,7 +85,7 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 					}
 	
 					if ((*movedEntries)->date[0]!= '\0') {
-						mport_call_msg_cb(mport,"%-25s %8s     expired on %s", (*packs)->name, (*packs)->version, (*movedEntries)->date);
+						mport_call_msg_cb(mport,"%-30s %8s     expired on %s", (*packs)->name, (*packs)->version, (*movedEntries)->date);
 						free(movedEntries);
 						movedEntries = NULL;
 						packs++;
@@ -105,7 +105,7 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 
 				if (indexEntries == NULL || *indexEntries == NULL) {
 					mport_call_msg_cb(mport,
-					    "%-25s %8s     is not part of the package repository.",
+					    "%-30s %8s     is not part of the package repository.",
 					    (*packs)->name, (*packs)->version);
 					packs++;
 					continue;
@@ -118,9 +118,9 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 					|| ((*packs)->version != NULL && mport_version_cmp((*packs)->os_release, os_release) < 0)) {
 
 					if (mport->verbosity == MPORT_VVERBOSE) {
-						mport_call_msg_cb(mport,"%-25s %8s (%s)  <  %-8s %-25s", (*packs)->name, (*packs)->version, (*packs)->os_release, (*indexEntries)->version, (*indexEntries)->pkgname);
+						mport_call_msg_cb(mport,"%-30s %8s (%s)  <  %-8s %-30s", (*packs)->name, (*packs)->version, (*packs)->os_release, (*indexEntries)->version, (*indexEntries)->pkgname);
 					} else {
-						mport_call_msg_cb(mport,"%-25s %8s  <  %-8s", (*packs)->name, (*packs)->version, (*indexEntries)->version);
+						mport_call_msg_cb(mport,"%-30s %8s  <  %-8s", (*packs)->name, (*packs)->version, (*indexEntries)->version);
 					}
 				}
 				indexEntries++;
