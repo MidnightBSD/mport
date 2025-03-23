@@ -237,8 +237,8 @@ mport_index_check(mportInstance *mport, mportPackageMeta *pack) {
 			// if the pacakge was built for an older os, update it.  if the package version is less than the index version, update it.
 			// if the origin had to be matched, and the package name does not match the index, update it. (py38->py39)
             if ((*indexEntries)->version != NULL && pack->version != NULL && (mport_version_cmp(pack->version, (*indexEntries)->version) < 0 ||
-                                                     (mport_version_cmp(pack->version, (*indexEntries)->version) == 0 && osflag == MPORT_OK)) ||
-													 (used_origin && strcmp(pack->name, (*indexEntries)->pkgname) != 0)) {
+                                                     (mport_version_cmp(pack->version, (*indexEntries)->version) == 0 && osflag == MPORT_OK) ||
+													 (used_origin && strcmp(pack->name, (*indexEntries)->pkgname) != 0))) {
                 ret = used_origin ? 2 : 1;
                 break;
             }
