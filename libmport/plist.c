@@ -38,7 +38,7 @@
 #define STRING_EQ(r, l) (strcmp((r),(l)) == 0)
 
 static mportAssetListEntryType parse_command(const char *);
-static int parse_file_owner_mode(mportAssetListEntry **, char *);
+static int parse_file_owner_mode(mportAssetListEntry *, char *);
 
 /* Do everything needed to set up a new plist.  Always use this to create a plist,
  * don't go off and do it yourself.
@@ -89,29 +89,19 @@ mport_assetlist_free(mportAssetList *list) {
  */
 MPORT_PUBLIC_API int
 mport_parse_plistfile(FILE *fp, mportAssetList *list) {
-    size_t length;
+    size_t linecap = 0;
     size_t entrylen;
     char *line = NULL;
-
+    ssize_t read = 0;
     assert(fp != NULL);
 
-    while ((line = fgetln(fp, &length)) != NULL) {
-        if (feof(fp)) {
-            /* File didn't end in \n, get an exta byte so that the next step doesn't
-               wack the last char in the string. */
-            length++;
-            if ((line = realloc(line, length)) == NULL) {
-                RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
-            }
-        }
+    while ((read = getline(&line, &linecap, fp)) != -1) {
+        if (line[read - 1] == '\n')
+            line[read - 1] = '\0';
 
-        if (length == 1)
-            /* This is almost certainly a blank line. skip it */
+        /* skip blank lines */
+        if (line[0] == '\0' || read == 1)
             continue;
-
-
-        /* change the last \n to \0 */
-        *(line + length - 1) = '\0';
 
         mportAssetListEntry *entry = (mportAssetListEntry *) calloc(1, sizeof(mportAssetListEntry));
 
@@ -119,28 +109,40 @@ mport_parse_plistfile(FILE *fp, mportAssetList *list) {
             RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
         }
 
+        /* clear out any leading whitespace */
+        while (isspace(line[0])) {
+			line++;
+        }
+
+        /* line is effectively empty. skip it. */
+        if (*line == '\0') {
+            continue;
+        }
+
         if (*line == CMND_MAGIC_COOKIE) {
             line++;
             char *cmnd = strsep(&line, " \t");
 
-            if (cmnd == NULL)
+            if (cmnd == NULL) {
+                free(entry);
                 RETURN_ERROR(MPORT_ERR_FATAL, "Malformed plist file.");
+            }
 
 		entry->checksum[0] = '\0'; /* checksum is only used by bundle read install */
 		entry->type = parse_command(cmnd);
 		if (entry->type == ASSET_FILE_OWNER_MODE)
-			parse_file_owner_mode(&entry, cmnd);
+			parse_file_owner_mode(entry, cmnd);
 		if (entry->type == ASSET_DIR_OWNER_MODE) {
-			parse_file_owner_mode(&entry, &cmnd[3]);
+			parse_file_owner_mode(entry, &cmnd[3]);
 		}
 		if (entry->type == ASSET_SAMPLE_OWNER_MODE)
-			parse_file_owner_mode(&entry, &cmnd[6]);
+			parse_file_owner_mode(entry, &cmnd[6]);
         } else {
+            /* command is backed by a file */
             entry->type = ASSET_FILE;
         }
 
-
-        if (line == NULL) {
+        if (*line == '\0') {
             /* line was just a directive, no data */
             entry->data = NULL;
         } else {
@@ -154,25 +156,29 @@ mport_parse_plistfile(FILE *fp, mportAssetList *list) {
                 }
             }
 
-            entrylen = strlen(line) + 1;
-            entry->data = (char *) calloc(entrylen, sizeof(char));
-            if (entry->data == NULL) {
-                RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+            size_t buflen = strlen(line);
+            if (buflen > SIZE_MAX - 1) {
+                // Handle overflow error
+                free(entry);
+                RETURN_ERROR(MPORT_ERR_FATAL, "Buffer too large, potential overflow.");
             }
 
-
-            char *pos = line + strlen(line) - 1;
-
-            while (isspace(*pos)) {
-                *pos = 0;
+            char *pos = line + buflen - 1;
+            while (pos >= line && isspace(*pos)) {
+                *pos = '\0';
                 pos--;
             }
 
-            strlcpy(entry->data, line, entrylen);
+            entry->data = strdup(line);
+            if (entry->data == NULL) {
+                free(entry);
+                RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+            }
         }
 
         STAILQ_INSERT_TAIL(list, entry, next);
     }
+    free(line);
 
     return MPORT_OK;
 }
@@ -181,7 +187,7 @@ mport_parse_plistfile(FILE *fp, mportAssetList *list) {
  * Parse the file owner, group and mode.
  */
 static int 
-parse_file_owner_mode(mportAssetListEntry **entry, char *cmdLine) {
+parse_file_owner_mode(mportAssetListEntry *entry, char *cmdLine) {
 	char *start = NULL;
 	char *op = start = strdup(cmdLine);
 	char *permissions[3] = {NULL, NULL, NULL};
@@ -199,19 +205,19 @@ parse_file_owner_mode(mportAssetListEntry **entry, char *cmdLine) {
 #ifdef DEBUG
 		fprintf(stderr, "owner %s -", permissions[0]);
 #endif
-		strlcpy((*entry)->owner, permissions[0], MAXLOGNAME);
+		strlcpy(entry->owner, permissions[0], MAXLOGNAME);
 	}
 	if (permissions[1] != NULL) {
 #ifdef DEBUG
 		fprintf(stderr, "; group %s -", permissions[1]);
 #endif
-		strlcpy((*entry)->group, permissions[1], MAXLOGNAME * 2);
+		strlcpy(entry->group, permissions[1], MAXLOGNAME * 2);
 	}
 	if (permissions[2] != NULL) {
 #ifdef DEBUG
 		fprintf(stderr, "; mode %s -", permissions[2]);
 #endif
-		strlcpy((*entry)->mode, permissions[2], 5);
+		strlcpy(entry->mode, permissions[2], 5);
 	}
 
 	free(start);
