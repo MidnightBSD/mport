@@ -241,6 +241,9 @@ int mport_set_errx(int , const char *, ...);
 #define MPORT_OSVERSION "3.1"
 #elif __MidnightBSD_version >= 300000
 #define MPORT_OSVERSION "3.0"
+#elif __LINUX__
+LINUX_VERSION := $(shell uname -r)
+#define MPORT_OSVERSION LINUX_VERSION
 #else
 #error "libmport only supports MidnightBSD versions 3.0 and above."
 #endif
