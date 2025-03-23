@@ -108,19 +108,21 @@ mport_parse_plistfile(FILE *fp, mportAssetList *list) {
             RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
         }
 
+        char *parse_line = line;
+
         /* clear out any leading whitespace */
-        while (isspace(line[0])) {
-			line++;
+        while (*parse_line != '\0' && isspace(*parse_line)) {
+            parse_line++;
         }
 
         /* line is effectively empty. skip it. */
-        if (*line == '\0') {
+        if (*parse_line == '\0') {
             continue;
         }
 
-        if (*line == CMND_MAGIC_COOKIE) {
-            line++;
-            char *cmnd = strsep(&line, " \t");
+        if (*parse_line == CMND_MAGIC_COOKIE) {
+            parse_line++;
+            char *cmnd = strsep(&parse_line, " \t");
 
             if (cmnd == NULL) {
                 free(entry);
@@ -150,34 +152,34 @@ mport_parse_plistfile(FILE *fp, mportAssetList *list) {
             entry->type = ASSET_FILE;
         }
 
-        if (line == NULL || *line == '\0') {
+        if (parse_line == NULL || *parse_line == '\0') {
             /* line was just a directive, no data */
             entry->data = NULL;
         } else {
             if (entry->type == ASSET_COMMENT) {
-                if (!strncmp(line, "ORIGIN:", 7)) {
-                    line += 7;
+                if (!strncmp(parse_line, "ORIGIN:", 7)) {
+                    parse_line += 7;
                     entry->type = ASSET_ORIGIN;
-                } else if (!strncmp(line, "DEPORIGIN:", 10)) {
-                    line += 10;
+                } else if (!strncmp(parse_line, "DEPORIGIN:", 10)) {
+                    parse_line += 10;
                     entry->type = ASSET_DEPORIGIN;
                 }
             }
 
-            size_t buflen = strlen(line);
+            size_t buflen = strlen(parse_line);
             if (buflen > SIZE_MAX - 1) {
                 // Handle overflow error
                 free(entry);
                 RETURN_ERROR(MPORT_ERR_FATAL, "Buffer too large, potential overflow.");
             }
 
-            char *pos = line + buflen - 1;
-            while (pos >= line && isspace(*pos)) {
+            char *pos = parse_line + buflen - 1;
+            while (pos >= parse_line && isspace(*pos)) {
                 *pos = '\0';
                 pos--;
             }
 
-            entry->data = strdup(line);
+            entry->data = strdup(parse_line);
             if (entry->data == NULL) {
                 free(entry);
                 RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
