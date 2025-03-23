@@ -190,9 +190,11 @@ int mport_bundle_write_add_file(mportBundleWrite *bundle, const char *filename, 
     
     archive_entry_set_symlink(entry, linkdata);
   }
-    
+ 
+  #if defined(__MidnightBSD__) || defined(__FreeBSD__)
   if (st.st_flags != 0) 
     archive_entry_set_fflags(entry, st.st_flags, 0);
+  #endif
     
   archive_entry_copy_stat(entry, &st);
  
