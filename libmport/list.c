@@ -75,30 +75,41 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 					continue;
 				}
 
-				if (movedEntries == NULL || *movedEntries == NULL) {
-					mport_call_msg_cb(mport,"%-15s %8s is not part of the package repository.", (*packs)->name, (*packs)->version);
-					packs++;
-					continue;
-				}
-
-				if ((*movedEntries)->moved_to[0]!= '\0') {
-					mport_call_msg_cb(mport,"%-25s %8s was moved to %s", (*packs)->name, (*packs)->version, (*movedEntries)->moved_to);
+				if (movedEntries != NULL && *movedEntries != NULL) {
+					if ((*movedEntries)->moved_to[0]!= '\0') {
+						mport_call_msg_cb(mport,"%-25s %8s was moved to %s", (*packs)->name, (*packs)->version, (*movedEntries)->moved_to);
+						free(movedEntries);
+						movedEntries = NULL;
+						packs++;
+						continue;
+					}
+	
+					if ((*movedEntries)->date[0]!= '\0') {
+						mport_call_msg_cb(mport,"%-25s %8s expired on %s", (*packs)->name, (*packs)->version, (*movedEntries)->date);
+						free(movedEntries);
+						movedEntries = NULL;
+						packs++;
+						continue;
+					}
+	
 					free(movedEntries);
 					movedEntries = NULL;
+				}
+
+				if (mport_index_lookup_pkgname(
+					mport, (*packs)->origin, &indexEntries) != MPORT_OK) {
+					RETURN_ERRORX(MPORT_ERR_FATAL,
+					    "Error looking up package name %s: %d %s",
+					    (*packs)->name, mport_err_code(), mport_err_string());
+				}
+
+				if (indexEntries == NULL || *indexEntries == NULL) {
+					mport_call_msg_cb(mport,
+					    "%-15s %8s is not part of the package repository.",
+					    (*packs)->name, (*packs)->version);
 					packs++;
 					continue;
 				}
-
-				if ((*movedEntries)->date[0]!= '\0') {
-					mport_call_msg_cb(mport,"%-25s %8s expired on %s", (*packs)->name, (*packs)->version, (*movedEntries)->date);
-					free(movedEntries);
-					movedEntries = NULL;
-					packs++;
-					continue;
-				}
-
-				free(movedEntries);
-				movedEntries = NULL;
 			}
 	
 			iestart = indexEntries;		
@@ -107,7 +118,7 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 					|| ((*packs)->version != NULL && mport_version_cmp((*packs)->os_release, os_release) < 0)) {
 
 					if (mport->verbosity == MPORT_VVERBOSE) {
-						mport_call_msg_cb(mport,"%-25s %8s (%s)  <  %-s", (*packs)->name, (*packs)->version, (*packs)->os_release, (*indexEntries)->version);
+						mport_call_msg_cb(mport,"%-25s %8s (%6s) < %-25s %-8s", (*packs)->name, (*packs)->version, (*packs)->os_release, (*indexEntries)->pkgname, (*indexEntries)->version);
 					} else {
 						mport_call_msg_cb(mport,"%-25s %8s  <  %-8s", (*packs)->name, (*packs)->version, (*indexEntries)->version);
 					}
