@@ -31,8 +31,11 @@
 #ifndef _MPORT_H_
 #define _MPORT_H_
 
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
 
-#include <sys/cdefs.h>
+#include <limits.h>
 #include <archive.h>
 #include <paths.h>
 #include <sqlite3.h>
@@ -41,6 +44,10 @@
 #include <stdbool.h>
 #include <sys/param.h>
 #include "tllist.h"
+
+#ifndef MAXLOGNAME
+#define MAXLOGNAME 32
+#endif
 
 typedef void (*mport_msg_cb)(const char *);
 typedef void (*mport_progress_init_cb)(const char *);
