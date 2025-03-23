@@ -105,7 +105,7 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 
 				if (indexEntries == NULL || *indexEntries == NULL) {
 					mport_call_msg_cb(mport,
-					    "%-15s %8s is not part of the package repository.",
+					    "%-25s %8s is not part of the package repository.",
 					    (*packs)->name, (*packs)->version);
 					packs++;
 					continue;
