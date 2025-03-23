@@ -76,7 +76,6 @@ mport_createextras_new(void)
 	extra->luapkgpredeinstall = NULL;
 
 	extra->pkgmessage = NULL;
-	extra->conflicts = tll_init();
 	extra->depends = NULL;
 
 	return extra;
@@ -647,7 +646,7 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 }
 
 /*
- * mport_parselist(input, string_array_pointer)
+ * mport_parselist_tll(input, string_array_pointer)
  *
  * hacks input into sub strings by whitespace.  Allocates a chunk or memory
  * for an array of those strings, and sets the pointer you pass to reference
@@ -665,7 +664,6 @@ mport_parselist_tll(char *opt, stringlist_t *list)
 {
 	char *input;
 	char *field;
-	size_t list_size = 0;
 
 	if (opt == NULL || list == NULL)
 		return;
@@ -674,7 +672,6 @@ mport_parselist_tll(char *opt, stringlist_t *list)
 		return;
 	}
 
-	size_t loc = 0;
 	while ((field = strsep(&input, " \t\n")) != NULL) {
 		if (field != NULL && *field != '\0')
 			tll_push_back(*list, strdup(field));

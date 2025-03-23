@@ -61,10 +61,13 @@ mport_pkgmeta_new(void)
 
 	pack->action = MPORT_ACTION_UNKNOWN;
 
-//	for (int i = 0; i < MPORT_NUM_LUA_SCRIPTS; i++)
-//		pack->lua_scripts[i] = tll_init();	
+	for (int i = 0; i < MPORT_NUM_LUA_SCRIPTS; i++) {
+		stringlist_t sc = tll_init();
+		pack->lua_scripts[i] = sc;
+	}
 
-    pack->conflicts = tll_init();
+	stringlist_t cf = tll_init();
+	pack->conflicts = cf;
 
 	return pack;
 }
@@ -506,18 +509,22 @@ mport_pkgmeta_logevent(mportInstance *mport, mportPackageMeta *pkg, const char *
  */
 static int
 enrich_vec(mportPackageMeta ***vec, int len, sqlite3 *db) {
+	sqlite3_stmt *stmt;
+
 	for (int i = 0; i < len; i++) {
 		mportPackageMeta *pkg = (*vec)[i];
-        if (pkg == NULL)
-            continue;
+		if (pkg == NULL)
+			continue;
 
-        if (mport_db_prepare(db, NULL, "SELECT conflict_pkg FROM conflicts WHERE pkg=%Q", pkg->name) == MPORT_OK) {
-            if (sqlite3_step(stmt) == SQLITE_ROW) {
-                pkg->conflict = strdup((const char *)sqlite3_column_text(stmt, 0));
-            }
-            sqlite3_finalize(stmt);
-        }
+		if (mport_db_prepare(db, &stmt, "SELECT conflict_pkg FROM conflicts WHERE pkg=%Q", pkg->name) == MPORT_OK) {
+			if (sqlite3_step(stmt) == SQLITE_ROW) {
+				tll_push_back(pkg->conflicts, strdup((const char *)sqlite3_column_text(stmt, 0)));
+			}
+			sqlite3_finalize(stmt);
+		}
 	}
+
+	return MPORT_OK;
 }
 
 static int

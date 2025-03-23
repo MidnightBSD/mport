@@ -404,7 +404,7 @@ insert_conflicts(sqlite3 *db, mportPackageMeta *pack, mportCreateExtras *extra)
 	assert(extra != NULL);
 
 	/* we're done if there are no conflicts to record. */
-	if (extra->conflicts == NULL || tll_length(extra->conflicts) == 0)
+	if (tll_length(extra->conflicts) == 0)
 		return MPORT_OK;
 
 	if (mport_db_prepare(db, &stmnt,
@@ -418,7 +418,7 @@ insert_conflicts(sqlite3 *db, mportPackageMeta *pack, mportCreateExtras *extra)
 		return MPORT_ERR_FATAL;
 	}
 
-	tll_foreach(*extra->conflicts, s)
+	tll_foreach(extra->conflicts, s)
 	{
 		if (regexec(&regex, s->item, 3, matches, 0) == 0) {
 			pkg_name = strndup(

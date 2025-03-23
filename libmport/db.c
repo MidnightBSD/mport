@@ -43,6 +43,7 @@ static int mport_upgrade_master_schema_8to9(sqlite3 *);
 static int mport_upgrade_master_schema_9to10(sqlite3 *);
 static int mport_upgrade_master_schema_10to11(sqlite3 *);
 static int mport_upgrade_master_schema_11to12(sqlite3 *);
+static int mport_upgrade_master_schema_12to13(sqlite3 *);
 
 /* mport_db_do(sqlite3 *db, const char *sql, ...)
  * 
