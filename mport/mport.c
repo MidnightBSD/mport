@@ -589,6 +589,7 @@ usage(void)
 	    "    autoremove                  Remove automatically installed packages\n"
 	    "    clean                       Clean package cache\n"
 	    "    verify                      Verify installed packages\n\n"
+		"    deleteall                   Remove all installed packages\n\n"
 	    "  Information:\n"
 	    "    search <query>              Search for packages\n"
 	    "    info <package>              Display package information\n"
