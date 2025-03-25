@@ -7,7 +7,7 @@ MK_MAN= no
 
 LIBADD= mport pthread
 
-LDFLAGS += -L ${.CURDIR}/../libmport -lmport -lpthread
+LDFLAGS += -L ${.CURDIR}/../../libmport -lmport -lpthread
 
 BINDIR=/usr/libexec
 
