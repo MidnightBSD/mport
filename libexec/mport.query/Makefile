@@ -7,7 +7,7 @@ MK_MAN= no
 
 LIBADD= mport pthread sqlite3
 
-LDFLAGS += -L ${.CURDIR}/../libmport -lmport -lpthread -lsqlite3
+LDFLAGS += -L ${.CURDIR}/../../libmport -lmport -lpthread -lsqlite3
 
 BINDIR=/usr/libexec
 
