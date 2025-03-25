@@ -609,7 +609,7 @@ usage(void)
 	    "    audit [package]             Check for security vulnerabilities\n"
 	    "    lock <package>              Lock package against modifications\n"
 	    "    unlock <package>            Unlock package\n"
-	    "    locks                       List locked packages\n\n"
+	    "    locks                       List locked packages\n"
 	    "    cpe [package]               List Common Platform Enumeration info\n"
 	    "    purl [package]              List Package URL info\n"
 	    "  Miscellaneous:\n"
