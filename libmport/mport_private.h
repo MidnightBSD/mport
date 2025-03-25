@@ -66,10 +66,6 @@ struct ohash {
 #define MPORT_SETTING_MIRROR_REGION "mirror_region"
 #define MPORT_SETTING_TARGET_OS "target_os"
 
-/* callback syntactic sugar */
-void mport_call_msg_cb(mportInstance *, const char *, ...);
-void mport_call_progress_init_cb(mportInstance *, const char *, ...);
-
 /* precondition checking */
 #define MPORT_PRECHECK_INSTALLED   1
 #define MPORT_PRECHECK_DEPENDS     2

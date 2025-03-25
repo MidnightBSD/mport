@@ -91,12 +91,19 @@ mportInstance * mport_instance_new(void);
 int mport_instance_init(mportInstance *, const char *, const char *, bool noIndex, mportVerbosity verbosity);
 int mport_instance_free(mportInstance *);
 
+/* Run the callbacks. will display messages, etc */
+int mport_call_msg_cb(mportInstance *, const char *, ...);
+int mport_call_progress_init_cb(mportInstance *, const char *, ...);
+bool mport_call_confirm_cb(mportInstance *mport, const char *msg, const char *yes, const char *no, int def);
+
+/* setup your custom callbacks */
 void mport_set_msg_cb(mportInstance *, mport_msg_cb);
 void mport_set_progress_init_cb(mportInstance *, mport_progress_init_cb);
 void mport_set_progress_step_cb(mportInstance *, mport_progress_step_cb);
 void mport_set_progress_free_cb(mportInstance *, mport_progress_free_cb);
 void mport_set_confirm_cb(mportInstance *, mport_confirm_cb);
 
+/* default cbs for terminal use. For graphical apps, you want to make your own */
 void mport_default_msg_cb(const char *);
 int mport_default_confirm_cb(const char *, const char *, const char *, int);
 void mport_default_progress_init_cb(const char *);
@@ -308,6 +315,7 @@ int mport_merge_primative(mportInstance *mport, const char **, const char *);
 
 /* Package installation */
 int mport_install(mportInstance *, const char *, const char *, const char *, mportAutomatic);
+int mport_install_single(mportInstance *mport, const char *pkgname, const char *version, const char *prefix, mportAutomatic automatic);
 int mport_install_primative(mportInstance *, const char *, const char *, mportAutomatic);
 
 /* package updating */
