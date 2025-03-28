@@ -77,7 +77,7 @@ static int stats(mportInstance *mport);
 
 static int clean(mportInstance *);
 
-static int verify(mportInstance *):
+static int verify(mportInstance *);
 static int verify_many(mportInstance *mport, int argc, char *argv[], bool skipFirst);
 
 static int lock(mportInstance *, const char *);
