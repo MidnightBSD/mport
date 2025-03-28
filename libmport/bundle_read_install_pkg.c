@@ -1027,7 +1027,7 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 }
 
 static bool 
-is_linux_module_loaded() {
+is_linux_module_loaded(void) {
     size_t len;
 
     if (sysctlbyname("compat.linux.osrelease", NULL, &len, NULL, 0) == -1) {
