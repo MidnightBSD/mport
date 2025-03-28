@@ -137,19 +137,16 @@ mport_pkgmeta_free(mportPackageMeta *pack)
 MPORT_PUBLIC_API void
 mport_pkgmeta_vec_free(mportPackageMeta **vec)
 {
-	mportPackageMeta **pkgmetas = vec;
 
 	if (vec == NULL)
 		return;
 
-	while (*pkgmetas != NULL) {
-		mport_pkgmeta_free(*pkgmetas);
-		pkgmetas++;
+	for (mportPackageMeta **ptr = vec; *ptr != NULL; ptr++) {
+		mport_pkgmeta_free(*ptr);
 	}
 
 	free(vec);
 	vec = NULL;
-	pkgmetas = NULL;
 }
 
 /* mport_pkgmeta_read_stub(mportInstance *mport, mportPackageMeta ***pack)

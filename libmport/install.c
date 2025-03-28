@@ -218,15 +218,15 @@ mport_install_depends(mportInstance *mport, const char *packageName, const char 
 		}
 	} else if (packs == NULL) {
 		/* Package is not installed */
-		while (*depends != NULL) {
-			if (mport_install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version, MPORT_AUTOMATIC) != MPORT_OK) {
-     			mport_call_msg_cb(mport, "%s", mport_err_string());
-     			mport_index_depends_free_vec(depends_orig);
+    for (mportDependsEntry **dep = depends; dep && *dep != NULL; dep++) {
+      if (mport_install_depends(mport, (*dep)->d_pkgname, (*dep)->d_version, MPORT_AUTOMATIC) != MPORT_OK) {
+          mport_call_msg_cb(mport, "%s", mport_err_string());
+          mport_index_depends_free_vec(depends_orig);
           depends_orig = NULL;
-				return mport_err_code();
-			}
-			depends++;
-		}
+          return mport_err_code();
+      }
+    }
+		
 		if (mport_install_single(mport, packageName, version, NULL, automatic) != MPORT_OK) {
 			mport_call_msg_cb(mport, "%s", mport_err_string());
 			mport_index_depends_free_vec(depends_orig);
@@ -250,10 +250,11 @@ mport_install_depends(mportInstance *mport, const char *packageName, const char 
         packs = NULL;
 				return mport_err_code();
 			}
-		}
-
-        // TODO: fix crash on nested calls
-		//mport_pkgmeta_vec_free(packs);
+      mport_pkgmeta_vec_free(packs);
+		} else {
+      mport_call_msg_cb(mport, "The most recent version of %s is already installed.", packageName);
+      mport_pkgmeta_vec_free(packs);
+    }
 	}
 
 	return (MPORT_OK);
