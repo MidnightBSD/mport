@@ -77,7 +77,8 @@ static int stats(mportInstance *mport);
 
 static int clean(mportInstance *);
 
-static int verify(mportInstance *);
+static int verify(mportInstance *):
+static int verify_many(mportInstance *mport, int argc, char *argv[], bool skipFirst);
 
 static int lock(mportInstance *, const char *);
 
@@ -499,7 +500,11 @@ main(int argc, char *argv[])
 	} else if (!strcmp(cmd, "autoremove")) {
 		resultCode = mport_autoremove(mport);
 	} else if (!strcmp(cmd, "verify")) {
-		resultCode = verify(mport);
+		if (argc > 1) {
+			resultCode = verify_many(mport, argc, argv, true);
+		} else {
+			resultCode = verify(mport);
+		}
 	} else if (!strcmp(cmd, "version")) {
 		int local_argc = argc;
 		char *const *local_argv = argv;
@@ -1247,6 +1252,43 @@ cpeList(mportInstance *mport)
 }
 
 int
+verify_many(mportInstance *mport, int argc, char *argv[], bool skipfirst) 
+{
+	int total = 0;
+	int start = skipfirst ? 1 : 0;
+
+	if (argc < 2) {
+		fprintf(stderr, "Usage: mport verify <package>\n");
+		return (MPORT_ERR_WARN);
+	}
+
+	for (int i = start; i < argc; i++) {
+		mportPackageMeta **pkg_matches = NULL;
+    
+		if (mport_pkgmeta_search_master(mport, &pkg_matches, "LOWER(pkg)=LOWER(%Q)", argv[i]) != MPORT_OK) {
+			warnx("%s", mport_err_string());
+			continue;
+		}
+		
+		if (pkg_matches == NULL) {
+			warnx("Package '%s' not found", argv[i]);
+			continue;
+		}
+		
+		for (mportPackageMeta **pkg = pkg_matches; *pkg != NULL; pkg++) {
+			mport_verify_package(mport, *pkg);
+			total++;
+		}
+		
+		mport_pkgmeta_vec_free(pkg_matches);
+	}
+
+	printf("Packages verified: %d\n", total);
+
+	return (MPORT_OK);
+}
+
+int
 verify(mportInstance *mport)
 {
 	mportPackageMeta **packs = NULL;
@@ -1259,7 +1301,7 @@ verify(mportInstance *mport)
 
 	if (packs == NULL) {
 		warnx("No packages installed.");
-		return (1);
+		return (MPORT_ERR_WARN);
 	}
 
 	for (mportPackageMeta **pack = packs; *pack != NULL; pack++) {
@@ -1270,7 +1312,7 @@ verify(mportInstance *mport)
 	mport_pkgmeta_vec_free(packs);
 	printf("Packages verified: %d\n", total);
 
-	return (0);
+	return (MPORT_OK);
 }
 
 int
