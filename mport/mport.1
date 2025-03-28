@@ -197,9 +197,12 @@ List statistics about available and installed packages.
 Fetch and update a specific package
 .It Cm upgrade
 Upgrade all currently installed packages with the latest version
-.It Cm verify Ao name Ac
+.It Cm verify Fl r Ao name Ac
 Verify currently installed packages have not had files deleted or modified from the original
 installation.
+The r flag will attempt recompute the checksum of the installed files. This is useful
+if the user modified files and wants to verify the package is still valid. A large number of files
+with invalid checksums may indicate a security issue or corrupted package.
 .Sh SETTINGS
 The
 .Nm

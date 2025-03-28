@@ -625,7 +625,7 @@ usage(void)
 	    "    upgrade                     Upgrade all outdated packages\n"
 	    "    autoremove                  Remove automatically installed packages\n"
 	    "    clean                       Clean package cache\n"
-	    "    verify [package]            Verify installed packages\n"
+	    "    verify [-r] [package]            Verify installed packages\n"
 		"    deleteall                   Remove all installed packages\n\n"
 	    "  Information:\n"
 	    "    search <query>              Search for packages\n"
