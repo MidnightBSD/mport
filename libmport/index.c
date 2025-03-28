@@ -53,7 +53,7 @@ static void populate_row(sqlite3_stmt *stmt, mportIndexEntry *e);
 
 
 char *
-mport_index_file_path() {
+mport_index_file_path(void) {
 	char *envIndexFile = getenv("PKG_DB");
 
 	if (envIndexFile == NULL || strlen(envIndexFile) == 0) {

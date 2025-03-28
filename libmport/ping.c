@@ -69,7 +69,7 @@ calculateChecksum(unsigned short *buffer, int length)
 }
 
 static long
-getCurrentTime()
+getCurrentTime(void)
 {
 	struct timespec time;
 	clock_gettime(CLOCK_MONOTONIC, &time);
