@@ -141,9 +141,11 @@ mport_info(mportInstance *mport, const char *packageName) {
 
 		if (indexEntry == NULL || *indexEntry == NULL)
 			purl[0] = '\0';
-		else if (packs != NULL && (*indexEntry)->pkgname != NULL && (*packs)->version != NULL)
-			snprintf(purl, sizeof(purl), "pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s", (*indexEntry)->pkgname, (*packs)->version, MPORT_ARCH, os_release);
-		else
+		else if (packs != NULL && (*indexEntry)->pkgname != NULL && (*packs)->version != NULL) {
+			//snprintf(purl, sizeof(purl), "pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s", (*indexEntry)->pkgname, (*packs)->version, MPORT_ARCH, os_release);
+			// the purl format requires registration.  i'm switching to generic and requested above from them.
+			snprintf(purl, sizeof(purl), "pkg:generic/%s@%s?arch=%s&distro=midnightbsd-%s", (*indexEntry)->pkgname, (*packs)->version, MPORT_ARCH, os_release);
+		} else
 			purl[0] = '\0';	
 	}
 
