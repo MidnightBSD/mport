@@ -991,7 +991,8 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
 
 	if (package_count == 0) {
 		return (MPORT_ERR_WARN); // No packages to delete
-
+	}
+	
     // Convert total_flatsize to human-readable format
     humanize_number(flatsize_str, sizeof(flatsize_str), total_flatsize, "B", HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
 
