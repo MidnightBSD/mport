@@ -803,6 +803,8 @@ stats(mportInstance *mport)
 	printf("\nRemote package database:\n");
 	printf("\tPackages available: %d\n", s->pkg_available);
 
+	free(s);
+
 	return (0);
 }
 
@@ -939,6 +941,8 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
     mportPackageMeta **packs_orig = NULL;
     int start = skipFirst ? 1 : 0;
     int package_count = 0;
+	int missing = 0;
+	int locked = 0;
     long long total_flatsize = 0;
     char flatsize_str[8];
 	int resultCode = MPORT_OK;
@@ -949,11 +953,13 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
     for (int i = start; i < argc; i++) {
         if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", argv[i]) != MPORT_OK) {
             warnx("%s", mport_err_string());
+			missing++;
             continue;
         }
 
         if (packs_orig == NULL) {
             warnx("No packages installed matching '%s'", argv[i]);
+			missing++;
             continue;
         }
 
@@ -965,6 +971,10 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
             }
             printf("\n");
 
+			if (mport_lock_islocked((*packs)) == MPORT_LOCKED) {
+                locked++;
+            }
+
             package_count++;
             total_flatsize += (*packs)->flatsize;
             packs++;
@@ -974,6 +984,13 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
         mport_pkgmeta_vec_free(packs_orig);
         packs_orig = NULL;
     }
+
+	if (package_count == 0 || locked > 0 || missing > 0) {
+		printf("%d packages requested for removal: %d locked, %d missing\n", argc - start, locked, missing);
+	}
+
+	if (package_count == 0) {
+		return (MPORT_ERR_WARN); // No packages to delete
 
     // Convert total_flatsize to human-readable format
     humanize_number(flatsize_str, sizeof(flatsize_str), total_flatsize, "B", HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
@@ -1000,6 +1017,12 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
 
         packs = packs_orig;
         while (*packs != NULL) {
+
+			if (mport_lock_islocked((*packs)) == MPORT_LOCKED) {
+				warnx("Package '%s' is locked. skipping", argv[i]);
+                continue;
+            }
+
             (*packs)->action = MPORT_ACTION_DELETE;
             if (mport_delete_primative(mport, *packs, mport->force) != MPORT_OK) {
                 warnx("%s", mport_err_string());
