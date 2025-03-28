@@ -520,8 +520,8 @@ main(int argc, char *argv[])
 
 		if (rflag) {
 			resultCode = MPORT_OK;
-			for (int x = 1; x < argc; x++) {
-				mportPackageMeta **packs = lookup_package(mport, argv[x]);
+			for (int x = 0; x < local_argc; x++) {
+				mportPackageMeta **packs = lookup_package(mport, local_argv[x]);
 				if (packs == NULL) {
 					continue;
 				}
