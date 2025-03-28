@@ -86,50 +86,61 @@ mport_verify_package(mportInstance *mport, mportPackageMeta *pack)
 		}
 
 		switch (type) {
-			case ASSET_FILE_OWNER_MODE:
-				/* FALLS THROUGH */
-			case ASSET_FILE:
-				/* FALLS THROUGH */
-			case ASSET_SAMPLE:
-				/* FALLS THROUGH */
-			case ASSET_SAMPLE_OWNER_MODE:
-				if (lstat(file, &st) != 0) {
-					mport_call_msg_cb(mport, "Can't stat %s: %s", file, strerror(errno));
-					break; /* next asset */
+		case ASSET_FILE_OWNER_MODE:
+			/* FALLS THROUGH */
+		case ASSET_FILE:
+			/* FALLS THROUGH */
+		case ASSET_SHELL:
+			/* FALLS THROUGH */
+		case ASSET_SAMPLE:
+			/* FALLS THROUGH */
+		case ASSET_INFO:
+			/* FALLS THROUGH */
+		case ASSET_SAMPLE_OWNER_MODE:
+
+			if (lstat(file, &st) != 0) {
+				mport_call_msg_cb(
+				    mport, "Can't stat %s: %s", file, strerror(errno));
+				break; /* next asset */
+			}
+
+			if (S_ISREG(st.st_mode)) {
+				if (checksum == NULL) {
+					mport_call_msg_cb(
+					    mport, "Source checksum missing %s", file);
+				} else if (strlen(checksum) < 34) {
+					if (MD5File(file, hash) == NULL)
+						mport_call_msg_cb(mport, "Can't MD5 %s: %s", file,
+						    strerror(errno));
+
+					if (hash == NULL)
+						mport_call_msg_cb(mport,
+						    "Destination checksum could not be computed %s",
+						    file);
+					else if (strcmp(hash, checksum) != 0)
+						mport_call_msg_cb(mport,
+						    "Checksum mismatch: %s %s %s", file, hash,
+						    checksum);
+				} else {
+					if (SHA256_File(file, hash) == NULL)
+						mport_call_msg_cb(mport, "Can't SHA256 %s: %s",
+						    file, strerror(errno));
+
+					if (hash == NULL)
+						mport_call_msg_cb(mport,
+						    "Destination checksum could not be computed %s",
+						    file);
+					else if (strcmp(hash, checksum) != 0)
+						mport_call_msg_cb(mport,
+						    "Checksum mismatch: %s %s %s", file, hash,
+						    checksum);
 				}
+			}
 
-				if (S_ISREG(st.st_mode)) {
-					if (checksum == NULL) {
-						mport_call_msg_cb(mport, "Source checksum missing %s", file);
-					} else if (strlen(checksum) < 34) {
-						if (MD5File(file, hash) == NULL)
-							mport_call_msg_cb(mport, "Can't MD5 %s: %s", file, strerror(errno));
-
-						if (hash == NULL)
-							mport_call_msg_cb(mport,
-							                  "Destination checksum could not be computed %s",
-							                  file);
-						else if (strcmp(hash, checksum) != 0)
-							mport_call_msg_cb(mport, "Checksum mismatch: %s %s %s", file, hash,
-							                  checksum);
-					} else {
-						if (SHA256_File(file, hash) == NULL)
-							mport_call_msg_cb(mport, "Can't SHA256 %s: %s", file, strerror(errno));
-
-						if (hash == NULL)
-							mport_call_msg_cb(mport,
-							                  "Destination checksum could not be computed %s",
-							                  file);
-						else if (strcmp(hash, checksum) != 0)
-							mport_call_msg_cb(mport, "Checksum mismatch: %s %s %s", file, hash,
-							                  checksum);
-					}
-				}
-
-				break;
-			default:
-				/* do nothing */
-				break;
+			break;
+		default:
+			/* do nothing */
+			break;
 		}
 	}
 

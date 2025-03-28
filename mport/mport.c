@@ -1250,7 +1250,6 @@ int
 verify(mportInstance *mport)
 {
 	mportPackageMeta **packs = NULL;
-	mportPackageMeta **ref = NULL;
 	int total = 0;
 
 	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
@@ -1262,15 +1261,13 @@ verify(mportInstance *mport)
 		warnx("No packages installed.");
 		return (1);
 	}
-	ref = packs;
 
-	while (*packs != NULL) {
-		mport_verify_package(mport, *packs);
-		packs++;
+	for (mportPackageMeta **pack = packs; *pack != NULL; pack++) {
+		mport_verify_package(mport, *pack);
 		total++;
 	}
 
-	mport_pkgmeta_vec_free(ref);
+	mport_pkgmeta_vec_free(packs);
 	printf("Packages verified: %d\n", total);
 
 	return (0);
