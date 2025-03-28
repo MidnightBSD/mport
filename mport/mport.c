@@ -1152,7 +1152,7 @@ purlGet(mportInstance *mport, const char *packageName)
     while (*packs != NULL) {
 	    char *purl = mport_purl_uri(*packs);
 		if (purl != NULL) {
-	    	printf("%s", purl);
+	    	printf("%s\n", purl);
 	    	free(purl);
 		}
 	    
