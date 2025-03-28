@@ -1149,14 +1149,15 @@ purlGet(mportInstance *mport, const char *packageName)
     }
 
     mportPackageMeta **packs_orig = packs;
-	while (*packs != NULL) {
-		printf("pkg:generic/%s@%s?arch=%s&distro=midnightbsd-%s", (*packs)->name, (*packs)->version, MPORT_ARCH, os_release);
-	
-		/*printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->name,
-		    	(*packs)->version, MPORT_ARCH, (*packs)->os_release); */
-			purl_total++;
-		packs++;
-	}
+    while (*packs != NULL) {
+	    char *purl = mport_purl_uri(packs);
+	    printf("%s", purl);
+	    free(purl);
+	    purl = NULL;
+
+	    purl_total++;
+	    packs++;
+    }
 
 	mport_pkgmeta_vec_free(packs_orig);
 
@@ -1188,11 +1189,12 @@ purlList(mportInstance *mport)
 
 	packs = packs_orig;
 	while (*packs != NULL) {
-		printf("pkg:generic/%s@%s?arch=%s&distro=midnightbsd-%s", (*packs)->name, (*packs)->version, MPORT_ARCH, os_release);
+		char *purl = mport_purl_uri(packs);
+		printf("%s\n", purl);
+		free(purl);
+		purl = NULL;
 	
-		/* printf("pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s\n", (*packs)->name,
-		    	(*packs)->version, MPORT_ARCH, (*packs)->os_release); */
-			purl_total++;
+		purl_total++;
 		packs++;
 	}
 	mport_pkgmeta_vec_free(packs_orig);

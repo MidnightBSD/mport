@@ -1047,6 +1047,29 @@ mport_drop_privileges(void)
 	return (MPORT_OK);
 }
 
+/**
+ * @brief generate PURL URI for a package
+ * Caller must free the returned string.
+ * @param packs mport package metadata
+ * @return PURL URI or NULL
+ */
+MPORT_PUBLIC_API char * 
+mport_purl_uri(mportPackageMeta *packs) 
+{
+	char *purl = NULL;
+
+	// https://github.com/package-url/purl-spec/blob/main/PURL-TYPES.rst
+	//asprintf(&purl, "pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s", (*indexEntry)->pkgname, (*packs)->version, MPORT_ARCH, os_release);
+	// the purl format requires registration.  i'm switching to generic and requested above from them.
+		
+	int ret = asprintf(&purl, "pkg:generic/%s@%s?arch=%s&distro=midnightbsd-%s", (*packs)->pkgname, (*packs)->version, MPORT_ARCH, (*packs)->os_release);
+	if (ret = -1) {
+		err(EX_OSERR, "Could not build skip regex");
+	}
+
+	return (purl);
+}
+
 bool
 mport_check_answer_bool(char *ans) 
 {

@@ -365,6 +365,7 @@ int mport_setting_set(mportInstance *, const char *, const char *);
 char ** mport_setting_list(mportInstance *);
 
 /* Utils */
+char * mport_purl_uri(mportPackageMeta *packs);
 void mport_parselist(char *, char ***, size_t *);
 void mport_parselist_tll(char *, stringlist_t *);
 int mport_verify_hash(const char *, const char *);
