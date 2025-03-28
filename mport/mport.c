@@ -1151,10 +1151,11 @@ purlGet(mportInstance *mport, const char *packageName)
     mportPackageMeta **packs_orig = packs;
     while (*packs != NULL) {
 	    char *purl = mport_purl_uri(packs);
-	    printf("%s", purl);
-	    free(purl);
-	    purl = NULL;
-
+		if (purl != NULL) {
+	    	printf("%s", purl);
+	    	free(purl);
+		}
+	    
 	    purl_total++;
 	    packs++;
     }
@@ -1189,10 +1190,11 @@ purlList(mportInstance *mport)
 
 	packs = packs_orig;
 	while (*packs != NULL) {
-		char *purl = mport_purl_uri(packs);
-		printf("%s\n", purl);
-		free(purl);
-		purl = NULL;
+	    char *purl = mport_purl_uri(packs);
+		if (purl != NULL) {
+	    	printf("%s", purl);
+	    	free(purl);
+		}
 	
 		purl_total++;
 		packs++;

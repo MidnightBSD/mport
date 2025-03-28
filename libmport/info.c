@@ -143,9 +143,12 @@ mport_info(mportInstance *mport, const char *packageName) {
 			purl[0] = '\0';
 		else if (packs != NULL && (*indexEntry)->pkgname != NULL && (*packs)->version != NULL) {
 			char *tmppurl = mport_purl_uri(packs);
-			snprintf(purl, sizeof(purl), "%s", tmppurl);
-			free(tmppurl);
-			tmppurl = NULL;
+			if (tmppurl != NULL) {
+				snprintf(purl, sizeof(purl), "%s", tmppurl);
+				free(tmppurl);
+			} else {
+				purl[0] = '\0';
+			}
 		} else
 			purl[0] = '\0';	
 	}
