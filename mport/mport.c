@@ -520,8 +520,8 @@ main(int argc, char *argv[])
 
 		if (rflag) {
 			resultCode = MPORT_OK;
-			for (int i = 1; i < argc; i++) {
-				mportPackageMeta **packs = lookup_package(mport, argv[i]);
+			for (int x = 1; x < argc; x++) {
+				mportPackageMeta **packs = lookup_package(mport, argv[x]);
 				if (packs == NULL) {
 					continue;
 				}
@@ -1085,11 +1085,6 @@ delete(mportInstance *mport, const char *packageName)
     if (packs == NULL) {
         return (MPORT_ERR_FATAL);
     }
-
-	if (packs_orig == NULL) {
-		warnx("No packages installed matching '%s'", packageName);
-		return (MPORT_ERR_FATAL);
-	}
 
 	mportPackageMeta **packs_orig = packs;
 	while (*packs != NULL) {
