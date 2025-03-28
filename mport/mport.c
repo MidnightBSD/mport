@@ -992,7 +992,7 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
 	if (package_count == 0) {
 		return (MPORT_ERR_WARN); // No packages to delete
 	}
-	
+
     // Convert total_flatsize to human-readable format
     humanize_number(flatsize_str, sizeof(flatsize_str), total_flatsize, "B", HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
 
@@ -1094,6 +1094,8 @@ configSet(mportInstance *mport, const char *settingName, const char *val)
 {
 	int result = mport_setting_set(mport, settingName, val);
 
+	mport_drop_privileges();
+
 	if (result != MPORT_OK) {
 		warnx("%s", mport_err_string());
 		return mport_err_code();
@@ -1113,6 +1115,8 @@ purlGet(mportInstance *mport, const char *packageName)
 		mport_pkgmeta_vec_free(packs_orig);
 		return (MPORT_ERR_FATAL);
 	}
+
+	mport_drop_privileges();
 
 	if (packs_orig == NULL) {
 		return (MPORT_ERR_WARN);
@@ -1181,6 +1185,8 @@ cpeGet(mportInstance *mport, const char *packageName)
 		mport_pkgmeta_vec_free(packs_orig);
 		return (MPORT_ERR_FATAL);
 	}
+
+	mport_drop_privileges();
 
 	if (packs_orig == NULL) {
 		return (MPORT_ERR_WARN);
