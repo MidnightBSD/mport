@@ -142,7 +142,7 @@ mport_info(mportInstance *mport, const char *packageName) {
 		if (indexEntry == NULL || *indexEntry == NULL)
 			purl[0] = '\0';
 		else if (packs != NULL && (*indexEntry)->pkgname != NULL && (*packs)->version != NULL) {
-			char *tmppurl = mport_purl_uri(packs);
+			char *tmppurl = mport_purl_uri(*packs);
 			if (tmppurl != NULL) {
 				snprintf(purl, sizeof(purl), "%s", tmppurl);
 				free(tmppurl);
