@@ -1062,9 +1062,9 @@ mport_purl_uri(mportPackageMeta *packs)
 	//asprintf(&purl, "pkg:mport/midnightbsd/%s@%s?arch=%s&osrel=%s", (*indexEntry)->pkgname, (*packs)->version, MPORT_ARCH, os_release);
 	// the purl format requires registration.  i'm switching to generic and requested above from them.
 		
-	int ret = asprintf(&purl, "pkg:generic/%s@%s?arch=%s&distro=midnightbsd-%s", (*packs)->pkgname, (*packs)->version, MPORT_ARCH, (*packs)->os_release);
-	if (ret = -1) {
-		err(EX_OSERR, "Could not build skip regex");
+	int ret = asprintf(&purl, "pkg:generic/%s@%s?arch=%s&distro=midnightbsd-%s", packs->pkgname, packs->version, MPORT_ARCH, packs->os_release);
+	if (ret == -1) {
+		return NULL;
 	}
 
 	return (purl);
