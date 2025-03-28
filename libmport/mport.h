@@ -332,6 +332,7 @@ int mport_autoremove(mportInstance *);
 
 /* package verify */
 int mport_verify_package(mportInstance *, mportPackageMeta *);
+int mport_recompute_checksums(mportInstance *, mportPackageMeta *);
 
 /* version comparing */
 int mport_version_cmp(const char *, const char *);
