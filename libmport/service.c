@@ -46,7 +46,7 @@ static int run_service_cmd(mportInstance *mport, const char *rc_script, char *co
 int 
 mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_action_t action) 
 {
-    sqlite3_stmt *stmt;
+	sqlite3_stmt *stmt;
 	int ret;
 	char *service;
 	const unsigned char *rc_script;
@@ -58,14 +58,14 @@ mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_a
 	if (getenv("MPORT_GUI") != NULL)
 		return (MPORT_OK);
 
-    // if handle rc scripts is disabled, we don't need to do anything
+	// if handle rc scripts is disabled, we don't need to do anything
 	handle_rc_script = mport_setting_get(mport, MPORT_SETTING_HANDLE_RC_SCRIPTS);
 	if (getenv("HANDLE_RC_SCRIPTS") == NULL && !mport_check_answer_bool(handle_rc_script))
 	    return (MPORT_OK);
 	
 	/* stop any services that might exist; this replaces @stopdaemon */
 	if (mport_db_prepare(mport->db, &stmt,
-		"select * from assets where data like '/usr/local/etc/rc.d/%%' and type=%i and pkg=%Q",
+		"select data from assets where data like '/usr/local/etc/rc.d/%%' and type=%i and pkg=%Q",
 		ASSET_FILE, pack->name) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
@@ -111,7 +111,6 @@ run_service_cmd(mportInstance *mport, const char *rc_script, char *command)
 	argv[3] = NULL;
 
 	service = basename((char *)rc_script);
-
 	if ((error = posix_spawn(&pid, "/usr/sbin/service", NULL, NULL, (char **)argv, environ)) != 0) {
 		errno = error;
 		mport_call_msg_cb(mport, "Unable to %s service %s\n", command, service);
@@ -119,8 +118,9 @@ run_service_cmd(mportInstance *mport, const char *rc_script, char *command)
 	}
 
 	while (waitpid(pid, &pstat, 0) == -1) {
-		if (errno != EINTR)
+		if (errno != EINTR) {
 			return (-1);
+		}
 	}
 
 	return (WEXITSTATUS(pstat));
