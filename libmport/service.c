@@ -41,6 +41,12 @@ mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_a
 	const unsigned char *rc_script;
 	char *handle_rc_script;
 
+
+	// don't turn off services if MPORT_GUI is set.  This can drop someone out of an X session.
+	// TODO: we should handle this with triggers eventually.
+	if (getenv("MPORT_GUI") != NULL)
+		return MPORT_OK;
+
     // if handle rc scripts is disabled, we don't need to do anything
 	handle_rc_script = mport_setting_get(mport, MPORT_SETTING_HANDLE_RC_SCRIPTS);
 	if (getenv("HANDLE_RC_SCRIPTS") == NULL && !mport_check_answer_bool(handle_rc_script))
