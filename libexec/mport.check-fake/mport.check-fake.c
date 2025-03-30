@@ -29,6 +29,7 @@
 
 #include <sys/cdefs.h>
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <dirent.h>
@@ -42,6 +43,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <regex.h>
+#include <ftw.h>
 
 #ifdef PRINT_DIAG
 #define DIAG(fmt, ...) warnx(fmt, ##__VA_ARGS__);
@@ -52,6 +54,15 @@
 static void usage(void);
 static int check_fake(mportAssetList *, const char *, const char *, const char *);
 static int grep_file(const char *, const char *);
+static bool is_in_plist(const char *relative_path);
+static int check_missing_from_plist(const char *path, const struct stat *st, int typeflag, struct FTW *ftwbuf);
+static void check_for_missing_files(const char *destdir, mportAssetList *assetlist);
+ 
+
+
+// Global variables to hold the destdir and assetlist for comparison
+static const char *global_destdir;
+static mportAssetList *global_assetlist;
 
 int
 main(int argc, char *argv[]) 
@@ -113,6 +124,7 @@ main(int argc, char *argv[])
 	
 	printf("Checking %s\n", destdir);
 	ret = check_fake(assetlist, destdir, prefix, skip);
+	check_for_missing_files(destdir, assetlist);
 	
 	if (ret == 0) {
 		printf("Fake succeeded.\n");
@@ -358,6 +370,52 @@ grep_file(const char *filename, const char *destdir)
 	regfree(&regex);
 	fclose(file);
 	return ret;
+}
+
+
+static bool 
+is_in_plist(const char *relative_path) {
+    mportAssetListEntry *e;
+
+    STAILQ_FOREACH(e, global_assetlist, next) {
+        if (e->data != NULL && strcmp(e->data, relative_path) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static int 
+check_missing_from_plist(const char *path, const struct stat *st, int typeflag, struct FTW *ftwbuf) 
+{
+    // Skip directories; only check files
+    if (typeflag == FTW_D || typeflag == FTW_DP) {
+        return 0;
+    }
+
+    // Get the relative path of the file
+    const char *relative_path = path + strlen(global_destdir);
+
+    // Check if the file is in the plist
+    if (!is_in_plist(relative_path)) {
+        printf("    %s is missing from the plist\n", relative_path);
+    }
+
+    return 0;
+}
+
+static void 
+check_for_missing_files(const char *destdir, mportAssetList *assetlist) 
+{
+    global_destdir = destdir;
+    global_assetlist = assetlist;
+
+    // Use nftw to traverse the destdir
+    if (nftw(destdir, check_missing_from_plist, 10, FTW_PHYS) == -1) {
+        perror("nftw");
+        exit(EXIT_FAILURE);
+    }
 }
 			
 static void
