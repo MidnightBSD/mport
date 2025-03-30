@@ -263,6 +263,18 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 		}
 
 		if (S_ISREG(st.st_mode) && access(file, X_OK) == 0) {
+			// Check if the file is a shell script
+			FILE *f = fopen(file, "r");
+			if (f != NULL) {
+				char shebang[3] = { 0 }; // Buffer to hold the first two characters
+				if (fread(shebang, 1, 2, f) == 2 && strcmp(shebang, "#!") == 0) {
+					DIAG("Skipping ldd check for shell script: %s", file);
+					fclose(f);
+					continue;
+				}
+				fclose(f);
+			}
+
 			char cmd[FILENAME_MAX];
 			(void)snprintf(cmd, sizeof(cmd), "ldd %s > /dev/null 2>&1", file);
 			if (system(cmd) != 0) {
