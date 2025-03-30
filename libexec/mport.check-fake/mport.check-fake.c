@@ -222,6 +222,7 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 			continue;
 		}
 		
+		// symlink checks.
 		if (S_ISLNK(st.st_mode)) {
 			char target[FILENAME_MAX];
 			ssize_t len = readlink(file, target, sizeof(target) - 1);
@@ -230,8 +231,17 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 				ret = 1;
 			} else {
 				target[len] = '\0';
-				if (strncmp(target, destdir, strlen(destdir)) != 0) {
-					(void)printf("    %s points outside the destdir: %s\n", file, target);
+				// Resolve the symlink target relative to the directory containing
+				// the link
+				char resolved_target[FILENAME_MAX];
+				if (realpath(file, resolved_target) == NULL) {
+					(void)printf("    %s points to an invalid target: %s\n",
+					    file, target);
+					ret = 1;
+				} else if (strncmp(resolved_target, destdir, strlen(destdir)) !=
+				    0) {
+					(void)printf("    %s points outside the destdir: %s\n",
+					    file, resolved_target);
 					ret = 1;
 				}
 			}
