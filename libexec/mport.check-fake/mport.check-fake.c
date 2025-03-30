@@ -191,7 +191,7 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 			break;
 		}
 
-		if (e->data != NULL && strcmp(e->data, "+CONTENTS") == 0 || strcmp(e->data, "+DESC") == 0) {
+		if (e->data != NULL && (strcmp(e->data, "+CONTENTS") == 0 || strcmp(e->data, "+DESC") == 0)) {
 			if (lstat(file, &st) != 0) {
 				printf("    Metadata file %s is missing\n", file);
 				ret = 1;
