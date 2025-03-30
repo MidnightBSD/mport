@@ -387,7 +387,7 @@ is_in_plist(const char *relative_path) {
 }
 
 static int 
-check_missing_from_plist(const char *path, const struct stat *st, int typeflag, struct FTW *ftwbuf) 
+check_missing_from_plist(const char *path, const struct stat *st __attribute__((unused)), int typeflag, struct FTW *ftwbuf __attribute__((unused))) 
 {
     // Skip directories; only check files
     if (typeflag == FTW_D || typeflag == FTW_DP) {
