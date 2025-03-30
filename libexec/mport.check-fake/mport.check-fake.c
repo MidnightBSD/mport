@@ -30,6 +30,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <dirent.h>
 #include <err.h>
 #include <string.h>
 #include <unistd.h>
@@ -165,6 +166,36 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 				
 				break;
 		}
+
+		if (e->type == ASSET_DIR) {
+			DIR *dir = opendir(file);
+			if (dir != NULL) {
+				struct dirent *entry;
+				int is_empty = 1;
+				while ((entry = readdir(dir)) != NULL) {
+					if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+						is_empty = 0;
+						break;
+					}
+				}
+				closedir(dir);
+				if (is_empty) {
+					printf("    %s is an empty directory\n", file);
+					// we might not want to fail here, but we should warn user.
+					// ret = 1;
+				}
+			}
+
+			break;
+		}
+
+		if (e->data != NULL && strcmp(e->data, "+CONTENTS") == 0 || strcmp(e->data, "+DESC") == 0) {
+			if (lstat(file, &st) != 0) {
+				printf("    Metadata file %s is missing\n", file);
+				ret = 1;
+			}
+			continue;
+		}
 		
 		if (e->type != ASSET_FILE)
 			continue;
@@ -189,18 +220,53 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 			continue;
 		}
 		
-		if (S_ISLNK(st.st_mode))
-			continue;	 /* skip symlinks */
+		if (S_ISLNK(st.st_mode)) {
+			char target[FILENAME_MAX];
+			ssize_t len = readlink(file, target, sizeof(target) - 1);
+			if (len == -1) {
+				(void)printf("    %s is a broken symlink\n", file);
+				ret = 1;
+			} else {
+				target[len] = '\0';
+				if (strncmp(target, destdir, strlen(destdir)) != 0) {
+					(void)printf("    %s points outside the destdir: %s\n", file, target);
+					ret = 1;
+				}
+			}
+			continue;
+		}
 
 		/* if file matches skip continue */
 		if (skip != NULL && (regexec(&skipre, e->data, 0, NULL, 0) == 0))
-			continue;			 
-		
+			continue;
+
+		if (S_ISREG(st.st_mode) && st.st_size == 0) {
+			printf("    %s is an empty file\n", file);
+			ret = 1;
+			continue;
+		}
+
+		if (e->data != NULL && (strstr(e->data, ".tmp") != NULL || strstr(e->data, ".bak") != NULL || strstr(e->data, ".debug") != NULL)) {
+			printf("    %s is a temporary or debug file and should not be installed\n", file);
+			ret = 1;
+			continue;
+		}
+
 		DIAG("==> Grepping %s", file)
 		/* grep file for fake destdir */
 		if (grep_file(file, destdir)) {
 			(void)printf("		%s contains the fake destdir\n", e->data);
 			ret = 1;
+			continue;
+		}
+
+		if (S_ISREG(st.st_mode) && access(file, X_OK) == 0) {
+			char cmd[FILENAME_MAX];
+			(void)snprintf(cmd, sizeof(cmd), "ldd %s > /dev/null 2>&1", file);
+			if (system(cmd) != 0) {
+				(void)printf("    %s has missing or broken dependencies\n", file);
+				ret = 1;
+			}
 		}
 	}
 	
