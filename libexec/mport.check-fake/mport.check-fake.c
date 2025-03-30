@@ -445,7 +445,7 @@ check_for_missing_files(const char *destdir, const char *prefix, mportAssetList 
 		exit(EXIT_FAILURE);
 	}
 
-	printf("Checking for missing files\n", destdir, prefix);
+	printf("Checking for missing files\n");
 	printf("NOTE: may have false positives if plist uses @cwd\n");
 
     // Use nftw to traverse the destdir
