@@ -54,14 +54,15 @@
 static void usage(void);
 static int check_fake(mportAssetList *, const char *, const char *, const char *);
 static int grep_file(const char *, const char *);
-static bool is_in_plist(const char *relative_path);
+static bool is_in_plist(const char *relative_path, const char *prefix);
 static int check_missing_from_plist(const char *path, const struct stat *st, int typeflag, struct FTW *ftwbuf);
-static void check_for_missing_files(const char *destdir, mportAssetList *assetlist);
+static void check_for_missing_files(const char *destdir, const char *prefix, mportAssetList *assetlist);
  
 
 
 // Global variables to hold the destdir and assetlist for comparison
 static const char *global_destdir;
+static const char *global_prefix;
 static mportAssetList *global_assetlist;
 
 int
@@ -124,7 +125,7 @@ main(int argc, char *argv[])
 	
 	printf("Checking %s\n", destdir);
 	ret = check_fake(assetlist, destdir, prefix, skip);
-	check_for_missing_files(destdir, assetlist);
+	check_for_missing_files(destdir, prefix, assetlist);
 	
 	if (ret == 0) {
 		printf("Fake succeeded.\n");
@@ -374,13 +375,21 @@ grep_file(const char *filename, const char *destdir)
 
 
 static bool 
-is_in_plist(const char *relative_path) {
+is_in_plist(const char *relative_path, const char *prefix) {
     mportAssetListEntry *e;
 
-    STAILQ_FOREACH(e, global_assetlist, next) {
-        if (e->data != NULL && strcmp(e->data, relative_path) == 0) {
-            return true;
-        }
+    STAILQ_FOREACH (e, global_assetlist, next) {
+	    // Check for an exact match (absolute path)
+	    if (strcmp(e->data, relative_path) == 0) {
+		    return true;
+	    }
+
+	    // Check for a match relative to the prefix
+	    char prefixed_path[FILENAME_MAX];
+	    snprintf(prefixed_path, sizeof(prefixed_path), "%s/%s", prefix, e->data);
+	    if (strcmp(prefixed_path, relative_path) == 0) {
+		    return true;
+	    }
     }
 
     return false;
@@ -398,7 +407,7 @@ check_missing_from_plist(const char *path, const struct stat *st __attribute__((
     const char *relative_path = path + strlen(global_destdir);
 
     // Check if the file is in the plist
-    if (!is_in_plist(relative_path)) {
+    if (!is_in_plist(relative_path, global_prefix)) {
         printf("    %s is missing from the plist\n", relative_path);
     }
 
@@ -406,10 +415,14 @@ check_missing_from_plist(const char *path, const struct stat *st __attribute__((
 }
 
 static void 
-check_for_missing_files(const char *destdir, mportAssetList *assetlist) 
+check_for_missing_files(const char *destdir, const char *prefix, mportAssetList *assetlist) 
 {
     global_destdir = destdir;
+    global_prefix = prefix;
     global_assetlist = assetlist;
+
+	printf("Checking for missing files in destdir: %s prefix: %s\n", destdir, prefix);
+	printf("NOTE: may have false positives if plist uses @cwd\n");
 
     // Use nftw to traverse the destdir
     if (nftw(destdir, check_missing_from_plist, 10, FTW_PHYS) == -1) {
