@@ -379,6 +379,10 @@ is_in_plist(const char *relative_path, const char *prefix) {
     mportAssetListEntry *e;
 
     STAILQ_FOREACH (e, global_assetlist, next) {
+		if (e->data == NULL) {
+			continue; // Skip entries with NULL data
+		}
+
 	    // Check for an exact match (absolute path)
 	    if (strcmp(e->data, relative_path) == 0) {
 		    return true;
@@ -398,10 +402,20 @@ is_in_plist(const char *relative_path, const char *prefix) {
 static int 
 check_missing_from_plist(const char *path, const struct stat *st __attribute__((unused)), int typeflag, struct FTW *ftwbuf __attribute__((unused))) 
 {
+	if (path == NULL) {
+		fprintf(stderr, "Error: nftw provided a NULL path\n");
+		return 0;
+	}
+
     // Skip directories; only check files
     if (typeflag == FTW_D || typeflag == FTW_DP) {
         return 0;
     }
+
+	if (strncmp(path, global_destdir, strlen(global_destdir)) != 0) {
+		fprintf(stderr, "Error: Path '%s' does not start with destdir '%s'\n", path, global_destdir);
+		return 0;
+	}
 
     // Get the relative path of the file
     const char *relative_path = path + strlen(global_destdir);
@@ -421,7 +435,12 @@ check_for_missing_files(const char *destdir, const char *prefix, mportAssetList 
     global_prefix = prefix;
     global_assetlist = assetlist;
 
-	printf("Checking for missing files in destdir: %s prefix: %s\n", destdir, prefix);
+	if (global_destdir == NULL || global_prefix == NULL) {
+		fprintf(stderr, "Error: global_destdir or global_prefix is not initialized\n");
+		exit(EXIT_FAILURE);
+	}
+
+	printf("Checking for missing files\n", destdir, prefix);
 	printf("NOTE: may have false positives if plist uses @cwd\n");
 
     // Use nftw to traverse the destdir
