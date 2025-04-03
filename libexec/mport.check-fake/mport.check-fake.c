@@ -211,8 +211,9 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 			}
 			continue;
 		}
-		
-		if (e->type != ASSET_FILE && e->type != ASSET_FILE_OWNER_MODE && e->type != ASSET_INFO && e->type != ASSET_SAMPLE && e->type != ASSET_SAMPLE_OWNER_MODE && e->type != ASSET_SHELL)
+	
+		// skip sample files until we can fix the edge cases with alternate file names. e->type != ASSET_SAMPLE	
+		if (e->type != ASSET_FILE && e->type != ASSET_FILE_OWNER_MODE && e->type != ASSET_INFO && e->type != ASSET_SAMPLE_OWNER_MODE && e->type != ASSET_SHELL)
 			continue;
 
 		if (e->data[0] == '/')
