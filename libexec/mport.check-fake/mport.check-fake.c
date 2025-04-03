@@ -287,6 +287,31 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 
 		if (S_ISREG(st.st_mode) && access(file, X_OK) == 0) {
 			// Check if the file is a shell script
+			if (strstr(e->data, ".sh") != NULL) {
+				DIAG("Skipping ldd check for shell script: %s", file);
+				continue;
+			} else if (strstr(e->data, ".pl") != NULL) {
+				DIAG("Skipping ldd check for Perl script: %s", file);
+				continue;
+			} else if (strstr(e->data, ".py") != NULL) {
+				DIAG("Skipping ldd check for Python script: %s", file);
+				continue;
+			} else if (strstr(e->data, ".rb") != NULL) {
+				DIAG("Skipping ldd check for Ruby script: %s", file);
+				continue;
+			} else if (strstr(e->data, ".js") != NULL) {
+				DIAG("Skipping ldd check for JavaScript script: %s", file);
+				continue;
+            } else if (strstr(e->data, ".lua") != NULL) {
+				DIAG("Skipping ldd check for Lua script: %s", file);
+				continue;
+			} else if (strstr(e->data, ".php") != NULL) {
+				DIAG("Skipping ldd check for PHP script: %s", file);
+				continue;
+			} else if (strstr(e->data, ".awk") != NULL) {
+				DIAG("Skipping ldd check for AWK script: %s", file);
+				continue;
+			}
 			FILE *f = fopen(file, "r");
 			if (f != NULL) {
 				char shebang[3] = { 0 }; // Buffer to hold the first two characters
@@ -445,8 +470,7 @@ check_for_missing_files(const char *destdir, const char *prefix, mportAssetList 
 		exit(EXIT_FAILURE);
 	}
 
-	printf("Checking for missing files\n", destdir, prefix);
-	printf("NOTE: may have false positives if plist uses @cwd\n");
+	printf("Checking for missing files. NOTE: may have false positives if plist uses @cwd\n", destdir, prefix);
 
     // Use nftw to traverse the destdir
     if (nftw(destdir, check_missing_from_plist, 10, FTW_PHYS) == -1) {
