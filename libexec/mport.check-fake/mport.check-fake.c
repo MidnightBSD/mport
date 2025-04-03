@@ -429,7 +429,7 @@ static int
 check_missing_from_plist(const char *path, const struct stat *st __attribute__((unused)), int typeflag, struct FTW *ftwbuf __attribute__((unused))) 
 {
 	if (path == NULL) {
-		fprintf(stderr, "Error: nftw provided a NULL path\n");
+		(void)fprintf(stderr, "Error: nftw provided a NULL path\n");
 		return 0;
 	}
 
@@ -439,7 +439,7 @@ check_missing_from_plist(const char *path, const struct stat *st __attribute__((
     }
 
 	if (strncmp(path, global_destdir, strlen(global_destdir)) != 0) {
-		fprintf(stderr, "Error: Path '%s' does not start with destdir '%s'\n", path, global_destdir);
+		(void)fprintf(stderr, "Error: Path '%s' does not start with destdir '%s'\n", path, global_destdir);
 		return 0;
 	}
 
@@ -453,7 +453,7 @@ check_missing_from_plist(const char *path, const struct stat *st __attribute__((
 
     // Check if the file is in the plist
     if (!is_in_plist(relative_path, global_prefix)) {
-        printf("    %s is missing from the plist\n", relative_path);
+        (void)printf("    %s is missing from the plist\n", relative_path);
     }
 
     return 0;
@@ -467,11 +467,11 @@ check_for_missing_files(const char *destdir, const char *prefix, mportAssetList 
     global_assetlist = assetlist;
 
 	if (global_destdir == NULL || global_prefix == NULL) {
-		fprintf(stderr, "Error: global_destdir or global_prefix is not initialized\n");
+		(void)fprintf(stderr, "Error: global_destdir or global_prefix is not initialized\n");
 		exit(EXIT_FAILURE);
 	}
 
-	printf("Checking for missing files. NOTE: may have false positives if plist uses @cwd\n", destdir, prefix);
+	(void)printf("Checking for missing files. NOTE: may have false positives if plist uses @cwd\n");
 
     // Use nftw to traverse the destdir
     if (nftw(destdir, check_missing_from_plist, 10, FTW_PHYS) == -1) {
