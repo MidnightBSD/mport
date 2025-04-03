@@ -267,8 +267,8 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 			continue;
 
 		if (S_ISREG(st.st_mode) && st.st_size == 0) {
-			printf("    %s is an empty file\n", file);
-			ret = 1;
+			// we don't fail, just warn for an empty file.
+			(void)printf("    %s is an empty file\n", file);
 			continue;
 		}
 
