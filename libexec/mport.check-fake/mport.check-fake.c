@@ -272,10 +272,15 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 			continue;
 		}
 
-		if (e->data != NULL && (strstr(e->data, ".tmp") != NULL || strstr(e->data, ".bak") != NULL || strstr(e->data, ".debug") != NULL)) {
-			printf("    %s is a temporary or debug file and should not be installed\n", file);
-			ret = 1;
-			continue;
+	
+		if (e->data != NULL) {
+			const char *ext = strrchr(e->data, '.'); // Find the last occurrence of '.'
+			if (ext != NULL && 
+				(strcmp(ext, ".tmp") == 0 || strcmp(ext, ".bak") == 0 || strcmp(ext, ".debug") == 0)) {
+				printf("    %s is a temporary or debug file and should not be installed\n", file);
+				ret = 1;
+				continue;
+			}
 		}
 
 		DIAG("==> Grepping %s", file)
