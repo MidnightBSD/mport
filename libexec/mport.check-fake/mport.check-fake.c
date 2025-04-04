@@ -313,6 +313,13 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 				DIAG("Skipping ldd check for AWK script: %s", file);
 				continue;
 			}
+
+			// check if .la file
+			if (strstr(e->data, ".la") != NULL) {
+				DIAG("Skipping ldd check for libtool archive: %s", file);
+				continue;
+			}
+
 			FILE *f = fopen(file, "r");
 			if (f != NULL) {
 				char shebang[3] = { 0 }; // Buffer to hold the first two characters
