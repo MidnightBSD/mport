@@ -287,6 +287,12 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 		}
 
 		if (S_ISREG(st.st_mode) && access(file, X_OK) == 0) {
+
+			if (!mport_is_elf_file(file) ) {
+				DIAG("Skipping ldd check for non-elf file: %s", file);
+				continue;
+			}
+
 			// Check if the file is a shell script
 			if (strstr(e->data, ".sh") != NULL) {
 				DIAG("Skipping ldd check for shell script: %s", file);

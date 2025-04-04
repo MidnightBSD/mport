@@ -1228,3 +1228,28 @@ finish:
 	}
 	return (p_start);
 }
+
+
+#define ELF_MAGIC "\x7F""ELF"
+#define ELF_MAGIC_SIZE 4
+
+MPORT_PUBLIC_API bool 
+mport_is_elf_file(const char *file) 
+{
+    FILE *f = fopen(file, "rb");
+    if (f == NULL) {
+        perror("fopen");
+        return false;
+    }
+
+    char magic[ELF_MAGIC_SIZE];
+    if (fread(magic, 1, ELF_MAGIC_SIZE, f) != ELF_MAGIC_SIZE) {
+        fclose(f);
+        return false;
+    }
+
+    fclose(f);
+
+    // Compare the magic number
+    return (memcmp(magic, ELF_MAGIC, ELF_MAGIC_SIZE) == 0);
+}
