@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -49,6 +50,9 @@
 #include <poll.h>
 #include <libgen.h>
 #include <unistd.h>
+#include <libelf.h>
+#include <gelf.h>
+
 #include "mport.h"
 #include "mport_private.h"
 
@@ -1252,4 +1256,66 @@ mport_is_elf_file(const char *file)
 
     // Compare the magic number
     return (memcmp(magic, ELF_MAGIC, ELF_MAGIC_SIZE) == 0);
+}
+
+MPORT_PUBLIC_API bool 
+mport_is_statically_linked(const char *file) {
+    if (elf_version(EV_CURRENT) == EV_NONE) {
+        fprintf(stderr, "ELF library initialization failed: %s\n", elf_errmsg(-1));
+        return false;
+    }
+
+    int fd = open(file, O_RDONLY);
+    if (fd < 0) {
+        perror("open");
+        return false;
+    }
+
+    Elf *elf = elf_begin(fd, ELF_C_READ, NULL);
+    if (elf == NULL) {
+        fprintf(stderr, "elf_begin failed: %s\n", elf_errmsg(-1));
+        close(fd);
+        return false;
+    }
+
+    // Check if the file is an ELF file
+    if (elf_kind(elf) != ELF_K_ELF) {
+        fprintf(stderr, "%s is not an ELF file\n", file);
+        elf_end(elf);
+        close(fd);
+        return false;
+    }
+
+    // Iterate through the sections to find the .dynamic section
+    size_t shstrndx;
+    if (elf_getshdrstrndx(elf, &shstrndx) != 0) {
+        fprintf(stderr, "elf_getshdrstrndx failed: %s\n", elf_errmsg(-1));
+        elf_end(elf);
+        close(fd);
+        return false;
+    }
+
+    Elf_Scn *scn = NULL;
+    while ((scn = elf_nextscn(elf, scn)) != NULL) {
+        GElf_Shdr shdr;
+        if (gelf_getshdr(scn, &shdr) != &shdr) {
+            fprintf(stderr, "gelf_getshdr failed: %s\n", elf_errmsg(-1));
+            elf_end(elf);
+            close(fd);
+            return false;
+        }
+
+        const char *section_name = elf_strptr(elf, shstrndx, shdr.sh_name);
+        if (section_name != NULL && strcmp(section_name, ".dynamic") == 0) {
+            // Found the .dynamic section, meaning the file is dynamically linked
+            elf_end(elf);
+            close(fd);
+            return false;
+        }
+    }
+
+    // If no .dynamic section is found, the file is statically linked
+    elf_end(elf);
+    close(fd);
+    return true;
 }

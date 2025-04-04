@@ -293,6 +293,11 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 				continue;
 			}
 
+			if (mport_is_statically_linked(file)) {
+				DIAG("Skipping ldd check for statically linked file: %s", file);
+				continue;
+			}
+
 			// Check if the file is a shell script
 			if (strstr(e->data, ".sh") != NULL) {
 				DIAG("Skipping ldd check for shell script: %s", file);
