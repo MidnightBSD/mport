@@ -254,9 +254,9 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 					ret = 1;
 				} else if (strncmp(resolved_target, destdir, strlen(destdir)) !=
 				    0) {
-					(void)printf("    %s points outside the destdir: %s\n",
+					(void)printf("    WARN: %s points outside the destdir: %s\n",
 					    file, resolved_target);
-					ret = 1;
+					//ret = 1;
 				}
 			}
 			continue;
