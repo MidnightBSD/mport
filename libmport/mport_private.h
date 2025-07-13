@@ -103,6 +103,10 @@ typedef enum {
 } service_action_t;
 int mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_action_t action);
 
+/* cbs / color */
+bool mport_is_color_terminal(void);
+bool mport_is_terminal(void);
+
 /* Utils */
 bool mport_starts_with(const char *, const char *);
 char* mport_hash_file(const char *);
