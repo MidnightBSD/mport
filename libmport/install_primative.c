@@ -187,9 +187,8 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		}
 		dependencies = get_dependencies(mport, pkgs[0]);
 
-		// close so we can safely process depdendencies.
-		if (mport_bundle_read_finish(mport, bundle) != MPORT_OK)
-			return MPORT_ERR_FATAL;
+		// close so we can safely process depdendencies. ignore errors for this one.
+		mport_bundle_read_finish(mport, bundle);
 
 		deps = dependencies;
 		char *dir = mport_directory(filename);
