@@ -181,7 +181,7 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		}
 
 		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_CONFLICTS) != MPORT_OK) {
-			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name, pkg->version,
+			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkgs[0]->name, pkgs[0]->version,
 			                  mport_err_string());
 			return MPORT_ERR_FATAL;
 		}
