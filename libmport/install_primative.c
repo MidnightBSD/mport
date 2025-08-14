@@ -175,7 +175,7 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 			if (mport->force) {
 				mport_delete_primative(mport, pkgs[0], 1);
 			} else {
-				mport_call_msg_cb(mport, "%s-%s: already installed.", pkg->name, pkg->version);
+				mport_call_msg_cb(mport, "%s-%s: already installed.", pkgs[0]->name, pkgs[0]->version);
 				return MPORT_OK;
 			}
 		}
