@@ -192,7 +192,7 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 
 		deps = dependencies;
 		char *dir = mport_directory(filename);
-		while (deps!= NULL) {
+		while (deps!= NULL && *deps != NULL) {
 			char *dep_filename = NULL; 
 			asprintf(&dep_filename, "%s/%s.mport", dir, *deps);
 			if (dep_filename == NULL) {
@@ -202,11 +202,11 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 
 			if (!mport_file_exists(dep_filename)) {
 				free(dep_filename);
-    			dep_filename = find_file_with_prefix(dir, *deps);
+				dep_filename = find_file_with_prefix(dir, *deps);
 				if (dep_filename == NULL) {
-        			mport_call_msg_cb(mport, "Dependency %s not found in %s", *deps, dir);
-        			deps++;
-        			continue;
+	    			mport_call_msg_cb(mport, "Dependency %s not found in %s", *deps, dir);
+	    			deps++;
+		   			continue;
 				}
 			}
 
