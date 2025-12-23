@@ -261,6 +261,14 @@ mport_generate_stub_schema(mportInstance *mport, sqlite3 *db)
 	RUN_SQL(db, "CREATE TABLE meta (field text NOT NULL, value text NOT NULL)");
 	RUN_SQL(db, "INSERT INTO meta VALUES (\"bundle_format_version\", " MPORT_BUNDLE_VERSION_STR ")");
 	RUN_SQL(db, sql);
+	free(sql);
+	sql = NULL;
+
+	if (mport_db_do(db, "INSERT INTO meta VALUES (\"os_release\", %Q)", ptr) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+	free(ptr);
+	ptr = NULL;
+	
 	RUN_SQL(db,
 	        "CREATE TABLE assets (pkg text not NULL, type int NOT NULL, data text, checksum text, owner text, grp text, mode text)");
 	RUN_SQL(db,
