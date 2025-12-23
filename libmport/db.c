@@ -81,11 +81,11 @@ mport_db_do(sqlite3 *db, const char *fmt, ...)
 		result = MPORT_ERR_FATAL;
 	}
 
-	sqlite3_free(sql);
-	sql = NULL;
-
 	if (result == MPORT_ERR_FATAL)
 		SET_ERRORX(result, "sql error preparing '%s' : %s", sql, err);
+
+	sqlite3_free(sql);
+	sql = NULL;
 
 	return result;
 }
