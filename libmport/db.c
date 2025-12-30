@@ -124,16 +124,16 @@ mport_db_prepare(sqlite3 *db, sqlite3_stmt **stmt, const char *fmt, ...)
 		result = MPORT_ERR_FATAL;
 	}
 
-	sqlite3_free(sql);
-	sql = NULL;
-
-    if (result == MPORT_ERR_FATAL) {
+	if (result == MPORT_ERR_FATAL) {
 		if (err != NULL) {
 			SET_ERRORX(result, "sql error preparing '%s' : %s", sql, err);
 		} else {
 			SET_ERRORX(result, "sql error preparing '%s'", sql);
 		}
 	}
+
+	sqlite3_free(sql);
+	sql = NULL;
 
 	return result;
 }
@@ -167,11 +167,11 @@ mport_db_count(sqlite3 *db, int *count, const char *fmt, ...)
 		result = MPORT_ERR_FATAL;
 	}
 
-	sqlite3_free(sql);
-	sql = NULL;
-
 	if (result == MPORT_ERR_FATAL)
 		SET_ERRORX(result, "sql error preparing '%s' : %s", sql, err);
+
+	sqlite3_free(sql);
+	sql = NULL;
 
 	if (sqlite3_step(stmt) != SQLITE_ROW) {
 		sqlite3_finalize(stmt);
@@ -261,14 +261,6 @@ mport_generate_stub_schema(mportInstance *mport, sqlite3 *db)
 	RUN_SQL(db, "CREATE TABLE meta (field text NOT NULL, value text NOT NULL)");
 	RUN_SQL(db, "INSERT INTO meta VALUES (\"bundle_format_version\", " MPORT_BUNDLE_VERSION_STR ")");
 	RUN_SQL(db, sql);
-	free(sql);
-	sql = NULL;
-
-	if (mport_db_do(db, "INSERT INTO meta VALUES (\"os_release\", %Q)", ptr) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
-	free(ptr);
-	ptr = NULL;
-	
 	RUN_SQL(db,
 	        "CREATE TABLE assets (pkg text not NULL, type int NOT NULL, data text, checksum text, owner text, grp text, mode text)");
 	RUN_SQL(db,
