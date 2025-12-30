@@ -154,7 +154,7 @@ mport_db_count(sqlite3 *db, int *count, const char *fmt, ...)
 	if (sql == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate memory for sql statement");
 
-	sqlite3_stmt *stmt;
+	sqlite3_stmt *stmt = NULL;
 	int sqlcode = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
 	if (sqlcode == SQLITE_BUSY || sqlcode == SQLITE_LOCKED) {
 		sleep(2);
@@ -172,6 +172,9 @@ mport_db_count(sqlite3 *db, int *count, const char *fmt, ...)
 
 	sqlite3_free(sql);
 	sql = NULL;
+
+	if (result != MPORT_OK)
+		return result;
 
 	if (sqlite3_step(stmt) != SQLITE_ROW) {
 		sqlite3_finalize(stmt);
