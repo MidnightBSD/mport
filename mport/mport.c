@@ -95,6 +95,9 @@ static int selectMirror(mportInstance *mport);
 static mportPackageMeta **
 lookup_package(mportInstance *mport, const char *packageName);
 
+static int 
+annotate_show(mportInstance *mport, const char *packageName, const char* tagName);
+
 int
 main(int argc, char *argv[])
 {
@@ -335,6 +338,29 @@ main(int argc, char *argv[])
 	} else if (!strcmp(cmd, "upgrade")) {
 		loadIndex(mport);
 		resultCode = mport_upgrade(mport);
+	} else if (!strcmp(cmd, "annotate")) {
+		loadIndex(mport);
+
+		int local_argc = argc;
+		char *const *local_argv = argv;
+		int sflag = 0;
+
+		if (local_argc > 1) {
+			int ch2;
+			while ((ch2 = getopt(local_argc, local_argv, "S")) != -1) {
+				switch (ch2) {
+				case 'S':
+					sflag = 1;
+					break;
+				}
+			}
+			local_argc -= optind;
+			local_argv += optind;
+		}
+
+		if (argc > 1 &&sflag) {
+			resultCode = annotate_show(mport, argv[1], argv[2]);
+		}
 	} else if (!strcmp(cmd, "audit")) {
 		loadIndex(mport);
 
@@ -1467,6 +1493,29 @@ audit_package(mportInstance *mport, const char *packageName, bool dependsOn)
 			else
 				printf("%s\n", output);
 			free(output);
+		}
+		packs++;
+	}
+
+    mport_pkgmeta_vec_free(packs_orig);
+
+	return (0);
+}
+
+int 
+annotate_show(mportInstance *mport, const char *packageName, const char* tagName) 
+{
+    mportPackageMeta **packs = lookup_package(mport, packageName);
+    if (packs == NULL) {
+        return (MPORT_ERR_FATAL);
+    }
+
+	mportPackageMeta **packs_orig = packs;
+	while (*packs != NULL) {
+		if (strcmp(tagName, "flavor") == 0) {
+			if (packs->flavor != NULL && strlen(packs->flavor) > 0) {
+				printf("%s\n", packs->flavor);
+			}
 		}
 		packs++;
 	}
