@@ -358,8 +358,8 @@ main(int argc, char *argv[])
 			local_argv += optind;
 		}
 
-		if (argc > 1 &&sflag) {
-			resultCode = annotate_show(mport, argv[1], argv[2]);
+		if (local_argc > 1 && sflag) {
+			resultCode = annotate_show(mport, local_argv[0], local_argv[1]);
 		}
 	} else if (!strcmp(cmd, "audit")) {
 		loadIndex(mport);
