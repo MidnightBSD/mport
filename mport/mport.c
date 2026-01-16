@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2010-2018, 2021 Lucas Holt
+ * Copyright (c) 2010-2018, 2021, 2026 Lucas Holt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -680,6 +680,7 @@ usage(void)
 	    "    cpe [package]               List Common Platform Enumeration info\n"
 	    "    purl [package]              List Package URL info\n"
 	    "  Miscellaneous:\n"
+	    "    annotate [-qS]              Print package annotation\n"
 	    "    import <file>               Import package list\n"
 	    "    export <file>               Export package list\n"
 	    "    shell                       Open SQLite shell for package database\n"
