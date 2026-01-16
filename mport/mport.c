@@ -1513,8 +1513,8 @@ annotate_show(mportInstance *mport, const char *packageName, const char* tagName
 	mportPackageMeta **packs_orig = packs;
 	while (*packs != NULL) {
 		if (strcmp(tagName, "flavor") == 0) {
-			if (packs->flavor != NULL && strlen(packs->flavor) > 0) {
-				printf("%s\n", packs->flavor);
+			if ((*packs)->flavor != NULL && strlen((*packs)->flavor) > 0) {
+				printf("%s\n", (*packs)->flavor);
 			}
 		}
 		packs++;
