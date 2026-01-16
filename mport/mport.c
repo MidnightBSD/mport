@@ -1516,6 +1516,10 @@ annotate_show(mportInstance *mport, const char *packageName, const char* tagName
 			if ((*packs)->flavor != NULL && strlen((*packs)->flavor) > 0) {
 				printf("%s\n", (*packs)->flavor);
 			}
+		} else if (strcmp(tagName, "cpe") == 0) {
+			if ((*packs)->cpe != NULL && strlen((*packs)->cpe) > 0) {
+				printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, (*packs)->cpe );
+			}
 		}
 		packs++;
 	}
