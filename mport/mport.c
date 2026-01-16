@@ -347,10 +347,13 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "S")) != -1) {
+			while ((ch2 = getopt(local_argc, local_argv, "qS")) != -1) {
 				switch (ch2) {
 				case 'S':
 					sflag = 1;
+					break;
+				case 'q':
+					mport->verbosity = MPORT_VQUIET;
 					break;
 				}
 			}
@@ -359,8 +362,9 @@ main(int argc, char *argv[])
 		}
 
 		if (local_argc > 1 && sflag) {
-			resultCode = annotate_show(mport, local_argv[0], local_argv[1]);
-		}
+			int index = quiet == true ? 2 : 0;
+			resultCode = annotate_show(mport, local_argv[index], local_argv[index+1]);
+		} 
 	} else if (!strcmp(cmd, "audit")) {
 		loadIndex(mport);
 
@@ -1514,11 +1518,17 @@ annotate_show(mportInstance *mport, const char *packageName, const char* tagName
 	while (*packs != NULL) {
 		if (strcmp(tagName, "flavor") == 0) {
 			if ((*packs)->flavor != NULL && strlen((*packs)->flavor) > 0) {
-				printf("%s\n", (*packs)->flavor);
+				if (mport->verbosity == MPORT_VQUIET)
+					printf("%s\n", (*packs)->flavor);
+				else
+					printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, (*packs)->flavor );
 			}
 		} else if (strcmp(tagName, "cpe") == 0) {
 			if ((*packs)->cpe != NULL && strlen((*packs)->cpe) > 0) {
-				printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, (*packs)->cpe );
+				if (mport->verbosity == MPORT_VQUIET)
+					printf("%s\n", (*packs)->cpe);
+				else
+					printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, (*packs)->cpe );
 			}
 		}
 		packs++;
