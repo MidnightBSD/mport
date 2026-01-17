@@ -240,10 +240,13 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "Ay")) != -1) {
+			while ((ch2 = getopt(local_argc, local_argv, "AMy")) != -1) {
 				switch (ch2) {
 				case 'A':
 					aflag = 1;
+					break;
+				case 'M':
+					mport->ignoreMissing = true;
 					break;
 				case 'y':
 					setenv("ASSUME_ALWAYS_YES", "1", 1);
@@ -677,7 +680,7 @@ usage(void)
 	    "Commands:\n"
 	    "  Package Management:\n"
 	    "    add [-A] <package file>     Install package from file\n"
-	    "    install [-A] <package>      Install package from repository\n"
+	    "    install [-AMy] <package>      Install package from repository\n"
 	    "    delete <package>            Remove installed package\n"
 	    "    update [package]            Update installed package(s)\n"
 	    "    upgrade                     Upgrade all outdated packages\n"
