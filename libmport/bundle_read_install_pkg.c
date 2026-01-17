@@ -276,7 +276,7 @@ create_annotations(mportInstance *mport, mportPackageMeta *pkg)
 {
 	/* Insert the annotations into the master table */
 	if (mport_db_do(mport->db,
-	                "INSERT INTO annotations (pkg, annotation) SELECT pkg, annotation FROM stub.meta WHERE pkg=%Q",
+	                "INSERT INTO annotation (pkg, tag, val) SELECT %Q as pkg, field as tag, value as val FROM stub.meta",
 	                pkg->name) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
