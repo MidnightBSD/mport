@@ -133,6 +133,7 @@ time_t mport_get_time(void);
 bool mport_check_answer_bool(char *answer);
 int mport_count_spaces(const char *str);
 char * mport_tokenize(char **args);
+char * mport_get_osreleasedate(void);
 
 enum parse_states {
 	START,

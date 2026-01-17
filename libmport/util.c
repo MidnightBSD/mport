@@ -897,6 +897,26 @@ mport_get_osrelease(mportInstance *mport)
 	return version;
 }
 
+char *
+mport_get_osreleasedate(void)
+{
+	char osreleasedate[128];
+	size_t len;
+	char *date = NULL;
+
+	len = sizeof(osreleasedate);
+	if (sysctlbyname("kern.osreldate", &osreleasedate, &len, NULL, 0) < 0)
+		return NULL;
+
+	date = calloc(8, sizeof(char));
+	if (date == NULL)
+		return NULL;
+
+	strlcpy(date, osreleasedate, 8);
+
+	return date;
+}
+
 static char *
 mport_get_osrelease_kern(void)
 {

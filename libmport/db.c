@@ -46,6 +46,8 @@ static int mport_upgrade_master_schema_11to12(sqlite3 *);
 static int mport_upgrade_master_schema_12to13(sqlite3 *);
 static int mport_upgrade_master_schema_13to14(sqlite3 *);
 
+static void insert_meta_values(sqlite3 *db, char *key, char *value);
+
 /* mport_db_do(sqlite3 *db, const char *sql, ...)
  * 
  * A wrapper for executing a single sql query.  Takes a sqlite3 struct
@@ -251,20 +253,39 @@ mport_detach_stub_db(sqlite3 *db)
   if (mport_db_do(db, sql) != MPORT_OK) \
     RETURN_CURRENT_ERROR
 
+static void 
+insert_meta_values(sqlite3 *db, char *key, char *value) {
+	char *sql = NULL;
+	asprintf(&sql, "INSERT INTO meta VALUES (\"%s\", \"%s\")", key, value);
+	if (sql != NULL) {
+		RUN_SQL(db, sql);
+		free(sql);
+		sql = NULL;
+	}
+}
+
 int
 mport_generate_stub_schema(mportInstance *mport, sqlite3 *db)
 {
 	char *ptr = NULL;
-	char *sql = NULL;
+
+	/* create metadata for package, useful for annotations in master db */
+	RUN_SQL(db, "CREATE TABLE meta (field text NOT NULL, value text NOT NULL)");
+	insert_meta_values(db, "bundle_format_version", MPORT_BUNDLE_VERSION_STR);
 
 	ptr = mport_get_osrelease(mport);
 	if (ptr == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "OS Release could not be determined");
-	asprintf(&sql, "INSERT INTO meta VALUES (\"os_release\", \"%s\")", ptr);
+	insert_meta_values(db, "os_release", ptr);
+	free(ptr);
 
-	RUN_SQL(db, "CREATE TABLE meta (field text NOT NULL, value text NOT NULL)");
-	RUN_SQL(db, "INSERT INTO meta VALUES (\"bundle_format_version\", " MPORT_BUNDLE_VERSION_STR ")");
-	RUN_SQL(db, sql);
+	ptr = mport_get_osreleasedate();
+	if (ptr == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "OS Release Date could not be determined");
+	insert_meta_values(db, "MidnightBSD_version", ptr);
+	free(ptr);
+	ptr = NULL;
+
 	RUN_SQL(db,
 	        "CREATE TABLE assets (pkg text not NULL, type int NOT NULL, data text, checksum text, owner text, grp text, mode text)");
 	RUN_SQL(db,

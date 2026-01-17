@@ -74,6 +74,8 @@ static int create_conflicts(mportInstance *mport, mportPackageMeta *pkg);
 
 static int create_depends(mportInstance *mport, mportPackageMeta *pkg);
 
+static int create_annotations(mportInstance *mport, mportPackageMeta *pkg);
+
 static int create_sample_file(mportInstance *mport, char *cwd, const char *file);
 
 static char **parse_sample(char *input);
@@ -263,6 +265,18 @@ create_conflicts(mportInstance *mport, mportPackageMeta *pkg)
 	/* Insert the conflicts into the master table */
 	if (mport_db_do(mport->db,
 	                "INSERT INTO conflicts (pkg, conflict_pkg, conflict_version) SELECT pkg, conflict_pkg, conflict_version FROM stub.conflicts WHERE pkg=%Q",
+	                pkg->name) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	return MPORT_OK;
+}
+
+static int
+create_annotations(mportInstance *mport, mportPackageMeta *pkg)
+{
+	/* Insert the annotations into the master table */
+	if (mport_db_do(mport->db,
+	                "INSERT INTO annotations (pkg, annotation) SELECT pkg, annotation FROM stub.meta WHERE pkg=%Q",
 	                pkg->name) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
