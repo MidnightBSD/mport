@@ -500,6 +500,9 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 	if (create_conflicts(mport, pkg) != MPORT_OK)
 		goto ERROR;
 
+	if (create_annotations(mport, pkg) != MPORT_OK)
+		goto ERROR;
+
 	/* Insert the assets into the master table. We do this one by one because we want to insert file assets as absolute paths. */
 	if (mport_db_prepare(mport->db, &insert,
 	                     "INSERT INTO assets (pkg, type, data, checksum, owner, grp, mode) values (%Q,?,?,?,?,?,?)",
