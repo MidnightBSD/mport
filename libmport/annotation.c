@@ -71,7 +71,6 @@ mport_annotation_get(mportInstance *mport, const char *pkg, const char *tag, cha
 MPORT_PUBLIC_API int
 mport_annotation_set(mportInstance *mport, const char *pkg, const char *tag, const char *annotation)
 {
-    int result = MPORT_OK;
 
     return mport_db_do(mport->db,
                          "INSERT OR REPLACE INTO annotation (pkg, tag, val) VALUES (%Q, %Q, %Q)",
