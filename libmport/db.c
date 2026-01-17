@@ -261,7 +261,10 @@ insert_meta_values(sqlite3 *db, char *key, char *value) {
 		RUN_SQL(db, sql);
 		free(sql);
 		sql = NULL;
+		return MPORT_OK;
 	}
+
+	return MPORT_ERR_WARN;
 }
 
 int
