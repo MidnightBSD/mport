@@ -46,7 +46,7 @@ static int mport_upgrade_master_schema_11to12(sqlite3 *);
 static int mport_upgrade_master_schema_12to13(sqlite3 *);
 static int mport_upgrade_master_schema_13to14(sqlite3 *);
 
-static void insert_meta_values(sqlite3 *db, char *key, char *value);
+static int insert_meta_values(sqlite3 *db, char *key, char *value);
 
 /* mport_db_do(sqlite3 *db, const char *sql, ...)
  * 
@@ -253,7 +253,7 @@ mport_detach_stub_db(sqlite3 *db)
   if (mport_db_do(db, sql) != MPORT_OK) \
     RETURN_CURRENT_ERROR
 
-static void 
+static int 
 insert_meta_values(sqlite3 *db, char *key, char *value) {
 	char *sql = NULL;
 	asprintf(&sql, "INSERT INTO meta VALUES (\"%s\", \"%s\")", key, value);
