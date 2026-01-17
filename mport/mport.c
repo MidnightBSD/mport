@@ -95,8 +95,10 @@ static int selectMirror(mportInstance *mport);
 static mportPackageMeta **
 lookup_package(mportInstance *mport, const char *packageName);
 
-static int 
-annotate_show(mportInstance *mport, const char *packageName, const char* tagName);
+static int annotate_show(mportInstance *mport, const char *packageName, const char* tagName);
+static int annotate_list(mportInstance *mport, const char* tagName);
+static int annotate_delete(mportInstance *mport, const char *packageName, const char* tagName);
+static int annotate_add(mportInstance *mport, const char *packageName, const char* tagName, const char* tagValue);
 
 int
 main(int argc, char *argv[])
@@ -343,17 +345,29 @@ main(int argc, char *argv[])
 
 		int local_argc = argc;
 		char *const *local_argv = argv;
-		int sflag = 0;
+		int Sflag = 0;
+		int aflag = 0;
+		int Aflag = 0;
+		int Dflag = 0;
 
 		if (local_argc > 1) {
 			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "qS")) != -1) {
+			while ((ch2 = getopt(local_argc, local_argv, "aqADS")) != -1) {
 				switch (ch2) {
 				case 'S':
-					sflag = 1;
+					Sflag = 1;
 					break;
 				case 'q':
 					mport->verbosity = MPORT_VQUIET;
+					break;
+				case 'a':
+					aflag = 1;
+					break;
+				case 'A':
+					Aflag = 1;
+					break;
+				case 'D':
+					Dflag = 1;
 					break;
 				}
 			}
@@ -361,10 +375,21 @@ main(int argc, char *argv[])
 			local_argv += optind;
 		}
 
-		if (local_argc > 1 && sflag) {
+		if (local_argc > 1 && Sflag) {
 			int index = quiet == true ? 2 : 0;
-			resultCode = annotate_show(mport, local_argv[index], local_argv[index+1]);
-		} 
+			if (aflag == 0) { 
+				resultCode = annotate_show(mport, local_argv[index], local_argv[index+1]);
+			} else {
+				resultCode = annotate_list(mport, local_argv[1]);
+			}
+		} else if (local_argc > 1 && Dflag) {
+			resultCode = annotate_delete(mport, local_argv[1], local_argv[2]);
+		} else if (local_argc > 2 && Aflag) {
+			resultCode = annotate_add(mport, local_argv[1], local_argv[2], local_argv[3]);
+		} else {
+			mport_instance_free(mport);
+			usage();
+		}
 	} else if (!strcmp(cmd, "audit")) {
 		loadIndex(mport);
 
@@ -1507,9 +1532,46 @@ audit_package(mportInstance *mport, const char *packageName, bool dependsOn)
 	return (0);
 }
 
+int
+annotate_list(mportInstance *mport, const char* tagName) 
+{
+	mportPackageMeta **packs = NULL;
+	mportPackageMeta **packs_orig = NULL;
+
+	if (mport_pkgmeta_list(mport, &packs_orig) != MPORT_OK) {
+		warnx("%s", mport_err_string());
+		return mport_err_code();
+	}
+
+	if (packs_orig == NULL) {
+		warnx("No packages installed.");
+		return (1);
+	}
+
+	packs = packs_orig;
+	while (*packs != NULL) {
+		char *annotationValue = NULL;
+		int result = mport_annotation_get(mport, (*packs)->name, tagName, &annotationValue);
+		if (result == MPORT_OK && annotationValue != NULL) {
+			if (mport->verbosity == MPORT_VQUIET)
+				printf("%s\n", annotationValue);
+			else
+				printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, annotationValue );
+			free(annotationValue);
+			annotationValue = NULL;
+		}
+		packs++;
+	}
+
+	mport_pkgmeta_vec_free(packs_orig);
+
+	return (0);
+}
+
 int 
 annotate_show(mportInstance *mport, const char *packageName, const char* tagName) 
 {
+	char *annotationValue = NULL;
     mportPackageMeta **packs = lookup_package(mport, packageName);
     if (packs == NULL) {
         return (MPORT_ERR_FATAL);
@@ -1531,11 +1593,65 @@ annotate_show(mportInstance *mport, const char *packageName, const char* tagName
 				else
 					printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, (*packs)->cpe );
 			}
+		} else {
+			int result = mport_annotation_get(mport, (*packs)->name, tagName, &annotationValue);
+			if (result == MPORT_OK && annotationValue != NULL) {
+				if (mport->verbosity == MPORT_VQUIET)
+					printf("%s\n", annotationValue);
+				else
+					printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, annotationValue );
+				free(annotationValue);
+				annotationValue = NULL;
+			}
 		}
 		packs++;
 	}
 
     mport_pkgmeta_vec_free(packs_orig);
+
+	return (0);
+}
+
+int 
+annotate_add(mportInstance *mport, const char *packageName, const char* tagName, const char* tagValue) 
+{
+	mportPackageMeta **packs = lookup_package(mport, packageName);
+	if (packs == NULL) {
+		return (MPORT_ERR_FATAL);
+	}
+
+	mportPackageMeta **packs_orig = packs;
+	while (*packs != NULL) {
+		int result = mport_annotation_add(mport, (*packs)->name, tagName, tagValue);
+		if (result != MPORT_OK) {
+			warnx("%s", mport_err_string());
+		}
+		packs++;
+	}
+
+	mport_pkgmeta_vec_free(packs_orig);
+
+	return (0);
+}
+
+int
+annotate_delete(mportInstance *mport, const char *packageName, const char* tagName) 
+{
+	mportPackageMeta **packs = lookup_package(mport, packageName);
+	if (packs == NULL) {
+		return (MPORT_ERR_FATAL);
+	}
+
+	mportPackageMeta **packs_orig = packs;
+	while (*packs != NULL) {
+		int result = mport_annotation_delete(mport, (*packs)->name, tagName);
+		if (result != MPORT_OK) {
+			warnx("%s", mport_err_string());
+		}
+		packs++;
+	}
+
+	mport_pkgmeta_vec_free(packs_orig);
 
 	return (0);
 }
