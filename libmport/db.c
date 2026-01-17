@@ -275,7 +275,7 @@ mport_generate_stub_schema(mportInstance *mport, sqlite3 *db)
 	/* create metadata for package, useful for annotations in master db */
 	RUN_SQL(db, "CREATE TABLE meta (field text NOT NULL, value text NOT NULL)");
 	insert_meta_values(db, "bundle_format_version", MPORT_BUNDLE_VERSION_STR);
-	RUN_SQL(db, "INSERT INTO meta VALUES (\"build_timestamp\", date('now'))");
+	RUN_SQL(db, "INSERT INTO meta VALUES (\"build_timestamp\", datetime('now'))");
 
 	ptr = mport_get_osrelease(mport);
 	if (ptr == NULL)
