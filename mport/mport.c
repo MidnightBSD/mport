@@ -1622,7 +1622,7 @@ annotate_add(mportInstance *mport, const char *packageName, const char* tagName,
 
 	mportPackageMeta **packs_orig = packs;
 	while (*packs != NULL) {
-		int result = mport_annotation_add(mport, (*packs)->name, tagName, tagValue);
+		int result = mport_annotation_set(mport, (*packs)->name, tagName, tagValue);
 		if (result != MPORT_OK) {
 			warnx("%s", mport_err_string());
 		}
