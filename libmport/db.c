@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2013, 2014, 2018, 2022, 2023 Lucas Holt
+ * Copyright (c) 2013-2026 Lucas Holt
  * Copyright (c) 2007-2009 Chris Reinhardt
  * All rights reserved.
  *
@@ -44,6 +44,7 @@ static int mport_upgrade_master_schema_9to10(sqlite3 *);
 static int mport_upgrade_master_schema_10to11(sqlite3 *);
 static int mport_upgrade_master_schema_11to12(sqlite3 *);
 static int mport_upgrade_master_schema_12to13(sqlite3 *);
+static int mport_upgrade_master_schema_13to14(sqlite3 *);
 
 /* mport_db_do(sqlite3 *db, const char *sql, ...)
  * 
@@ -296,6 +297,7 @@ mport_upgrade_master_schema(sqlite3 *db, int databaseVersion)
 			mport_upgrade_master_schema_10to11(db);
 			mport_upgrade_master_schema_11to12(db);
 			mport_upgrade_master_schema_12to13(db);
+			mport_upgrade_master_schema_13to14(db);
 			mport_set_database_version(db);
 			break;
 		case 2:
@@ -330,8 +332,11 @@ mport_upgrade_master_schema(sqlite3 *db, int databaseVersion)
 		case 12:
 		    /* falls through */
 			mport_upgrade_master_schema_12to13(db);
-			mport_set_database_version(db);
 		case 13:
+		    /* falls through */
+			mport_upgrade_master_schema_13to14(db);
+			mport_set_database_version(db);
+		case 14:
 			break;
 		default:
 			RETURN_ERROR(MPORT_ERR_FATAL, "Invalid master database version");
@@ -460,6 +465,14 @@ mport_upgrade_master_schema_12to13(sqlite3 *db)
 	return (MPORT_OK);
 }
 
+static int
+mport_upgrade_master_schema_13to14(sqlite3 *db)
+{
+	RUN_SQL(db, "CREATE TABLE IF NOT EXISTS annotation (pkg text NOT NULL, tag TEXT NOT NULL, val TEXT NOT NULL, PRIMARY KEY (pkg, tag))");
+
+	return (MPORT_OK);
+}
+
 int
 mport_generate_master_schema(sqlite3 *db)
 {
@@ -494,6 +507,8 @@ mport_generate_master_schema(sqlite3 *db)
 	RUN_SQL(db, "INSERT OR IGNORE INTO settings VALUES (\"" MPORT_SETTING_HANDLE_RC_SCRIPTS "\", \"yes\")");
 	RUN_SQL(db, "INSERT OR IGNORE INTO settings VALUES (\"" MPORT_SETTING_REPO_AUTOUPDATE "\", \"yes\")");
 
+	RUN_SQL(db, "CREATE TABLE IF NOT EXISTS annotation (pkg text NOT NULL, tag TEXT NOT NULL, val TEXT NOT NULL, PRIMARY KEY (pkg, tag))");
+	
 	mport_set_database_version(db);
 
 	return (MPORT_OK);

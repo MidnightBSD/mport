@@ -353,6 +353,13 @@ const char * mport_err_string(void);
 #define MPORT_ERR_FATAL 		1
 #define MPORT_ERR_WARN			2
 
+/* Annotations */
+int mport_annotation_get(mportInstance *mport, const char *pkg, const char *tag, char **annotation);
+int mport_annotation_set(mportInstance *mport, const char *pkg, const char *tag, const char *annotation);
+int mport_annotation_delete(mportInstance *mport, const char *pkg, const char *tag);
+int mport_annotation_delete_all(mportInstance *mport, const char *pkg);
+int mport_annotation_list(mportInstance *mport, const char *pkg, char ***tags, int *tag_count);
+
 /* Clean */
 int mport_clean_database(mportInstance *);
 int mport_clean_oldpackages(mportInstance *);
