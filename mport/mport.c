@@ -240,10 +240,13 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "A")) != -1) {
+			while ((ch2 = getopt(local_argc, local_argv, "Ay")) != -1) {
 				switch (ch2) {
 				case 'A':
 					aflag = 1;
+					break;
+				case 'y':
+					setenv("ASSUME_ALWAYS_YES", "1", 1);
 					break;
 				}
 			}
