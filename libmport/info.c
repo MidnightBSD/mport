@@ -168,9 +168,9 @@ mport_info(mportInstance *mport, const char *packageName) {
 					char *val = NULL;
 					if (mport_annotation_get(mport, (*packs)->name, tags[i], &val) == MPORT_OK && val != NULL) {
 						if (i == 0)
-							fprintf(fp, "Annotations     : %s=%s\n", tags[i], val);
+							fprintf(fp, "Annotations     :\n                      %s:        %s\n", tags[i], val);
 						else
-							fprintf(fp, "                  : %s=%s\n", tags[i], val);
+							fprintf(fp, "                       %s:        %s\n", tags[i], val);
 						free(val);
 					}
 					free(tags[i]);
