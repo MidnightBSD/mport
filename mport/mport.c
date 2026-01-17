@@ -705,7 +705,7 @@ usage(void)
 	    "    cpe [package]               List Common Platform Enumeration info\n"
 	    "    purl [package]              List Package URL info\n"
 	    "  Miscellaneous:\n"
-	    "    annotate [-qS]              Print package annotation\n"
+	    "    annotate [-aqADS]           Manage annotations\n"
 	    "    import <file>               Import package list\n"
 	    "    export <file>               Export package list\n"
 	    "    shell                       Open SQLite shell for package database\n"
