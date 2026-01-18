@@ -120,7 +120,7 @@ do_pre_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *
 {
 	char cwd[FILENAME_MAX];
 	char file[FILENAME_MAX];
-	mportAssetList *alist;
+	mportAssetList *alist = NULL;
 	mportAssetListEntry *e = NULL;
 
 	/* run mtree */
@@ -191,9 +191,12 @@ do_pre_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *
 static int
 get_file_count(mportInstance *mport, char *pkg_name, int *file_total)
 {
-	sqlite3_stmt *count;
+	sqlite3_stmt *count = NULL;
 	int result = MPORT_OK;
-	char *err;
+	char *err = NULL;
+
+	if (pkg_name == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "pkg_name is null");
 
 	if (mport_db_prepare(mport->db, &count,
 	                     "SELECT COUNT(*) FROM stub.assets WHERE (type=%i or type=%i or type=%i or type=%i or type=%i or type=%i) AND pkg=%Q",
@@ -223,6 +226,11 @@ get_file_count(mportInstance *mport, char *pkg_name, int *file_total)
 static int
 create_package_row(mportInstance *mport, mportPackageMeta *pkg)
 {
+	if (pkg == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "pkg is null");
+	if (mport->db == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "mport database is not initialized");
+
 	/* Insert the package meta row into the packages table (We use pack here because things might have been twiddled) */
 	/* Note that this will be marked as dirty by default */
 	if (mport_db_do(mport->db,
@@ -238,6 +246,11 @@ create_package_row(mportInstance *mport, mportPackageMeta *pkg)
 static int
 create_depends(mportInstance *mport, mportPackageMeta *pkg)
 {
+	if (pkg == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "pkg is null");
+	if (mport->db == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "mport database is not initialized");
+
 	/* Insert the dependencies into the master table */
 	if (mport_db_do(mport->db,
 	                "INSERT INTO depends (pkg, depend_pkgname, depend_pkgversion, depend_port) SELECT pkg,depend_pkgname,depend_pkgversion,depend_port FROM stub.depends WHERE pkg=%Q",
@@ -250,6 +263,11 @@ create_depends(mportInstance *mport, mportPackageMeta *pkg)
 static int
 create_categories(mportInstance *mport, mportPackageMeta *pkg)
 {
+	if (pkg == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "pkg is null");
+	if (mport->db == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "mport database is not initialized");
+
 	/* Insert the categories into the master table */
 	if (mport_db_do(mport->db,
 	                "INSERT INTO categories (pkg, category) SELECT pkg, category FROM stub.categories WHERE pkg=%Q",
@@ -262,6 +280,11 @@ create_categories(mportInstance *mport, mportPackageMeta *pkg)
 static int
 create_conflicts(mportInstance *mport, mportPackageMeta *pkg)
 {
+	if (pkg == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "pkg is null");
+	if (mport->db == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "mport database is not initialized");
+
 	/* Insert the conflicts into the master table */
 	if (mport_db_do(mport->db,
 	                "INSERT INTO conflicts (pkg, conflict_pkg, conflict_version) SELECT pkg, conflict_pkg, conflict_version FROM stub.conflicts WHERE pkg=%Q",
@@ -274,6 +297,11 @@ create_conflicts(mportInstance *mport, mportPackageMeta *pkg)
 static int
 create_annotations(mportInstance *mport, mportPackageMeta *pkg)
 {
+	if (pkg == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "pkg is null");
+	if (mport->db == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "mport database is not initialized");
+
 	/* Insert the annotations into the master table */
 	if (mport_db_do(mport->db,
 	                "INSERT INTO annotation (pkg, tag, val) SELECT %Q as pkg, field as tag, value as val FROM stub.meta",
@@ -288,6 +316,10 @@ static char **
 parse_sample(char *input)
 {
 	char **ap, **argv;
+
+	if (input == NULL)
+		return NULL;
+
 	argv = calloc(3, sizeof(char *));
 
 	if (argv == NULL)

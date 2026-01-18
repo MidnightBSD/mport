@@ -128,6 +128,11 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 	int cur_pipe[2];
 	char *line = NULL;
 
+	if (pkg == NULL) {
+		SET_ERROR(MPORT_ERR_FATAL, "Invalid package passed to mport_lua_script_run()");
+		return (MPORT_ERR_FATAL);
+	}
+
 	if (tll_length(pkg->lua_scripts[type]) == 0)
 		return (MPORT_OK);
 
@@ -244,7 +249,11 @@ mport_lua_script_from_ucl(mportInstance *mport, mportPackageMeta *pkg, const ucl
 		if (ucl_object_type(cur) != UCL_STRING) {
             RETURN_ERROR(MPORT_ERR_FATAL, "lua scripts should be strings.\n");
 		}
-		tll_push_back(pkg->lua_scripts[type], strdup(ucl_object_tostring(cur)));
+		char *script = strdup(ucl_object_tostring(cur));
+		if (script == NULL) {
+			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+		}
+		tll_push_back(pkg->lua_scripts[type], script);
 	}
 	return (MPORT_OK);
 }
@@ -264,11 +273,11 @@ int
 mport_lua_script_read_file(mportInstance *mport, mportPackageMeta *pkg, mport_lua_script type, char *luafile)
 {
 	char filename[FILENAME_MAX];
-	char *buf;
+	char *buf = NULL;
 	struct stat st;
-	FILE *file;
-	struct ucl_parser *parser;
-	ucl_object_t *obj;
+	FILE *file = NULL;
+	struct ucl_parser *parser = NULL;
+	ucl_object_t *obj = NULL;
 
 	/* Assumes copy_metafile has run on install already */
 	(void)snprintf(filename, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_INST_INFRA_DIR,

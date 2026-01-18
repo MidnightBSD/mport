@@ -503,6 +503,8 @@ mport_directory(const char *path)
 	if (path[0] == '/') {
 		// 'path' is a full path, so we can extract the directory directly
 		char *dir = strdup(path);
+		if (dir == NULL)
+			return NULL;
 		char *lastSlash = strrchr(dir, '/');
 		if (lastSlash != NULL) {
 			*lastSlash = '\0'; // Null-terminate at the last slash to get the directory
