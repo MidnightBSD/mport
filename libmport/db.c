@@ -204,7 +204,8 @@ mport_attach_stub_db(sqlite3 *db, const char *dir)
 {
 	char *file = NULL;
 
-	asprintf(&file, "%s/%s", dir, MPORT_STUB_DB_FILE);
+	if (asprintf(&file, "%s/%s", dir, MPORT_STUB_DB_FILE) == -1)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
 
 	if (mport_db_do(db, "ATTACH %Q AS stub", file) != MPORT_OK) {
 		/* it might be attached already on error */

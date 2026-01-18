@@ -252,9 +252,7 @@ mport_chdir(mportInstance *mport, const char *dir)
 	if (mport != NULL) {
 		char *finaldir = NULL;
 
-		asprintf(&finaldir, "%s%s", mport->root, dir);
-
-		if (finaldir == NULL)
+		if (asprintf(&finaldir, "%s%s", mport->root, dir) == -1)
 			RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't building root'ed dir");
 
 		if (chdir(finaldir) != 0) {
@@ -746,7 +744,9 @@ mport_run_asset_exec(mportInstance *mport, const char *fmt, const char *cwd, con
 				max -= l;
 				break;
 			case 'B':
-				lfcpy = malloc(strlen(last_file) * sizeof(char));
+				lfcpy = strdup(last_file);
+				if (lfcpy == NULL)
+					RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
 				name = dirname(lfcpy); /* dirname(3) in MidnightBSD 3.0 and higher
 							  modifies the source. */
 				(void)strlcpy(pos, name, max);
@@ -1020,8 +1020,11 @@ mport_version(mportInstance *mport)
 {
 	char *version = NULL;
 	char *osrel = mport_get_osrelease(mport);
-	asprintf(&version, "mport %s for MidnightBSD %s, Bundle Version %s\n", MPORT_VERSION, osrel,
-	    MPORT_BUNDLE_VERSION_STR);
+	if (asprintf(&version, "mport %s for MidnightBSD %s, Bundle Version %s\n", MPORT_VERSION, osrel,
+	    MPORT_BUNDLE_VERSION_STR) == -1) {
+		free(osrel);
+		return NULL;
+	}
 	free(osrel);
 	osrel = NULL;
 
@@ -1033,7 +1036,10 @@ mport_version_short(mportInstance *mport)
 {
 	char *version = NULL;
 	char *osrel = mport_get_osrelease(mport);
-	asprintf(&version, "%s\n", MPORT_VERSION);
+	if (asprintf(&version, "%s\n", MPORT_VERSION) == -1) {
+		free(osrel);
+		return NULL;
+	}
 	free(osrel);
 	osrel = NULL;
 
