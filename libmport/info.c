@@ -92,6 +92,16 @@ mport_info(mportInstance *mport, const char *packageName) {
 		expirationDate = 0;
 		options = strdup("");
 		desc = strdup("");
+
+		if (!status || !origin || !os_release || !cpe || !flavor || !deprecated || !options || !desc) {
+			free(status); free(origin); free(os_release); free(cpe);
+			free(flavor); free(deprecated); free(options); free(desc);
+			mport_index_entry_free_vec(indexEntry);
+			free(movedEntries);
+			SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+			return (NULL);
+		}
+
 		automatic = MPORT_EXPLICIT;
 		installDate = 0;
 		type = 0;
@@ -107,6 +117,10 @@ mport_info(mportInstance *mport, const char *packageName) {
 		flavor = (*packs)->flavor;
 		if (flavor == NULL) {
 			flavor = strdup("");
+			if (flavor == NULL) {
+				SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+				return (NULL);
+			}
 		}
 		deprecated = (*packs)->deprecated;
 		if (deprecated == NULL || deprecated[0] == '\0') {
@@ -114,6 +128,10 @@ mport_info(mportInstance *mport, const char *packageName) {
 				deprecated = strdup("yes");
 			} else {
 				deprecated = strdup("no");
+			}
+			if (deprecated == NULL) {
+				SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+				return (NULL);
 			}
 		}
 
@@ -127,11 +145,19 @@ mport_info(mportInstance *mport, const char *packageName) {
 
 		if (options == NULL) {
 			options = strdup("");
+			if (options == NULL) {
+				SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+				return (NULL);
+			}
 		}
 
 		desc = (*packs)->desc;
 		if (desc == NULL) {
 			desc = strdup("");
+			if (desc == NULL) {
+				SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+				return (NULL);
+			}
 		}
 
 		automatic = (*packs)->automatic;
