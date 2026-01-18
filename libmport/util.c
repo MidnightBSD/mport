@@ -1198,7 +1198,8 @@ mport_tokenize(char **args)
 	char *p, *p_start;
 	enum parse_states parse_state = START;
 
-	assert(args != NULL && *args != NULL);
+	if (args == NULL || *args == NULL)
+		return NULL;
 
 	for (p = p_start = *args; *p != '\0'; p++) {
 		switch (parse_state) {
@@ -1254,6 +1255,10 @@ finish:
 		else
 			*args = p;
 	}
+
+	if (parse_state == START)
+		return NULL;
+
 	return (p_start);
 }
 
