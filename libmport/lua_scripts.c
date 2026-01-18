@@ -126,7 +126,6 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 	int ret = MPORT_OK;
 	int pstat;
 	int cur_pipe[2];
-	char *line = NULL;
 
 	if (pkg == NULL) {
 		SET_ERROR(MPORT_ERR_FATAL, "Invalid package passed to mport_lua_script_run()");
@@ -181,17 +180,32 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 				char *walk, *begin, *line = NULL;
 				int spaces, argc = 0;
 				char **args = NULL;
+				char *args_base = NULL;
 
 				walk = strchr(s->item, '\n');
 				begin = s->item + strlen("-- args: ");
-				line = strndup(begin, walk - begin);
-				spaces = mport_count_spaces(line);
-				args = malloc((spaces + 1)* sizeof(char *));
-				walk = strdup(line);
-				while (walk != NULL) {
-					args[argc++] = mport_tokenize(&walk);
+				if (walk != NULL)
+					line = strndup(begin, walk - begin);
+				else
+					line = strdup(begin);
+
+				if (line != NULL) {
+					spaces = mport_count_spaces(line);
+					args = calloc((spaces + 2), sizeof(char *));
+					if (args != NULL) {
+						args_base = strdup(line);
+						if (args_base != NULL) {
+							walk = args_base;
+							while (walk != NULL) {
+								args[argc++] = mport_tokenize(&walk);
+							}
+							lua_args_table(L, args, argc);
+							free(args_base);
+						}
+						free(args);
+					}
+					free(line);
 				}
-				lua_args_table(L, args, argc);
 			}
 
 			//pkg_debug(3, "Scripts: executing lua\n--- BEGIN ---\n%s\nScripts: --- END ---", s->item);
@@ -221,7 +235,6 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 
 
 cleanup:
-	free(line);
 
 	return (ret);
 }
