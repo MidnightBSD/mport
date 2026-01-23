@@ -168,7 +168,7 @@ mport_upgrade(mportInstance *mport) {
 			continue;
 		}		
 
-		if ((*movedEntries)->moved_to_pkgname[0] != '\0') {   
+		if ((*movedEntries)->moved_to_pkgname != NULL && (*movedEntries)->moved_to_pkgname[0] != '\0') {   
 			mport_call_msg_cb(mport, "Package %s has moved to %s. Migrating %s\n", (*packs)->name, (*movedEntries)->moved_to_pkgname,  (*movedEntries)->moved_to_pkgname);
 			(*packs)->action = MPORT_ACTION_UPGRADE;
 			mport_delete_primative(mport, (*packs), true);
@@ -186,13 +186,12 @@ mport_upgrade(mportInstance *mport) {
     // update packages that haven't moved already
 	packs = packs_orig;
 	while (*packs != NULL) {
-#if defined(__MidnightBSD__)
+		#if defined(__MidnightBSD__)
 		slot = ohash_qlookup(&h, (*packs)->name);
 		key = ohash_find(&h, slot);
 		if (key == NULL) {
 		#endif
 			int match;
-			bool use_cached_index = false;
 
 			#if defined(__MidnightBSD__)
 			/* Check cache for index_check result */
@@ -200,7 +199,6 @@ mport_upgrade(mportInstance *mport) {
 			index_check_cache_t *cached_index = (index_check_cache_t *)ohash_find(&index_cache, slot);
 			if (cached_index != NULL && cached_index->cached) {
 				match = cached_index->result;
-				use_cached_index = true;
 			} else {
 				match = mport_index_check(mport, *packs);
 				/* Cache the result */
@@ -259,23 +257,27 @@ mport_upgrade(mportInstance *mport) {
 	packs_orig = NULL;
 	packs = NULL;
 #if defined(__MidnightBSD__)
-	/* Free cached moved entries - only free the cache structures, not the actual entries */
-	/* The actual moved entries are managed elsewhere and may still be in use */
-	for (slot = ohash_first(&moved_cache, &key); key != NULL; slot = ohash_next(&moved_cache, &slot)) {
-		moved_lookup_cache_t *cache_entry = (moved_lookup_cache_t *)ohash_find(&moved_cache, slot);
-		if (cache_entry != NULL) {
+	{
+		unsigned int iter_slot;
+		void *cache_val;
+
+		/* Free cached moved entries - only free the cache structures, not the actual entries */
+		/* The actual moved entries are managed elsewhere and may still be in use */
+		for (cache_val = ohash_first(&moved_cache, &iter_slot); cache_val != NULL;
+		    cache_val = ohash_next(&moved_cache, &iter_slot)) {
+			moved_lookup_cache_t *cache_entry = (moved_lookup_cache_t *)cache_val;
 			efree(cache_entry, sizeof(moved_lookup_cache_t), NULL);
 		}
-	}
-	ohash_delete(&moved_cache);
-	/* Free index cache entries */
-	for (slot = ohash_first(&index_cache, &key); key != NULL; slot = ohash_next(&index_cache, &slot)) {
-		index_check_cache_t *cache_entry = (index_check_cache_t *)ohash_find(&index_cache, slot);
-		if (cache_entry != NULL) {
+		ohash_delete(&moved_cache);
+
+		/* Free index cache entries */
+		for (cache_val = ohash_first(&index_cache, &iter_slot); cache_val != NULL;
+		    cache_val = ohash_next(&index_cache, &iter_slot)) {
+			index_check_cache_t *cache_entry = (index_check_cache_t *)cache_val;
 			efree(cache_entry, sizeof(index_check_cache_t), NULL);
 		}
+		ohash_delete(&index_cache);
 	}
-	ohash_delete(&index_cache);
 	ohash_delete(&h);
 #endif
 
