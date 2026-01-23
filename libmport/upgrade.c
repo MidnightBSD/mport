@@ -177,6 +177,9 @@ mport_upgrade(mportInstance *mport) {
 					mport_delete_primative(mport, (*packs), true);
 					// TODO: how to mark this action as an update?
 					mport_install_single(mport, (*ieUpdateMe)->pkgname,  NULL, NULL, (*packs)->automatic);
+					#if defined(__MidnightBSD__)
+					ohash_insert(&h, slot, (*ieUpdateMe)->pkgname);
+					#endif
 					updated++;
 				}
 				free(msg);
