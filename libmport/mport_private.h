@@ -61,7 +61,7 @@ struct ohash {
 #define MPORT_MASTER_VERSION 14
 #define MPORT_BUNDLE_VERSION 6
 #define MPORT_BUNDLE_VERSION_STR "6"
-#define MPORT_VERSION "2.7.5"
+#define MPORT_VERSION "2.7.6"
 
 #define MPORT_SETTING_MIRROR_REGION "mirror_region"
 #define MPORT_SETTING_TARGET_OS "target_os"
@@ -180,7 +180,7 @@ int mport_bundle_read_install_pkg(mportInstance *, mportBundleRead *, mportPacka
 int mport_bundle_read_update_pkg(mportInstance *, mportBundleRead *, mportPackageMeta *);
 
 int mport_install_depends(mportInstance *, const char *, const char *, mportAutomatic);
-int mport_update_down(mportInstance *, mportPackageMeta *, struct ohash_info *, struct ohash *);
+int mport_update_down(mportInstance *, mportPackageMeta *, struct ohash_info *, struct ohash *, struct ohash *);
 
 /* version compare functions */
 void mport_version_cmp_sqlite(sqlite3_context *, int, sqlite3_value **);
