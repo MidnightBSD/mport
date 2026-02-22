@@ -61,6 +61,18 @@ efree(void *p, size_t s1, void *data){
 	free(p);
 }
 
+/* Cache structure for index check results */
+typedef struct {
+	int result;  /* 0 = no update, 1 = update available, 2 = origin match */
+	bool cached;
+} index_check_cache_t;
+
+/* Cache structure for moved lookup results */
+typedef struct {
+	mportIndexMovedEntry **entries;
+	bool cached;
+} moved_lookup_cache_t;
+
 MPORT_PUBLIC_API int
 mport_upgrade(mportInstance *mport) {
 	mportPackageMeta **packs, **packs_orig = NULL;
@@ -68,7 +80,10 @@ mport_upgrade(mportInstance *mport) {
 	int updated = 0;
 #if defined(__MidnightBSD__)
 	struct ohash_info info = { 0, NULL, ecalloc, efree, NULL };
-	struct ohash h;
+	struct ohash h;  /* Tracks processed packages */
+	struct ohash_info cache_info = { 0, NULL, ecalloc, efree, NULL };
+	struct ohash index_cache;  /* Caches index_check results */
+	struct ohash moved_cache;  /* Caches moved_lookup results */
 #endif
 	unsigned int slot;
 	char *key = NULL;
@@ -90,12 +105,15 @@ mport_upgrade(mportInstance *mport) {
 
 #if defined(__MidnightBSD__)
 	ohash_init(&h, 6, &info);
+	ohash_init(&index_cache, 6, &cache_info);
+	ohash_init(&moved_cache, 6, &cache_info);
 	#endif
 
 	// check for moved/expired packages first
 	packs = packs_orig;
 	while (*packs != NULL) {
-		mportIndexMovedEntry **movedEntries;
+		mportIndexMovedEntry **movedEntries = NULL;
+		bool use_cached_moved = false;
 
 		#if defined(__MidnightBSD__)
 		slot = ohash_qlookup(&h, (*packs)->name);
@@ -104,12 +122,36 @@ mport_upgrade(mportInstance *mport) {
 			packs++;
 			continue;
 		}
+
+		/* Check cache for moved lookup */
+		slot = ohash_qlookup(&moved_cache, (*packs)->origin);
+		moved_lookup_cache_t *cached_moved = (moved_lookup_cache_t *)ohash_find(&moved_cache, slot);
+		if (cached_moved != NULL && cached_moved->cached) {
+			movedEntries = cached_moved->entries;
+			use_cached_moved = true;
+		}
 		#endif
 
-		if (mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK ||
-		    movedEntries == NULL || *movedEntries == NULL) {
-			packs++;
-			continue;
+		if (!use_cached_moved) {
+			if (mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK ||
+			    movedEntries == NULL || *movedEntries == NULL) {
+				#if defined(__MidnightBSD__)
+				/* Cache negative result to avoid repeated queries */
+				moved_lookup_cache_t *cache_entry = (moved_lookup_cache_t *)ecalloc(sizeof(moved_lookup_cache_t), NULL);
+				cache_entry->entries = NULL;
+				cache_entry->cached = true;
+				ohash_insert(&moved_cache, slot, cache_entry);
+				#endif
+				packs++;
+				continue;
+			}
+			#if defined(__MidnightBSD__)
+			/* Cache positive result - entries are managed by mport_moved_lookup */
+			moved_lookup_cache_t *cache_entry = (moved_lookup_cache_t *)ecalloc(sizeof(moved_lookup_cache_t), NULL);
+			cache_entry->entries = movedEntries;
+			cache_entry->cached = true;
+			ohash_insert(&moved_cache, slot, cache_entry);
+			#endif
 		}
 
 		if ((*movedEntries)->date[0] != '\0') {
@@ -126,7 +168,7 @@ mport_upgrade(mportInstance *mport) {
 			continue;
 		}		
 
-		if ((*movedEntries)->moved_to_pkgname != NULL && (*movedEntries)->moved_to_pkgname[0]!= '\0') {   
+		if ((*movedEntries)->moved_to_pkgname != NULL && (*movedEntries)->moved_to_pkgname[0] != '\0') {   
 			mport_call_msg_cb(mport, "Package %s has moved to %s. Migrating %s\n", (*packs)->name, (*movedEntries)->moved_to_pkgname,  (*movedEntries)->moved_to_pkgname);
 			(*packs)->action = MPORT_ACTION_UPGRADE;
 			mport_delete_primative(mport, (*packs), true);
@@ -144,18 +186,37 @@ mport_upgrade(mportInstance *mport) {
     // update packages that haven't moved already
 	packs = packs_orig;
 	while (*packs != NULL) {
-#if defined(__MidnightBSD__)
+		#if defined(__MidnightBSD__)
 		slot = ohash_qlookup(&h, (*packs)->name);
 		key = ohash_find(&h, slot);
 		if (key == NULL) {
 		#endif
-			int match = mport_index_check(mport, *packs);
+			int match;
+
+			#if defined(__MidnightBSD__)
+			/* Check cache for index_check result */
+			slot = ohash_qlookup(&index_cache, (*packs)->name);
+			index_check_cache_t *cached_index = (index_check_cache_t *)ohash_find(&index_cache, slot);
+			if (cached_index != NULL && cached_index->cached) {
+				match = cached_index->result;
+			} else {
+				match = mport_index_check(mport, *packs);
+				/* Cache the result */
+				index_check_cache_t *cache_entry = (index_check_cache_t *)ecalloc(sizeof(index_check_cache_t), NULL);
+				cache_entry->result = match;
+				cache_entry->cached = true;
+				ohash_insert(&index_cache, slot, cache_entry);
+			}
+			#else
+			match = mport_index_check(mport, *packs);
+			#endif
+
 			if (match == 1) {
 				(*packs)->action = MPORT_ACTION_UPGRADE;
 				#if defined(__MidnightBSD__)
-				updated += mport_update_down(mport, *packs, &info, &h);
+				updated += mport_update_down(mport, *packs, &info, &h, &index_cache);
 				#else
-				updated += mport_update_down(mport, *packs, NULL, NULL);
+				updated += mport_update_down(mport, *packs, NULL, NULL, NULL);
 				#endif
 			} else if (match == 2) {
 				mportIndexEntry **ieUpdateMe;
@@ -179,6 +240,7 @@ mport_upgrade(mportInstance *mport) {
 					// TODO: how to mark this action as an update?
 					mport_install_single(mport, (*ieUpdateMe)->pkgname,  NULL, NULL, (*packs)->automatic);
 					#if defined(__MidnightBSD__)
+					slot = ohash_qlookup(&h, (*ieUpdateMe)->pkgname);
 					ohash_insert(&h, slot, (*ieUpdateMe)->pkgname);
 					#endif
 					updated++;
@@ -195,6 +257,27 @@ mport_upgrade(mportInstance *mport) {
 	packs_orig = NULL;
 	packs = NULL;
 #if defined(__MidnightBSD__)
+	{
+		unsigned int iter_slot;
+		void *cache_val;
+
+		/* Free cached moved entries - only free the cache structures, not the actual entries */
+		/* The actual moved entries are managed elsewhere and may still be in use */
+		for (cache_val = ohash_first(&moved_cache, &iter_slot); cache_val != NULL;
+		    cache_val = ohash_next(&moved_cache, &iter_slot)) {
+			moved_lookup_cache_t *cache_entry = (moved_lookup_cache_t *)cache_val;
+			efree(cache_entry, sizeof(moved_lookup_cache_t), NULL);
+		}
+		ohash_delete(&moved_cache);
+
+		/* Free index cache entries */
+		for (cache_val = ohash_first(&index_cache, &iter_slot); cache_val != NULL;
+		    cache_val = ohash_next(&index_cache, &iter_slot)) {
+			index_check_cache_t *cache_entry = (index_check_cache_t *)cache_val;
+			efree(cache_entry, sizeof(index_check_cache_t), NULL);
+		}
+		ohash_delete(&index_cache);
+	}
 	ohash_delete(&h);
 #endif
 
@@ -203,7 +286,7 @@ mport_upgrade(mportInstance *mport) {
 }
 
 int
-mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_info *info, struct ohash *h) {
+mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_info *info, struct ohash *h, struct ohash *index_cache) {
 	mportPackageMeta **depends, **depends_orig;
 	int ret = 0;
 	unsigned int slot;
@@ -217,7 +300,34 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 			key = ohash_find(h, slot);
 			#endif
 			if (key == NULL) {
-				if (mport_index_check(mport, pack)) {
+				int match;
+				bool use_cached = false;
+
+				#if defined(__MidnightBSD__)
+				if (index_cache != NULL) {
+					slot = ohash_qlookup(index_cache, pack->name);
+					index_check_cache_t *cached = (index_check_cache_t *)ohash_find(index_cache, slot);
+					if (cached != NULL && cached->cached) {
+						match = cached->result;
+						use_cached = true;
+					}
+				}
+				#endif
+
+				if (!use_cached) {
+					match = mport_index_check(mport, pack);
+					#if defined(__MidnightBSD__)
+					if (index_cache != NULL) {
+						/* Cache the result */
+						index_check_cache_t *cache_entry = (index_check_cache_t *)ecalloc(sizeof(index_check_cache_t), NULL);
+						cache_entry->result = match;
+						cache_entry->cached = true;
+						ohash_insert(index_cache, slot, cache_entry);
+					}
+					#endif
+				}
+
+				if (match) {
 					mport_call_msg_cb(mport, "Updating %s\n", pack->name);
 					pack->action = MPORT_ACTION_UPGRADE;
 					if (mport_update(mport, pack->name) !=0) {
@@ -226,6 +336,7 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 					} else {
 						ret = 1;
 #if defined(__MidnightBSD__)
+						slot = ohash_qlookup(h, pack->name);
 						ohash_insert(h, slot, pack->name);
 #endif
 					}
@@ -242,8 +353,36 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 				key = ohash_find(h, slot);
 #endif
 				if (key == NULL) {
-					ret += mport_update_down(mport, (*depends), info, h);
-					if (mport_index_check(mport, *depends)) {
+					ret += mport_update_down(mport, (*depends), info, h, index_cache);
+					
+					int match;
+					bool use_cached = false;
+
+					#if defined(__MidnightBSD__)
+					if (index_cache != NULL) {
+						slot = ohash_qlookup(index_cache, (*depends)->name);
+						index_check_cache_t *cached = (index_check_cache_t *)ohash_find(index_cache, slot);
+						if (cached != NULL && cached->cached) {
+							match = cached->result;
+							use_cached = true;
+						}
+					}
+					#endif
+
+					if (!use_cached) {
+						match = mport_index_check(mport, *depends);
+						#if defined(__MidnightBSD__)
+						if (index_cache != NULL) {
+							/* Cache the result */
+							index_check_cache_t *cache_entry = (index_check_cache_t *)ecalloc(sizeof(index_check_cache_t), NULL);
+							cache_entry->result = match;
+							cache_entry->cached = true;
+							ohash_insert(index_cache, slot, cache_entry);
+						}
+						#endif
+					}
+
+					if (match) {
 						mport_call_msg_cb(mport, "Updating depends %s\n", (*depends)->name);
 						(*depends)->action = MPORT_ACTION_UPGRADE;
 						if (mport_update(mport, (*depends)->name) != 0) {
@@ -251,6 +390,7 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 						} else {
 							ret++;
 #if defined(__MidnightBSD__)
+							slot = ohash_qlookup(h, (*depends)->name);
 							ohash_insert(h, slot, (*depends)->name);
 #endif
 						}
@@ -258,7 +398,35 @@ mport_update_down(mportInstance *mport, mportPackageMeta *pack, struct ohash_inf
 				}
 				depends++;
 			}
-			if (mport_index_check(mport, pack)) {
+			
+			int match;
+			bool use_cached = false;
+
+			#if defined(__MidnightBSD__)
+			if (index_cache != NULL) {
+				slot = ohash_qlookup(index_cache, pack->name);
+				index_check_cache_t *cached = (index_check_cache_t *)ohash_find(index_cache, slot);
+				if (cached != NULL && cached->cached) {
+					match = cached->result;
+					use_cached = true;
+				}
+			}
+			#endif
+
+			if (!use_cached) {
+				match = mport_index_check(mport, pack);
+				#if defined(__MidnightBSD__)
+				if (index_cache != NULL) {
+					/* Cache the result */
+					index_check_cache_t *cache_entry = (index_check_cache_t *)ecalloc(sizeof(index_check_cache_t), NULL);
+					cache_entry->result = match;
+					cache_entry->cached = true;
+					ohash_insert(index_cache, slot, cache_entry);
+				}
+				#endif
+			}
+
+			if (match) {
 				if (mport_update(mport, pack->name) != 0) {
 					mport_call_msg_cb(mport, "Error updating %s\n", pack->name);
 				} else {
