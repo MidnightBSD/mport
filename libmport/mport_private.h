@@ -41,7 +41,6 @@
 #if defined(__MidnightBSD__)
 #include <osreldate.h>
 #include <ohash.h>
-#include <libutil.h>
 #else
 struct ohash_info {
 

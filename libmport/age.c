@@ -34,16 +34,17 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <libutil.h>
 #include "mport.h"
 #include "mport_private.h"
 
 bool 
 mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack) 
 {
-    char *age_str = NULL;
-    int age = 0;
 
 #if defined(__MidnightBSD__) && __MidnightBSD_version >= 400004    
+    char *age_str = NULL;
+    int age = 0;
 
     if (mport_annotation_get(mport, pack->origin, "age", &age_str) != MPORT_OK) {
         mport_call_msg_cb(mport, "Failed to get age annotation for package %s: %s", pack->origin, mport_err_string());

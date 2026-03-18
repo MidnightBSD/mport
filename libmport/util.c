@@ -624,7 +624,6 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 	scan_ptr = scan;
 
 	/* first we need to get the length of the dependency list */
-	for (*list_size = 0; (field = strsep(&opt, " \t\n")) != NULL;) {
 	for (*list_size = 0; (field = strsep(&scan_ptr, " \t\n")) != NULL;) {
 		if (field != NULL && *field != '\0')
 			(*list_size)++;
