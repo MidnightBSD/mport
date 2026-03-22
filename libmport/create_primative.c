@@ -578,8 +578,8 @@ insert_annotations(sqlite3 *db, mportPackageMeta *pack, mportCreateExtras *extra
 		sep = strchr(tag, ':');
 
 		if (sep == NULL) {
-			// Malformed annotation
 			free(annotation_copy);
+			error_code = SET_ERRORX(MPORT_ERR_WARN, "malformed annotation (missing ':'): %s", s->item);
 			continue;
 		}
 
