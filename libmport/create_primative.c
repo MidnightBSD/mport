@@ -587,8 +587,8 @@ insert_annotations(sqlite3 *db, mportPackageMeta *pack, mportCreateExtras *extra
 		val = sep + 1;
 
 		if (sqlite3_bind_text(stmt, 1, pack->name, -1, SQLITE_STATIC) != SQLITE_OK ||
-		    sqlite3_bind_text(stmt, 2, tag, -1, SQLITE_STATIC) != SQLITE_OK ||
-		    sqlite3_bind_text(stmt, 3, val, -1, SQLITE_STATIC) != SQLITE_OK) {
+		    sqlite3_bind_text(stmt, 2, tag, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
+		    sqlite3_bind_text(stmt, 3, val, -1, SQLITE_TRANSIENT) != SQLITE_OK) {
 			error_code = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 			free(annotation_copy);
 			break;
