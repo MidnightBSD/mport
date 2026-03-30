@@ -37,6 +37,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/sysctl.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <spawn.h>
 #include <libgen.h>
 #include <stdlib.h>
@@ -47,6 +49,9 @@
 #include <stdarg.h>
 #include <archive_entry.h>
 #include <ucl.h>
+#include <pwd.h>
+#include <grp.h>
+#include <util.h>
 
 enum phase {
 	PREINSTALL, ACTUALINSTALL, POSTINSTALL
@@ -122,6 +127,25 @@ do_pre_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *
 	char file[FILENAME_MAX];
 	mportAssetList *alist = NULL;
 	mportAssetListEntry *e = NULL;
+	char *age_annotation = NULL;
+
+	/* Check for age restrictions */
+	if (mport_annotation_get(mport, pkg->name, "age", &age_annotation) == MPORT_OK && age_annotation != NULL) {
+		const char *user = getlogin();
+		if (user != NULL) {
+			int *ages = agev_get_age_bracket(user);
+			if (ages != NULL) {
+				int required_age = atoi(age_annotation);
+				if (required_age > ages[0]) {
+					free(ages);
+					free(age_annotation);
+					RETURN_ERRORX(MPORT_ERR_FATAL, "User not old enough to install this package. Required age: %d, user age: %d", required_age, ages[0]);
+				}
+				free(ages);
+			}
+		}
+		free(age_annotation);
+	}
 
 	/* run mtree */
 	if (run_mtree(mport, bundle, pkg) != MPORT_OK)
@@ -741,6 +765,32 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 					/* shell registration */
 					if (e->type == ASSET_SHELL && mport_shell_register(file) != MPORT_OK) {
 						goto ERROR;
+					}
+
+					/* age restriction */
+					char *age_annotation = NULL;
+					if (mport_annotation_get(mport, pkg->name, "age", &age_annotation) == MPORT_OK && age_annotation != NULL) {
+						if (strncmp(file, "/usr/local/bin/", 15) == 0 || strncmp(file, "/usr/local/sbin/", 16) == 0) {
+							int required_age = atoi(age_annotation);
+							const char *age_groups[] = {"age4p", "age13p", "age16p", "age18p"};
+							const int ages[] = {4, 13, 16, 18};
+							char cmd[1024];
+
+							for (size_t i = 0; i < sizeof(ages) / sizeof(ages[0]); i++) {
+								if (ages[i] < required_age) {
+									/* ZFS ACL */
+									snprintf(cmd, sizeof(cmd), "setfacl -m g:%s:r-x:deny %s", age_groups[i], file);
+									if (mport_xsystem(mport, cmd) != MPORT_OK) {
+										/* UFS ACL */
+										snprintf(cmd, sizeof(cmd), "setfacl -m group:%s:--- %s", age_groups[i], file);
+										if (mport_xsystem(mport, cmd) != MPORT_OK) {
+											mport_call_msg_cb(mport, "Could not set ACLs for age restriction on %s for group %s", file, age_groups[i]);
+										}
+									}
+								}
+							}
+						}
+						free(age_annotation);
 					}
 				}
 
