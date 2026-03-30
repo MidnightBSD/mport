@@ -52,6 +52,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <libutil.h>
+#include <limits.h>
 
 enum phase {
 	PREINSTALL, ACTUALINSTALL, POSTINSTALL
@@ -135,12 +136,34 @@ do_pre_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *
 		if (user != NULL) {
 			int *ages = agev_get_age_bracket(user);
 			if (ages != NULL) {
-				int required_age = atoi(age_annotation);
+				char *endptr = NULL;
+				long parsed_age;
+				int required_age;
+
+				errno = 0;
+				parsed_age = strtol(age_annotation, &endptr, 10);
+
+				/* Validate that the annotation is a clean, non-negative integer within int range */
+				if (errno != 0 ||
+				    endptr == age_annotation || /* no digits parsed */
+				    *endptr != '\0' ||          /* trailing garbage */
+				    parsed_age < 0 ||           /* negative ages not allowed */
+				    parsed_age > INT_MAX) {     /* out of int range */
+					free(ages);
+					free(age_annotation);
+					RETURN_ERRORX(MPORT_ERR_FATAL,
+					    "Invalid age annotation '%s' for package %s",
+					    age_annotation, pkg->name);
+				}
+
+				required_age = (int)parsed_age;
 				if (required_age > ages[0]) {
 					int user_age = ages[0];
 					free(ages);
 					free(age_annotation);
-					RETURN_ERRORX(MPORT_ERR_FATAL, "User not old enough to install this package. Required age: %d, user age: %d", required_age, user_age);
+					RETURN_ERRORX(MPORT_ERR_FATAL,
+					    "User not old enough to install this package. Required age: %d, user age: %d",
+					    required_age, user_age);
 				}
 				free(ages);
 			}
@@ -772,20 +795,45 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 					char *age_annotation = NULL;
 					if (mport_annotation_get(mport, pkg->name, "age", &age_annotation) == MPORT_OK && age_annotation != NULL) {
 						if (strncmp(file, "/usr/local/bin/", 15) == 0 || strncmp(file, "/usr/local/sbin/", 16) == 0) {
-							int required_age = atoi(age_annotation);
-							const char *age_groups[] = {"age4p", "age13p", "age16p", "age18p"};
-							const int ages[] = {4, 13, 16, 18};
-							char cmd[1024];
+							char *endptr = NULL;
+							long parsed_age;
+							int required_age;
 
-							for (size_t i = 0; i < sizeof(ages) / sizeof(ages[0]); i++) {
-								if (ages[i] < required_age) {
-									/* ZFS ACL */
-									snprintf(cmd, sizeof(cmd), "setfacl -m g:%s:r-x:deny %s", age_groups[i], file);
-									if (mport_xsystem(mport, cmd) != MPORT_OK) {
-										/* UFS ACL */
-										snprintf(cmd, sizeof(cmd), "setfacl -m group:%s:--- %s", age_groups[i], file);
-										if (mport_xsystem(mport, cmd) != MPORT_OK) {
-											mport_call_msg_cb(mport, "Could not set ACLs for age restriction on %s for group %s", file, age_groups[i]);
+							errno = 0;
+							parsed_age = strtol(age_annotation, &endptr, 10);
+
+							if (errno != 0 || endptr == age_annotation || *endptr != '\0' || parsed_age < 0 || parsed_age > INT_MAX) {
+								mport_call_msg_cb(mport, "Invalid age annotation '%s' for package %s, skipping ACLs.", age_annotation, pkg->name);
+							} else {
+								required_age = (int)parsed_age;
+								const char *age_groups[] = {"age4p", "age13p", "age16p", "age18p"};
+								const int ages[] = {4, 13, 16, 18};
+
+								for (size_t i = 0; i < sizeof(ages) / sizeof(ages[0]); i++) {
+									if (ages[i] < required_age) {
+										pid_t pid;
+										int ret;
+										char acl_spec[32];
+
+										/* ZFS ACL */
+										snprintf(acl_spec, sizeof(acl_spec), "g:%s:r-x:deny", age_groups[i]);
+										char *const zfs_args[] = {"/usr/bin/setfacl", "-m", acl_spec, (char *)file, NULL};
+										if ((ret = posix_spawn(&pid, "/usr/bin/setfacl", NULL, NULL, zfs_args, NULL)) == 0) {
+											waitpid(pid, &ret, 0);
+										}
+
+										if (ret != 0) {
+											/* UFS ACL */
+											snprintf(acl_spec, sizeof(acl_spec), "group:%s:---", age_groups[i]);
+											char *const ufs_args[] = {"/usr/bin/setfacl", "-m", acl_spec, (char *)file, NULL};
+											if ((ret = posix_spawn(&pid, "/usr/bin/setfacl", NULL, NULL, ufs_args, NULL)) == 0) {
+												waitpid(pid, &ret, 0);
+												if (ret != 0) {
+													mport_call_msg_cb(mport, "Could not set ACLs for age restriction on %s for group %s", file, age_groups[i]);
+												}
+											} else {
+												mport_call_msg_cb(mport, "Could not set ACLs for age restriction on %s for group %s", file, age_groups[i]);
+											}
 										}
 									}
 								}
