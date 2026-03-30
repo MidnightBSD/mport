@@ -51,7 +51,7 @@
 #include <ucl.h>
 #include <pwd.h>
 #include <grp.h>
-#include <util.h>
+#include <libutil.h>
 
 enum phase {
 	PREINSTALL, ACTUALINSTALL, POSTINSTALL
