@@ -497,8 +497,8 @@ mport_pkgmeta_logevent(mportInstance *mport, mportPackageMeta *pkg, const char *
 		RETURN_ERROR(MPORT_ERR_WARN, "null message to log");
 
 	return mport_db_do(mport->db,
-	    "INSERT INTO log (pkg, version, date, msg) VALUES (%s,%s,%i,%s)", pkg->name,
-	    pkg->version, now.tv_sec, msg);
+	    "INSERT INTO log (pkg, version, date, msg) VALUES (%Q,%Q,%i,%Q)", pkg->name,
+	    pkg->version, (int)now.tv_sec, msg);
 }
 
 /* enrich package meta vector with conflicts
