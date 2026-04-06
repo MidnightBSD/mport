@@ -53,6 +53,8 @@
 #include <grp.h>
 #include <libutil.h>
 #include <limits.h>
+#include <md5.h>
+#include <sha256.h>
 
 enum phase {
 	PREINSTALL, ACTUALINSTALL, POSTINSTALL
@@ -701,6 +703,25 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 
 				if (mport_bundle_read_extract_next_file(bundle, entry) != MPORT_OK)
 					goto ERROR;
+
+				if (e->checksum != NULL && e->checksum[0] != '\0') {
+					char hash[65];
+					if (strlen(e->checksum) < 34) {
+						if (MD5File(file, hash) == NULL) {
+							SET_ERRORX(MPORT_ERR_FATAL, "Could not MD5 %s: %s", file, strerror(errno));
+							goto ERROR;
+						}
+					} else {
+						if (SHA256_File(file, hash) == NULL) {
+							SET_ERRORX(MPORT_ERR_FATAL, "Could not SHA256 %s: %s", file, strerror(errno));
+							goto ERROR;
+						}
+					}
+					if (strcmp(hash, e->checksum) != 0) {
+						SET_ERRORX(MPORT_ERR_FATAL, "Checksum mismatch for %s: expected %s but got %s", file, e->checksum, hash);
+						goto ERROR;
+					}
+				}
 
 				if (lstat(file, &sb)) {
 					SET_ERRORX(MPORT_ERR_FATAL, "Unable to stat file %s", file);
