@@ -125,6 +125,7 @@ mport_createextras_free(mportCreateExtras *extra)
 	}
 
 	tll_free_and_free(extra->conflicts, free);
+	tll_free_and_free(extra->annotations, free);
 
 	free(extra);
 	extra = NULL;
@@ -497,6 +498,8 @@ mport_file_exists(const char *file)
 char *
 mport_directory(const char *path)
 {
+	if (path == NULL)
+		return NULL;
 
 	if (path[0] == '/') {
 		// 'path' is a full path, so we can extract the directory directly
@@ -509,24 +512,22 @@ mport_directory(const char *path)
 			return dir;
 		} else {
 			free(dir);
-			dir = NULL;
+			return NULL;
 		}
 	} else {
 		// 'path' is just a filename, so get the current working directory
 		char currentDir[PATH_MAX];
 		if (getcwd(currentDir, sizeof(currentDir)) != NULL) {
-			// Construct the full path by appending the filename
-			if (strlcat(currentDir, "/", sizeof(currentDir)) >= sizeof(currentDir) ||
-			    strlcat(currentDir, path, sizeof(currentDir)) >= sizeof(currentDir)) {
+			char *fullPath = NULL;
+			if (asprintf(&fullPath, "%s/%s", currentDir, path) == -1)
 				return NULL;
-			}
 
-			char *lastSlash = strrchr(currentDir, '/');
+			char *lastSlash = strrchr(fullPath, '/');
 			if (lastSlash != NULL) {
 				*lastSlash = '\0'; // Null-terminate at the last slash to get the directory
 			}
 
-			return strdup(currentDir);
+			return fullPath;
 		}
 	}
 

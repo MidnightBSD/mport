@@ -27,6 +27,7 @@
 *.so.*
 
 *.pico
+*.pieo
 *.depend
 
 # Executables
