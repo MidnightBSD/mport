@@ -658,6 +658,8 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 			continue;
 
 		*vec = strdup(field);
+		if (*vec == NULL)
+			break;
 		loc++;
 		vec++;
 	}

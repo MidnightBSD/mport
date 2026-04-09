@@ -1172,11 +1172,15 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 					strlcpy(in, "/usr/local/share/info", sizeof(in));
 				}
 				char *abs_path = realpath(in, NULL);
+				if (abs_path == NULL)
+					goto ERROR;
 				char *info_dir = dirname(abs_path);
-				if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") && 
+				if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") &&
 					mport_xsystem(mport, "/usr/local/bin/indexinfo %s", info_dir) != MPORT_OK) {
+					free(abs_path);
 					goto ERROR;
 				}
+				free(abs_path);
 				break;
 			case ASSET_KLD:
 				if (mport_xsystem(mport, "/usr/sbin/kldxref %s", file) != MPORT_OK) {
