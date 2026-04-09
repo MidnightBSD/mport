@@ -516,8 +516,10 @@ mport_directory(const char *path)
 		char currentDir[PATH_MAX];
 		if (getcwd(currentDir, sizeof(currentDir)) != NULL) {
 			// Construct the full path by appending the filename
-			strcat(currentDir, "/");
-			strcat(currentDir, path);
+			if (strlcat(currentDir, "/", sizeof(currentDir)) >= sizeof(currentDir) ||
+			    strlcat(currentDir, path, sizeof(currentDir)) >= sizeof(currentDir)) {
+				return NULL;
+			}
 
 			char *lastSlash = strrchr(currentDir, '/');
 			if (lastSlash != NULL) {

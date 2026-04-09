@@ -143,7 +143,8 @@ static int check_if_installed(mportInstance *mport, mportPackageMeta *pack)
 	if (step == SQLITE_DONE) {
 		if (pack->flavor != NULL && !mport_starts_with(pack->flavor, pack->name)) {
 			char *full_name;
-			asprintf(&full_name, "%s-%s", pack->flavor, pack->name);
+			if (asprintf(&full_name, "%s-%s", pack->flavor, pack->name) == -1)
+				RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
 			if (full_name != NULL) {
 				if (mport_db_prepare(mport->db, &stmt, "SELECT version, os_release FROM packages WHERE pkg=%Q", full_name) !=
 				    MPORT_OK) {

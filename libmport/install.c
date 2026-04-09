@@ -128,8 +128,7 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
     }
   }
 
-  asprintf(&filename, "%s/%s", MPORT_LOCAL_PKG_PATH, e[e_loc]->bundlefile);
-  if (filename == NULL) {
+  if (asprintf(&filename, "%s/%s", MPORT_LOCAL_PKG_PATH, e[e_loc]->bundlefile) == -1) {
     mport_index_entry_free_vec(e);
     e = NULL;
     RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
@@ -139,8 +138,7 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
     free(filename);
 
     /* fallback to install media location default */
-    asprintf(&filename, "%s/%s", MPORT_INSTALL_MEDIA_DIR, e[e_loc]->bundlefile);
-    if (filename == NULL) {
+    if (asprintf(&filename, "%s/%s", MPORT_INSTALL_MEDIA_DIR, e[e_loc]->bundlefile) == -1) {
       mport_index_entry_free_vec(e);
       e = NULL;
       RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
@@ -158,8 +156,7 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
             e = NULL;
             RETURN_CURRENT_ERROR;
         }
-      asprintf(&filename, "%s/%s", MPORT_FETCH_STAGING_DIR, e[e_loc]->bundlefile);
-      if (filename == NULL) {
+      if (asprintf(&filename, "%s/%s", MPORT_FETCH_STAGING_DIR, e[e_loc]->bundlefile) == -1) {
         mport_index_entry_free_vec(e);
         e = NULL;
         RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");

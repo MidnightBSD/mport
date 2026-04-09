@@ -297,12 +297,9 @@ index_update_last_checked(mportInstance *mport)
 	char *utime;
 	int ret;
 
-	asprintf(&utime, "%jd", (intmax_t) mport_get_time());
-	if (utime) {
-		ret = mport_setting_set(mport, MPORT_SETTING_INDEX_LAST_CHECKED, utime);
-	} else {
-		RETURN_CURRENT_ERROR;
-	}
+	if (asprintf(&utime, "%jd", (intmax_t) mport_get_time()) == -1)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+	ret = mport_setting_set(mport, MPORT_SETTING_INDEX_LAST_CHECKED, utime);
 	free(utime);
 
 	return ret;
@@ -578,11 +575,8 @@ mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char
 	if (strstr(search_term, "*") != NULL)
 		term = strdup(search_term);
 	else 
-		asprintf(&term, "*%s*", search_term);
-
-	if (term == NULL) {
+		if (asprintf(&term, "*%s*", search_term) == -1)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Could not allocate memory");
-	}
 
 	if (mport_db_count(mport->db, &len, "SELECT count(*) FROM idx.packages WHERE pkg glob %Q or comment glob %Q", term, term) != MPORT_OK) {
 		free(term);

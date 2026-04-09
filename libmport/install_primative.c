@@ -86,9 +86,15 @@ get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
 			depend_pkg = sqlite3_column_text(stmt, 0);
 			depend_version = sqlite3_column_text(stmt, 1);
 			if (sqlite3_column_type(stmt, 1) == SQLITE_NULL) {
-				asprintf(&dependencies[i], "%s", depend_pkg);
+				if (asprintf(&dependencies[i], "%s", depend_pkg) == -1) {
+					sqlite3_finalize(stmt);
+					return NULL;
+				}
 			} else {
-				asprintf(&dependencies[i], "%s-%s", depend_pkg, depend_version);
+				if (asprintf(&dependencies[i], "%s-%s", depend_pkg, depend_version) == -1) {
+					sqlite3_finalize(stmt);
+					return NULL;
+				}
 			}
 			i++;
 		} else if (ret == SQLITE_DONE) {
@@ -199,8 +205,7 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		char *dir = mport_directory(filename);
 		while (deps!= NULL && *deps != NULL) {
 			char *dep_filename = NULL; 
-			asprintf(&dep_filename, "%s/%s.mport", dir, *deps);
-			if (dep_filename == NULL) {
+			if (asprintf(&dep_filename, "%s/%s.mport", dir, *deps) == -1) {
 				deps++;
 				continue;
 			}

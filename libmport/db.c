@@ -254,18 +254,9 @@ mport_detach_stub_db(sqlite3 *db)
   if (mport_db_do(db, sql) != MPORT_OK) \
     RETURN_CURRENT_ERROR
 
-static int 
+static int
 insert_meta_values(sqlite3 *db, char *key, char *value) {
-	char *sql = NULL;
-	asprintf(&sql, "INSERT INTO meta VALUES (\"%s\", \"%s\")", key, value);
-	if (sql != NULL) {
-		RUN_SQL(db, sql);
-		free(sql);
-		sql = NULL;
-		return MPORT_OK;
-	}
-
-	return MPORT_ERR_WARN;
+	return mport_db_do(db, "INSERT INTO meta VALUES (%Q, %Q)", key, value);
 }
 
 int

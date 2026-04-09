@@ -250,6 +250,9 @@ mport_info(mportInstance *mport, const char *packageName) {
 		 desc);
 	}
 
+	if (info_text == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+
 	if (packs == NULL) {
 		free(status);
 		free(origin);
