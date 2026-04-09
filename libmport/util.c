@@ -812,17 +812,14 @@ mport_run_asset_exec(mportInstance *mport, const char *fmt, const char *cwd, con
 void
 mport_free_vec(void *vec)
 {
-	char *p = NULL;
-
 	if (vec == NULL)
 		return;
 
-	p = (char *)*(char **)vec;
+	char **cur = (char **)vec;
 
-	while (p != NULL) {
-		free(p);
-		p = NULL;
-		p++;
+	while (*cur != NULL) {
+		free(*cur);
+		cur++;
 	}
 
 	free(vec);
