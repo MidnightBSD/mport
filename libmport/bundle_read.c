@@ -274,7 +274,8 @@ mport_bundle_read_extract_next_file(mportBundleRead *bundle, struct archive_entr
 		ARCHIVE_EXTRACT_OWNER | ARCHIVE_EXTRACT_PERM |
 		    ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_ACL |
 		    ARCHIVE_EXTRACT_FFLAGS) != ARCHIVE_OK) {
-		RETURN_ERROR(MPORT_ERR_FATAL, archive_error_string(bundle->archive));
+		RETURN_ERRORX(MPORT_ERR_FATAL,
+			    "%s: %s", archive_error_string(bundle->archive), entry != NULL ? archive_entry_pathname(entry) : "unknown file");
 	}
 
 	return (MPORT_OK);
