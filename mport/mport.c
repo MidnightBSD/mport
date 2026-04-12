@@ -1017,7 +1017,7 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
 {
     mportPackageMeta **packs = NULL;
     int start = skipFirst ? 1 : 0;
-    int count = argc - start;
+    size_t count = (size_t)(argc - start);
     int package_count = 0;
 	int missing = 0;
 	int locked = 0;
@@ -1025,14 +1025,14 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
     char flatsize_str[8];
 	int resultCode = MPORT_OK;
 
-    mportPackageMeta ***results = calloc((size_t)count, sizeof(mportPackageMeta **));
+    mportPackageMeta ***results = calloc(count, sizeof(mportPackageMeta **));
     if (results == NULL)
         err(EXIT_FAILURE, "calloc");
 
 	printf("Installed packages to be REMOVED:\n\n");
 
     // First pass: query DB, display info, retain metadata for second pass
-    for (int i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
         mportPackageMeta **packs_orig = NULL;
         if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", argv[start + i]) != MPORT_OK) {
             warnx("%s", mport_err_string());
@@ -1067,12 +1067,13 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
     }
 
 	if (package_count == 0 || locked > 0 || missing > 0) {
-		printf("%d packages requested for removal: %d locked, %d missing\n", count, locked, missing);
+		printf("%zu packages requested for removal: %d locked, %d missing\n", count, locked, missing);
 	}
 
 	if (package_count == 0) {
-        for (int i = 0; i < count; i++)
-            mport_pkgmeta_vec_free(results[i]);
+        for (size_t i = 0; i < count; i++)
+            if (results[i] != NULL)
+                mport_pkgmeta_vec_free(results[i]);
         free(results);
 		return (MPORT_ERR_WARN); // No packages to delete
 	}
@@ -1085,14 +1086,15 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
     printf("Total disk space to be freed: %s\n", flatsize_str);
 
     if ((mport->confirm_cb)("Proceed with deinstalling packages?", "Delete", "Don't delete", 0) != MPORT_OK) {
-        for (int i = 0; i < count; i++)
-            mport_pkgmeta_vec_free(results[i]);
+        for (size_t i = 0; i < count; i++)
+            if (results[i] != NULL)
+                mport_pkgmeta_vec_free(results[i]);
         free(results);
         return (MPORT_ERR_WARN); // User chose not to proceed
     }
 
     // Second pass: delete using retained metadata, no DB re-query
-    for (int i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
         if (results[i] == NULL)
             continue;
 
