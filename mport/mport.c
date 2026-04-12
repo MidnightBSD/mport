@@ -1016,8 +1016,8 @@ int
 deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
 {
     mportPackageMeta **packs = NULL;
-    mportPackageMeta **packs_orig = NULL;
     int start = skipFirst ? 1 : 0;
+    size_t count = (size_t)(argc - start);
     int package_count = 0;
 	int missing = 0;
 	int locked = 0;
@@ -1025,22 +1025,28 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
     char flatsize_str[8];
 	int resultCode = MPORT_OK;
 
+    mportPackageMeta ***results = calloc(count, sizeof(mportPackageMeta **));
+    if (results == NULL)
+        err(EXIT_FAILURE, "calloc");
+
 	printf("Installed packages to be REMOVED:\n\n");
 
-    // First pass: count packages and calculate total flatsize
-    for (int i = start; i < argc; i++) {
-        if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", argv[i]) != MPORT_OK) {
+    // First pass: query DB, display info, retain metadata for second pass
+    for (size_t i = 0; i < count; i++) {
+        mportPackageMeta **packs_orig = NULL;
+        if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", argv[start + i]) != MPORT_OK) {
             warnx("%s", mport_err_string());
 			missing++;
             continue;
         }
 
         if (packs_orig == NULL) {
-            warnx("No packages installed matching '%s'", argv[i]);
+            warnx("No packages installed matching '%s'", argv[start + i]);
 			missing++;
             continue;
         }
 
+        results[i] = packs_orig;
         packs = packs_orig;
         while (*packs != NULL) {
 			printf("\t%s: %s", (*packs)->name, (*packs)->version);
@@ -1058,16 +1064,17 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
             packs++;
         }
 		printf("\n");
-
-        mport_pkgmeta_vec_free(packs_orig);
-        packs_orig = NULL;
     }
 
 	if (package_count == 0 || locked > 0 || missing > 0) {
-		printf("%d packages requested for removal: %d locked, %d missing\n", argc - start, locked, missing);
+		printf("%zu packages requested for removal: %d locked, %d missing\n", count, locked, missing);
 	}
 
 	if (package_count == 0) {
+        for (size_t i = 0; i < count; i++)
+            if (results[i] != NULL)
+                mport_pkgmeta_vec_free(results[i]);
+        free(results);
 		return (MPORT_ERR_WARN); // No packages to delete
 	}
 
@@ -1079,26 +1086,23 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
     printf("Total disk space to be freed: %s\n", flatsize_str);
 
     if ((mport->confirm_cb)("Proceed with deinstalling packages?", "Delete", "Don't delete", 0) != MPORT_OK) {
+        for (size_t i = 0; i < count; i++)
+            if (results[i] != NULL)
+                mport_pkgmeta_vec_free(results[i]);
+        free(results);
         return (MPORT_ERR_WARN); // User chose not to proceed
     }
 
-    // Second pass: actually delete the packages
-    for (int i = start; i < argc; i++) {
-        if (mport_pkgmeta_search_master(mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", argv[i]) != MPORT_OK) {
-            warnx("%s", mport_err_string());
+    // Second pass: delete using retained metadata, no DB re-query
+    for (size_t i = 0; i < count; i++) {
+        if (results[i] == NULL)
             continue;
-        }
 
-        if (packs_orig == NULL) {
-            warnx("No packages installed matching '%s'", argv[i]);
-            continue;
-        }
-
-        packs = packs_orig;
+        packs = results[i];
         while (*packs != NULL) {
-
 			if (mport_lock_islocked((*packs)) == MPORT_LOCKED) {
-				warnx("Package '%s' is locked. skipping", argv[i]);
+				warnx("Package '%s' is locked. skipping", argv[start + i]);
+                packs++;
                 continue;
             }
 
@@ -1109,10 +1113,10 @@ deleteMany(mportInstance *mport, int argc, char *argv[], bool skipFirst)
             packs++;
         }
 
-        mport_pkgmeta_vec_free(packs_orig);
-        packs_orig = NULL;
+        mport_pkgmeta_vec_free(results[i]);
     }
 
+    free(results);
     return (resultCode);
 }
 
