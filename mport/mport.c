@@ -1285,7 +1285,7 @@ cpeGet(mportInstance *mport, const char *packageName)
 
     mportPackageMeta **packs_orig = packs;
 	while (*packs != NULL) {
-		if ((*packs)->cpe != NULL && strlen((*packs)->cpe) > 0) {
+		if ((*packs)->cpe != NULL && (*packs)->cpe[0] != '\0') {
 			printf("%s\n", (*packs)->cpe);
 			cpe_total++;
 		}
@@ -1322,7 +1322,7 @@ cpeList(mportInstance *mport)
 
     packs = packs_orig;
 	while (*packs != NULL) {
-		if ((*packs)->cpe != NULL && strlen((*packs)->cpe) > 0) {
+		if ((*packs)->cpe != NULL && (*packs)->cpe[0] != '\0') {
 			printf("%s\n", (*packs)->cpe);
 			cpe_total++;
 		}
@@ -1584,20 +1584,22 @@ annotate_show(mportInstance *mport, const char *packageName, const char* tagName
     }
 
 	mportPackageMeta **packs_orig = packs;
+	int tag_flavor = strcmp(tagName, "flavor") == 0;
+	int tag_cpe = !tag_flavor && strcmp(tagName, "cpe") == 0;
 	while (*packs != NULL) {
-		if (strcmp(tagName, "flavor") == 0) {
-			if ((*packs)->flavor != NULL && strlen((*packs)->flavor) > 0) {
+		if (tag_flavor) {
+			if ((*packs)->flavor != NULL && (*packs)->flavor[0] != '\0') {
 				if (mport->verbosity == MPORT_VQUIET)
 					printf("%s\n", (*packs)->flavor);
 				else
-					printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, (*packs)->flavor );
+					printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, (*packs)->flavor);
 			}
-		} else if (strcmp(tagName, "cpe") == 0) {
-			if ((*packs)->cpe != NULL && strlen((*packs)->cpe) > 0) {
+		} else if (tag_cpe) {
+			if ((*packs)->cpe != NULL && (*packs)->cpe[0] != '\0') {
 				if (mport->verbosity == MPORT_VQUIET)
 					printf("%s\n", (*packs)->cpe);
 				else
-					printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, (*packs)->cpe );
+					printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, (*packs)->cpe);
 			}
 		} else {
 			int result = mport_annotation_get(mport, (*packs)->name, tagName, &annotationValue);
@@ -1605,7 +1607,7 @@ annotate_show(mportInstance *mport, const char *packageName, const char* tagName
 				if (mport->verbosity == MPORT_VQUIET)
 					printf("%s\n", annotationValue);
 				else
-					printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, annotationValue );
+					printf("%s-%s: Tag: %s Value: %s\n", (*packs)->name, (*packs)->version, tagName, annotationValue);
 				free(annotationValue);
 				annotationValue = NULL;
 			}
