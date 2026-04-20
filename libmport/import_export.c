@@ -41,7 +41,8 @@
 MPORT_PUBLIC_API int 
 mport_import(mportInstance *mport,  char  *path)
 {
-	FILE *file;
+	FILE *file = NULL;
+	FILE *input;
 	bool console = false;
 	char name[1024];
 
@@ -58,22 +59,21 @@ mport_import(mportInstance *mport,  char  *path)
 			RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open import file %s", path, strerror(errno));
 	}
 
-	while (!feof(file)) {
-		if (console) {
-			fgets(name, 1024, stdin);
-		} else {
-			fgets(name, 1024, file); 
-		}
-		
-		for (int i = 0; i < 1024; i++) {
-        	if (name[i] == '\n') {
-				name[i] = '\0';
-				break;
-			}
-		}
-		
+	input = console ? stdin : file;
+
+	while (fgets(name, sizeof(name), input) != NULL) {
+		name[strcspn(name, "\n")] = '\0';
+		if (name[0] == '\0')
+			continue;
+
 		mport_call_msg_cb(mport, "Installing %s", name);
 		mport_install(mport, name,  NULL, NULL, MPORT_EXPLICIT);
+	}
+
+	if (ferror(input)) {
+		if (!console)
+			fclose(file);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't read import source: %s", strerror(errno));
 	}
 
 	if (!console) {

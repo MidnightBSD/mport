@@ -168,10 +168,10 @@ void mport_default_progress_step_cb(int current, int total, const char *msg)
     bar_width = 10;
   }
 
-  if ((bar = (char *)calloc(width, sizeof(char))) == NULL) {
-    /* no memory, we're outa here */
-    (void)printf("%s\n", msg);
-    return;
+	  if ((bar = (char *)calloc((size_t)bar_width + 1, sizeof(char))) == NULL) {
+	    /* no memory, we're outa here */
+	    (void)printf("%s\n", msg);
+	    return;
   }
 
   percent = (double)current / (double)total;
@@ -203,4 +203,3 @@ void mport_default_progress_free_cb(void)
   (void)printf("\n");
   (void)fflush(stdout);
 }
-

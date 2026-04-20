@@ -229,6 +229,7 @@ mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
 static char *readJsonFile(char *jsonFile)
 {
 		FILE *fp;
+		long file_size;
 		size_t size;
 		char *buffer;
 
@@ -244,12 +245,29 @@ static char *readJsonFile(char *jsonFile)
 		}
 
 		// Get the file size
-		fseek(fp, 0, SEEK_END);
-		size = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
+		if (fseek(fp, 0, SEEK_END) != 0) {
+			SET_ERROR(MPORT_ERR_WARN, "could not determine file size");
+			fclose(fp);
+			return NULL;
+		}
+
+		file_size = ftell(fp);
+		if (file_size < 0) {
+			SET_ERROR(MPORT_ERR_WARN, "could not determine file size");
+			fclose(fp);
+			return NULL;
+		}
+
+		if (fseek(fp, 0, SEEK_SET) != 0) {
+			SET_ERROR(MPORT_ERR_WARN, "could not rewind file");
+			fclose(fp);
+			return NULL;
+		}
+
+		size = (size_t)file_size;
 
 		// Allocate memory for the file contents
-		buffer = (char *)malloc(size);
+		buffer = (char *)malloc(size + 1);
 		if (!buffer) {
 			SET_ERROR(MPORT_ERR_WARN, "could not allocate memory");
 			fclose(fp);
@@ -263,6 +281,7 @@ static char *readJsonFile(char *jsonFile)
 			free(buffer);
 			return NULL;
 		}
+		buffer[size] = '\0';
 
 		// Close the file
 		fclose(fp);

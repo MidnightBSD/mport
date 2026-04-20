@@ -101,11 +101,16 @@ mport_index_depends_list(mportInstance *mport, const char *pkgname, const char *
 				ret = MPORT_ERR_FATAL;
 				goto DONE;
 			}
-      
-			e[i]->pkgname    = strdup(sqlite3_column_text(stmt, 0));
-			e[i]->version    = strdup(sqlite3_column_text(stmt, 1));
-			e[i]->d_pkgname  = strdup(sqlite3_column_text(stmt, 2));
-			e[i]->d_version  = strdup(sqlite3_column_text(stmt, 3));
+
+			const unsigned char *pkgname = sqlite3_column_text(stmt, 0);
+			const unsigned char *version = sqlite3_column_text(stmt, 1);
+			const unsigned char *d_pkgname = sqlite3_column_text(stmt, 2);
+			const unsigned char *d_version = sqlite3_column_text(stmt, 3);
+
+			e[i]->pkgname = (pkgname == NULL) ? NULL : strdup((const char *)pkgname);
+			e[i]->version = (version == NULL) ? NULL : strdup((const char *)version);
+			e[i]->d_pkgname = (d_pkgname == NULL) ? NULL : strdup((const char *)d_pkgname);
+			e[i]->d_version = (d_version == NULL) ? NULL : strdup((const char *)d_version);
       
 			if (e[i]->pkgname == NULL ||
 			    e[i]->version == NULL ||

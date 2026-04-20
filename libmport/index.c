@@ -875,13 +875,26 @@ mport_moved_lookup(mportInstance *mport, const char *origin, mportIndexMovedEntr
 static void
 populate_row(sqlite3_stmt *stmt, mportIndexEntry *e)
 {
+	const unsigned char *pkgname;
+	const unsigned char *version;
+	const unsigned char *comment;
+	const unsigned char *bundlefile;
+	const unsigned char *license;
+	const unsigned char *hash;
 
-	e->pkgname = strdup((const char *) sqlite3_column_text(stmt, 0));
-	e->version = strdup((const char *) sqlite3_column_text(stmt, 1));
-	e->comment = strdup((const char *) sqlite3_column_text(stmt, 2));
-	e->bundlefile = strdup((const char *) sqlite3_column_text(stmt, 3));
-	e->license = strdup((const char *) sqlite3_column_text(stmt, 4));
-	e->hash = strdup((const char *) sqlite3_column_text(stmt, 5));
+	pkgname = sqlite3_column_text(stmt, 0);
+	version = sqlite3_column_text(stmt, 1);
+	comment = sqlite3_column_text(stmt, 2);
+	bundlefile = sqlite3_column_text(stmt, 3);
+	license = sqlite3_column_text(stmt, 4);
+	hash = sqlite3_column_text(stmt, 5);
+
+	e->pkgname = (pkgname == NULL) ? NULL : strdup((const char *)pkgname);
+	e->version = (version == NULL) ? NULL : strdup((const char *)version);
+	e->comment = (comment == NULL) ? NULL : strdup((const char *)comment);
+	e->bundlefile = (bundlefile == NULL) ? NULL : strdup((const char *)bundlefile);
+	e->license = (license == NULL) ? NULL : strdup((const char *)license);
+	e->hash = (hash == NULL) ? NULL : strdup((const char *)hash);
 
 	if (sqlite3_column_type(stmt, 6) == SQLITE_INTEGER) {
         e->type = sqlite3_column_int(stmt, 6);
