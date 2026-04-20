@@ -88,6 +88,9 @@ main(int argc, char *argv[]) {
 		if (chroot(chroot_path) == -1) {
 			err(EXIT_FAILURE, "chroot failed");
 		}
+		if (chdir("/") == -1) {
+			err(EXIT_FAILURE, "chdir failed");
+		}
 	}
 
 	mport = mport_instance_new();

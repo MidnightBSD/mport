@@ -78,6 +78,9 @@ main(int argc, char *argv[]) {
 		if (chroot(chroot_path) == -1) {
 			err(EXIT_FAILURE, "chroot failed");
 		}
+		if (chdir("/") == -1) {
+			err(EXIT_FAILURE, "chdir failed");
+		}
 	}
 
 	mport = mport_instance_new();
@@ -103,6 +106,11 @@ main(int argc, char *argv[]) {
 			bundleFile = strdup((*indexEntries)->bundlefile);
 			mport_index_entry_free_vec(indexEntries);
 			indexEntries = NULL;
+		} else {
+			fprintf(stderr, "No package found matching %s\n", argv[0]);
+			mport_instance_free(mport);
+			mport_index_entry_free_vec(indexEntries);
+			exit(3);
 		}
 
 		if (verbose)
