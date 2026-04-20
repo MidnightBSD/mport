@@ -42,8 +42,10 @@
 #include <sysexits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <regex.h>
 #include <ftw.h>
+#include <fcntl.h>
 
 #ifdef PRINT_DIAG
 #define DIAG(fmt, ...) warnx(fmt, ##__VA_ARGS__);
@@ -54,6 +56,7 @@
 static void usage(void);
 static int check_fake(mportAssetList *, const char *, const char *, const char *);
 static int grep_file(const char *, const char *);
+static int run_ldd_quiet(const char *);
 static bool is_in_plist(const char *relative_path, const char *prefix);
 static int check_missing_from_plist(const char *path, const struct stat *st, int typeflag, struct FTW *ftwbuf);
 static void check_for_missing_files(const char *destdir, const char *prefix, mportAssetList *assetlist);
@@ -136,6 +139,42 @@ main(int argc, char *argv[])
 	mport_assetlist_free(assetlist);
 	
 	return ret;
+}
+
+static int
+run_ldd_quiet(const char *file)
+{
+	pid_t pid;
+	int status;
+	int devnull;
+
+	pid = fork();
+	if (pid < 0)
+		return -1;
+
+	if (pid == 0) {
+		devnull = open("/dev/null", O_WRONLY);
+		if (devnull < 0)
+			_exit(127);
+
+		if (dup2(devnull, STDOUT_FILENO) == -1)
+			_exit(127);
+		if (dup2(devnull, STDERR_FILENO) == -1)
+			_exit(127);
+
+		close(devnull);
+
+		execlp("ldd", "ldd", file, (char *)NULL);
+		_exit(127);
+	}
+
+	if (waitpid(pid, &status, 0) == -1)
+		return -1;
+
+	if (!WIFEXITED(status))
+		return -1;
+
+	return WEXITSTATUS(status);
 }
 
 static int
@@ -356,12 +395,10 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 				fclose(f);
 			}
 
-			char cmd[FILENAME_MAX];
-			(void)snprintf(cmd, sizeof(cmd), "ldd %s > /dev/null 2>&1", file);
-			if (system(cmd) != 0) {
-				(void)printf("    %s has missing or broken dependencies, or is a linux binary\n", file);
-				//ret = 1; need to handle linux libraries better before we can fail here.
-			}
+				if (run_ldd_quiet(file) != 0) {
+					(void)printf("    %s has missing or broken dependencies, or is a linux binary\n", file);
+					//ret = 1; need to handle linux libraries better before we can fail here.
+				}
 		}
 	}
 	
