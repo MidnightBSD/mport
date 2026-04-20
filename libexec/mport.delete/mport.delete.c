@@ -41,7 +41,8 @@ static void usage(void);
 int main(int argc, char *argv[]) {
 	int ch, force;
 	mportInstance *mport;
-	mportPackageMeta **packs;
+	mportPackageMeta **packs = NULL;
+	mportPackageMeta **packs_orig = NULL;
 	const char *arg = NULL, *where = NULL;
 	const char *chroot_path = NULL;
 
@@ -107,19 +108,21 @@ int main(int argc, char *argv[]) {
 		exit(3);
 	}
 
+	packs_orig = packs;
+
 	while (*packs != NULL) {
 		(*packs)->action = MPORT_ACTION_DELETE;
 		if (mport_delete_primative(mport, *packs, force) != MPORT_OK) {
 			warnx("%s", mport_err_string());
 			mport_instance_free(mport);
-			mport_pkgmeta_vec_free(packs);
+			mport_pkgmeta_vec_free(packs_orig);
 			exit(EXIT_FAILURE);
 		}
 		packs++;
 	}
 
 	mport_instance_free(mport);
-	mport_pkgmeta_vec_free(packs);
+	mport_pkgmeta_vec_free(packs_orig);
 
 	return (0);
 }

@@ -178,14 +178,24 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 					(void)strlcpy(cwd, e->data, FILENAME_MAX);
 				}
 				
-				break;
-		}
+					break;
+			}
+
+			if (e->data != NULL) {
+				if (e->data[0] == '/')
+					(void)snprintf(file, FILENAME_MAX, "%s%s", destdir, e->data);
+				else
+					(void)snprintf(file, FILENAME_MAX, "%s%s/%s", destdir, cwd, e->data);
+			}
 
 
-		if (e->type == ASSET_DIR) {
-			DIR *dir = opendir(file);
-			if (dir != NULL) {
-				struct dirent *entry;
+			if (e->type == ASSET_DIR) {
+				if (e->data == NULL)
+					continue;
+
+				DIR *dir = opendir(file);
+				if (dir != NULL) {
+					struct dirent *entry;
 				int is_empty = 1;
 				while ((entry = readdir(dir)) != NULL) {
 					if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
@@ -202,10 +212,10 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 			}
 
 			break;
-		}
+			}
 
-		if (e->data != NULL && (strcmp(e->data, "+CONTENTS") == 0 || strcmp(e->data, "+DESC") == 0)) {
-			if (lstat(file, &st) != 0) {
+			if (e->data != NULL && (strcmp(e->data, "+CONTENTS") == 0 || strcmp(e->data, "+DESC") == 0)) {
+				if (lstat(file, &st) != 0) {
 				printf("    Metadata file %s is missing\n", file);
 				ret = 1;
 			}
@@ -213,15 +223,10 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 		}
 	
 		// skip sample files until we can fix the edge cases with alternate file names. e->type != ASSET_SAMPLE	
-		if (e->type != ASSET_FILE && e->type != ASSET_FILE_OWNER_MODE && e->type != ASSET_INFO && e->type != ASSET_SAMPLE_OWNER_MODE && e->type != ASSET_SHELL)
-			continue;
+			if (e->type != ASSET_FILE && e->type != ASSET_FILE_OWNER_MODE && e->type != ASSET_INFO && e->type != ASSET_SAMPLE_OWNER_MODE && e->type != ASSET_SHELL)
+				continue;
 
-		if (e->data[0] == '/')
-			(void)snprintf(file, FILENAME_MAX, "%s%s", destdir, e->data);
-		else		
-			(void)snprintf(file, FILENAME_MAX, "%s%s/%s", destdir, cwd, e->data);
-
-		DIAG("checking %s", file)
+			DIAG("checking %s", file)
 			
 		if (lstat(file, &st) != 0) {
 			(void)snprintf(file, FILENAME_MAX, "%s/%s", cwd, e->data);
@@ -512,5 +517,4 @@ usage(void)
 {
 	errx(EX_USAGE, "Usage: mport.check-fake [-s skip] [-c <chroot directory>] <-f plistfile> <-d destdir> <-p prefix>");
 }
-
 

@@ -43,7 +43,7 @@ main(int argc, char *argv[]) {
 	int ch;
 	mportInstance *mport;
 	mportPackageMeta **packs;
-	const char *arg, *where, *version = NULL;
+	const char *arg = NULL, *where = NULL, *version = NULL;
 	const char *chroot_path = NULL;
 
 	if (argc == 1)
