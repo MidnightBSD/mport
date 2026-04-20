@@ -1154,14 +1154,14 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 						goto ERROR;
 					}
 				} else {
-					if (mport_xsystem(mport, "%s/sbin/ldconfig", e->data) != MPORT_OK) {
+					if (mport_exec_linux_ldconfig(mport, e->data) != MPORT_OK) {
 						goto ERROR;
 					}
 				}
 				break;
 			case ASSET_GLIB_SCHEMAS:
-				if (mport_file_exists("/usr/local/bin/glib-compile-schemas") && 
-					mport_xsystem(mport, "/usr/local/bin/glib-compile-schemas %s/share/glib-2.0/schemas > /dev/null || true", e->data == NULL ? pkg->prefix : e->data) != MPORT_OK) {
+				if (mport_file_exists("/usr/local/bin/glib-compile-schemas") &&
+					mport_exec_glib_compile_schemas(mport, e->data == NULL ? pkg->prefix : e->data) != MPORT_OK) {
 					goto ERROR;
 				}
 				break;
@@ -1176,14 +1176,14 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 					goto ERROR;
 				char *info_dir = dirname(abs_path);
 				if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") &&
-					mport_xsystem(mport, "/usr/local/bin/indexinfo %s", info_dir) != MPORT_OK) {
+					mport_exec_indexinfo(mport, info_dir) != MPORT_OK) {
 					free(abs_path);
 					goto ERROR;
 				}
 				free(abs_path);
 				break;
 			case ASSET_KLD:
-				if (mport_xsystem(mport, "/usr/sbin/kldxref %s", file) != MPORT_OK) {
+				if (mport_exec_kldxref(mport, file) != MPORT_OK) {
 					goto ERROR;
 				}
 				break;

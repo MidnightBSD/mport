@@ -500,18 +500,18 @@ run_unldconfig(mportInstance *mport, mportPackageMeta *pkg)
 				goto UNLDCONFIG_ERROR;
 			}
 			break;
-		case ASSET_LDCONFIG_LINUX:
-			if (data == NULL) {
-				if (mport_xsystem(mport, "/compat/linux/sbin/ldconfig") !=
-				    MPORT_OK) {
-					goto UNLDCONFIG_ERROR;
+			case ASSET_LDCONFIG_LINUX:
+				if (data == NULL) {
+					if (mport_xsystem(mport, "/compat/linux/sbin/ldconfig") !=
+					    MPORT_OK) {
+						goto UNLDCONFIG_ERROR;
+					}
+				} else {
+					if (mport_exec_linux_ldconfig(mport, (const char *)data) != MPORT_OK) {
+						goto UNLDCONFIG_ERROR;
+					}
 				}
-			} else {
-				if (mport_xsystem(mport, "%s/sbin/ldconfig", data) != MPORT_OK) {
-					goto UNLDCONFIG_ERROR;
-				}
-			}
-			break;
+				break;
 		default:
 			break;
 		}
@@ -564,35 +564,33 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg)
 		data = sqlite3_column_text(assets, 1);
 
 		switch (type) {
-		case ASSET_GLIB_SCHEMAS:
-			if (mport_file_exists("/usr/local/bin/glib-compile-schemas") &&
-			    mport_xsystem(mport,
-				"/usr/local/bin/glib-compile-schemas %s/share/glib-2.0/schemas > /dev/null || true",
-				data == NULL ? pkg->prefix : data) != MPORT_OK) {
-				goto SPECIAL_ERROR;
-			}
-			break;
+			case ASSET_GLIB_SCHEMAS:
+				if (mport_file_exists("/usr/local/bin/glib-compile-schemas") &&
+				    mport_exec_glib_compile_schemas(mport, data == NULL ? pkg->prefix : (const char *)data) != MPORT_OK) {
+					goto SPECIAL_ERROR;
+				}
+				break;
 		case ASSET_INFO:
 			if (data != NULL) {
 				strlcpy(in, data, sizeof(in));
 			} else {
 				strlcpy(in, "/usr/local/share/info", sizeof(in));
 			}
-			char *abs_path = realpath(in, NULL);
-			if (abs_path == NULL)
-				goto SPECIAL_ERROR;
-			char *info_dir = dirname(abs_path);
-			if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") &&
-			    mport_xsystem(mport, "/usr/local/bin/indexinfo %s", info_dir) != MPORT_OK) {
+				char *abs_path = realpath(in, NULL);
+				if (abs_path == NULL)
+					goto SPECIAL_ERROR;
+				char *info_dir = dirname(abs_path);
+				if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") &&
+				    mport_exec_indexinfo(mport, info_dir) != MPORT_OK) {
+					free(abs_path);
+					goto SPECIAL_ERROR;
+				}
 				free(abs_path);
-				goto SPECIAL_ERROR;
-			}
-			free(abs_path);
-			break;
-		case ASSET_KLD:
-			if (mport_xsystem(mport, "/usr/sbin/kldxref %s", data) != MPORT_OK) {
-				goto SPECIAL_ERROR;
-			}
+				break;
+			case ASSET_KLD:
+				if (mport_exec_kldxref(mport, (const char *)data) != MPORT_OK) {
+					goto SPECIAL_ERROR;
+				}
 			/* attempt to remove the directory containing the kernel
 			 * module, if it's not /boot/modules */
 			if (strcmp("/boot/modules", data) != 0 &&
