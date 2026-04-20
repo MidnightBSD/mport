@@ -74,6 +74,9 @@ int main(int argc, char *argv[]) {
 	argc -= optind;
 	argv += optind;
 
+	if (argc == 0)
+		usage();
+
 	if (chroot_path != NULL) {
 		if (chroot(chroot_path) == -1) {
 			err(EXIT_FAILURE, "chroot failed");
@@ -141,6 +144,11 @@ build_where(int argc, char **argv) {
 	int started = 0, i;
 	size_t cur;
 
+	if (where == NULL)
+		errx(EXIT_FAILURE, "Out of memory");
+
+	where[0] = '\0';
+
 	for (i = 0; i < argc; i++) {
 		column = arg = argv[i];
 
@@ -197,4 +205,3 @@ build_where(int argc, char **argv) {
 
 	return where;
 }
-

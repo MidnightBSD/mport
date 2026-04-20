@@ -425,8 +425,7 @@ grep_file(const char *filename, const char *destdir)
 	
 	if (ferror(file) != 0)
 		err(EX_IOERR, "Error reading %s", filename);
-	
-	regfree(&regex);
+
 	fclose(file);
 	return ret;
 }
@@ -517,4 +516,3 @@ usage(void)
 {
 	errx(EX_USAGE, "Usage: mport.check-fake [-s skip] [-c <chroot directory>] <-f plistfile> <-d destdir> <-p prefix>");
 }
-
