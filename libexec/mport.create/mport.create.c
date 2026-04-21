@@ -37,6 +37,7 @@
 #include <unistd.h>
 
 #include <mport.h>
+#include <ucl.h>
 
 #define MPORT_LUA_PRE_INSTALL_FILE "pkg-pre-install.lua"
 #define MPORT_LUA_POST_INSTALL_FILE "pkg-post-install.lua"
@@ -46,6 +47,7 @@
 static void usage(void);
 
 static void check_for_required_args(const mportPackageMeta *, const mportCreateExtras *);
+static void parse_manifest_ucl(const char *, mportPackageMeta *, mportCreateExtras *);
 
 int main(int argc, char *argv[])
 {
@@ -73,7 +75,7 @@ int main(int argc, char *argv[])
 		errx(EXIT_FAILURE, "%s", mport_err_string());
 	}
 
-	while ((ch = getopt(argc, argv, "A:C:D:E:L:M:O:P:S:c:d:e:f:i:j:l:m:n:o:p:r:s:t:v:x:")) != -1) {
+	while ((ch = getopt(argc, argv, "A:C:D:E:L:M:O:P:S:X:c:d:e:f:i:j:l:m:n:o:p:r:s:t:v:x:")) != -1) {
 		switch (ch) {
 			case 'o':
 				strlcpy(extra->pkg_filename, optarg, sizeof(extra->pkg_filename));
@@ -188,6 +190,9 @@ int main(int argc, char *argv[])
 					pack->deprecated = strdup(optarg);
 				}
 				break;
+			case 'X':
+				parse_manifest_ucl(optarg, pack, extra);
+				break;
 			case '?':
 			default:
 				usage();
@@ -260,6 +265,128 @@ static void usage(void)
 	fprintf(stderr, "\t-m <pkg-message file>\n");
 	fprintf(stderr, "\t-M <mtree file>\n");
 	fprintf(stderr, "\t-t <categories>\n");
+	fprintf(stderr, "\t-X <UCL manifest file>\n");
 	exit(1);
+}
+
+static void
+parse_manifest_ucl(const char *manifest_file, mportPackageMeta *pack, mportCreateExtras *extra)
+{
+	struct ucl_parser *parser;
+	ucl_object_t *root;
+	const ucl_object_t *obj;
+
+	parser = ucl_parser_new(0);
+	if (!ucl_parser_add_file(parser, manifest_file)) {
+		warnx("Failed to parse manifest %s: %s", manifest_file, ucl_parser_get_error(parser));
+		ucl_parser_free(parser);
+		exit(1);
+	}
+
+	root = ucl_parser_get_object(parser);
+	ucl_parser_free(parser);
+
+	if (root == NULL) {
+		warnx("Manifest %s is empty or invalid", manifest_file);
+		exit(1);
+	}
+
+	if ((obj = ucl_object_lookup(root, "name")) != NULL && ucl_object_type(obj) == UCL_STRING)
+		pack->name = strdup(ucl_object_tostring(obj));
+
+	if ((obj = ucl_object_lookup(root, "version")) != NULL && ucl_object_type(obj) == UCL_STRING)
+		pack->version = strdup(ucl_object_tostring(obj));
+
+	if ((obj = ucl_object_lookup(root, "comment")) != NULL && ucl_object_type(obj) == UCL_STRING)
+		pack->comment = strdup(ucl_object_tostring(obj));
+
+	if ((obj = ucl_object_lookup(root, "desc")) != NULL && ucl_object_type(obj) == UCL_STRING)
+		pack->desc = strdup(ucl_object_tostring(obj));
+
+	if ((obj = ucl_object_lookup(root, "prefix")) != NULL && ucl_object_type(obj) == UCL_STRING)
+		pack->prefix = strdup(ucl_object_tostring(obj));
+
+	if ((obj = ucl_object_lookup(root, "origin")) != NULL && ucl_object_type(obj) == UCL_STRING)
+		pack->origin = strdup(ucl_object_tostring(obj));
+
+	if ((obj = ucl_object_lookup(root, "cpe")) != NULL && ucl_object_type(obj) == UCL_STRING)
+		pack->cpe = strdup(ucl_object_tostring(obj));
+
+	if ((obj = ucl_object_lookup(root, "categories")) != NULL && ucl_object_type(obj) == UCL_ARRAY) {
+		ucl_object_iter_t it = NULL;
+		const ucl_object_t *cat;
+		size_t count = 0;
+		while ((cat = ucl_object_iterate(obj, &it, true)) != NULL) {
+			if (ucl_object_type(cat) == UCL_STRING) {
+				count++;
+			}
+		}
+		if (count > 0) {
+			pack->categories = calloc(count + 1, sizeof(char *));
+			pack->categories_count = count;
+			it = NULL;
+			size_t i = 0;
+			while ((cat = ucl_object_iterate(obj, &it, true)) != NULL) {
+				if (ucl_object_type(cat) == UCL_STRING) {
+					pack->categories[i++] = strdup(ucl_object_tostring(cat));
+				}
+			}
+			pack->categories[i] = NULL;
+		}
+	}
+
+	if ((obj = ucl_object_lookup(root, "deps")) != NULL && ucl_object_type(obj) == UCL_OBJECT) {
+		ucl_object_iter_t it = NULL;
+		const ucl_object_t *dep;
+		size_t count = 0;
+		
+		while ((dep = ucl_object_iterate(obj, &it, true)) != NULL) {
+			count++;
+		}
+		
+		if (count > 0) {
+			extra->depends = calloc(count + 1, sizeof(char *));
+			extra->depends_count = count;
+			it = NULL;
+			size_t i = 0;
+			while ((dep = ucl_object_iterate(obj, &it, true)) != NULL) {
+				const char *pkgname = ucl_object_key(dep);
+				const ucl_object_t *origin_obj = ucl_object_lookup(dep, "origin");
+				const ucl_object_t *version_obj = ucl_object_lookup(dep, "version");
+				if (pkgname && origin_obj && version_obj &&
+				    ucl_object_type(origin_obj) == UCL_STRING &&
+				    ucl_object_type(version_obj) == UCL_STRING) {
+					asprintf(&extra->depends[i++], "%s:%s:%s", pkgname, ucl_object_tostring(origin_obj), ucl_object_tostring(version_obj));
+				}
+			}
+			extra->depends[i] = NULL;
+		}
+	}
+
+	if ((obj = ucl_object_lookup(root, "annotations")) != NULL && ucl_object_type(obj) == UCL_OBJECT) {
+		ucl_object_iter_t it = NULL;
+		const ucl_object_t *ann;
+		
+		while ((ann = ucl_object_iterate(obj, &it, true)) != NULL) {
+			const char *tag = ucl_object_key(ann);
+			if (tag && ucl_object_type(ann) == UCL_STRING) {
+				char *ann_str;
+				asprintf(&ann_str, "%s:%s", tag, ucl_object_tostring(ann));
+				tll_push_back(extra->annotations, ann_str);
+			}
+		}
+	}
+
+	if ((obj = ucl_object_lookup(root, "shlibs_provided")) != NULL && ucl_object_type(obj) == UCL_ARRAY) {
+		if (ucl_array_size(obj) > 0) {
+			pack->no_provide_shlib = 0;
+		} else {
+			pack->no_provide_shlib = 1;
+		}
+	} else {
+		pack->no_provide_shlib = 1;
+	}
+
+	ucl_object_unref(root);
 }
 
