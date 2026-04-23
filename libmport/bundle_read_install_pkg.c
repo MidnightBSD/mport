@@ -39,6 +39,7 @@
 #include <sys/sysctl.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <fcntl.h>
 #include <spawn.h>
 #include <libgen.h>
 #include <stdlib.h>
@@ -85,6 +86,9 @@ static int create_depends(mportInstance *mport, mportPackageMeta *pkg);
 static int create_annotations(mportInstance *mport, mportPackageMeta *pkg);
 
 static int create_sample_file(mportInstance *mport, char *cwd, const char *file);
+
+static int create_dir_asset_fd(mportInstance *, const char *, const char *, mode_t, int *);
+static int apply_dir_asset_attrs(int, mportAssetListEntry *, uid_t, gid_t);
 
 static char **parse_sample(char *input);
 
@@ -361,6 +365,153 @@ create_annotations(mportInstance *mport, mportPackageMeta *pkg)
 	return MPORT_OK;
 }
 
+static int
+create_dir_asset_fd(mportInstance *mport, const char *cwd, const char *path, mode_t mode, int *dirfd)
+{
+	char *work = NULL;
+	int fd = -1;
+	int nextfd = -1;
+	int len;
+	int result = MPORT_OK;
+	mode_t oumask;
+	char *p;
+	char *start;
+
+	if (path == NULL || path[0] == '\0')
+		RETURN_ERROR(MPORT_ERR_FATAL, "Directory asset path is empty");
+
+	fd = fcntl(mport->rootfd, F_DUPFD_CLOEXEC, 0);
+	if (fd == -1)
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open install root: %s", strerror(errno));
+
+	if (path[0] == '/') {
+		work = strdup(RELATIVE_PATH(path));
+		if (work == NULL)
+			goto oom;
+	} else {
+		len = asprintf(&work, "%s/%s", RELATIVE_PATH(cwd), path);
+		if (len == -1)
+			goto oom;
+	}
+
+	/*
+	 * Match the old mkdir -p style semantics without mutating process-wide
+	 * state during the walk: intermediate directories are created with the
+	 * permissive traversal mode, and the final component uses the requested
+	 * mode, both filtered through the caller's current umask snapshot.
+	 */
+	oumask = umask(0);
+	(void)umask(oumask);
+	for (p = work; ;) {
+		mode_t mkdir_mode;
+		int final_component;
+		char save;
+
+		while (*p == '/')
+			p++;
+		if (*p == '\0')
+			break;
+
+		start = p;
+		while (*p != '/' && *p != '\0')
+			p++;
+
+		save = *p;
+		*p = '\0';
+		if (strcmp(start, ".") == 0) {
+			/* nothing */
+		} else if (strcmp(start, "..") == 0) {
+			*p = save;
+			goto unsafe_path;
+		} else {
+			final_component = (save == '\0');
+			mkdir_mode = final_component ? mode : S_IRWXU | S_IRWXG | S_IRWXO;
+			mkdir_mode &= ~oumask;
+
+			if (mkdirat(fd, start, mkdir_mode) == -1 && errno != EEXIST) {
+				*p = save;
+				goto mkdir_error;
+			}
+			nextfd = openat(fd, start, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+			if (nextfd == -1) {
+				*p = save;
+				goto open_error;
+			}
+
+			close(fd);
+			fd = nextfd;
+			nextfd = -1;
+		}
+
+		*p = save;
+		if (*p == '\0')
+			break;
+	}
+
+	*dirfd = fd;
+	fd = -1;
+	goto out;
+
+oom:
+	result = SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+	goto err;
+unsafe_path:
+	result = SET_ERRORX(MPORT_ERR_FATAL, "Refusing unsafe directory path %s", path);
+	goto err;
+mkdir_error:
+	result = SET_ERRORX(MPORT_ERR_FATAL, "Unable to create directory %s: %s", path, strerror(errno));
+	goto err;
+open_error:
+	result = SET_ERRORX(MPORT_ERR_FATAL, "Unable to open directory %s: %s", path, strerror(errno));
+	goto err;
+err:
+	if (nextfd != -1)
+		close(nextfd);
+	if (fd != -1)
+		close(fd);
+out:
+	free(work);
+	return result;
+}
+
+static int
+apply_dir_asset_attrs(int dirfd, mportAssetListEntry *e, uid_t default_uid, gid_t default_gid)
+{
+	struct stat sb;
+	mode_t *dirset = NULL;
+	mode_t dirnewmode;
+	uid_t dir_uid = default_uid;
+	gid_t dir_gid = default_gid;
+
+	if (fstat(dirfd, &sb) == -1)
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to stat directory %s: %s", e->data, strerror(errno));
+	if (!S_ISDIR(sb.st_mode))
+		RETURN_ERRORX(MPORT_ERR_FATAL, "%s is not a directory", e->data);
+
+	if (e->mode != NULL && e->mode[0] != '\0') {
+		dirset = setmode(e->mode);
+		if (dirset == NULL)
+			RETURN_ERROR(MPORT_ERR_FATAL, "Unable to set mode");
+		dirnewmode = getmode(dirset, sb.st_mode);
+		free(dirset);
+		dirset = NULL;
+		if (fchmod(dirfd, dirnewmode) == -1)
+			RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to set permissions on directory %s: %s", e->data, strerror(errno));
+	}
+
+	if (e->owner != NULL && e->owner[0] != '\0')
+		dir_uid = mport_get_uid(e->owner);
+	if (e->group != NULL && e->group[0] != '\0')
+		dir_gid = mport_get_gid(e->group);
+
+	if ((e->owner != NULL && e->owner[0] != '\0') ||
+	    (e->group != NULL && e->group[0] != '\0')) {
+		if (fchown(dirfd, dir_uid, dir_gid) == -1)
+			RETURN_ERROR(MPORT_ERR_FATAL, "Unable to change owner");
+	}
+
+	return (MPORT_OK);
+}
 
 static char **
 parse_sample(char *input)
@@ -551,11 +702,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 	gid_t group = 0; /* wheel */
 	mode_t *set = NULL;
 	mode_t newmode;
-	mode_t *dirset = NULL;
-	mode_t dirnewmode;
 	char *mode = NULL;
-	char *mkdirp = NULL;
-	struct stat sb;
 	char file[FILENAME_MAX], cwd[FILENAME_MAX];
 	sqlite3_stmt *insert = NULL;
 
@@ -625,40 +772,16 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 			case ASSET_DIRRM:
 			case ASSET_DIRRMTRY:
 			case ASSET_DIR_OWNER_MODE:
-				mkdirp = strdup(e->data == NULL ? "" : e->data); /* need a char * here */
-				if (mkdirp == NULL || mport_mkdirp(mkdirp, S_IRWXU | S_IRWXG | S_IRWXO) == 0) {
-					free(mkdirp);
-					SET_ERRORX(MPORT_ERR_FATAL, "Unable to create directory %s", e->data);
-					goto ERROR;
-				}
-				free(mkdirp);
-
-				if (e->mode != NULL && e->mode[0] != '\0') {
-					if ((dirset = setmode(e->mode)) == NULL)
+				{
+					int dirfd = -1;
+					if (create_dir_asset_fd(mport, cwd, e->data, S_IRWXU | S_IRWXG | S_IRWXO, &dirfd) != MPORT_OK)
 						goto ERROR;
-					dirnewmode = getmode(dirset, sb.st_mode);
-					free(dirset);
-					if (chmod(e->data, dirnewmode))
-						goto ERROR;
-				}
-				if (e->owner != NULL && e->group != NULL && e->owner[0] != '\0' &&
-				    e->group[0] != '\0') {
-					if (chown(e->data, mport_get_uid(e->owner), mport_get_gid(e->group)) == -1) {
-						SET_ERROR(MPORT_ERR_FATAL, "Unable to change owner");
+					if (apply_dir_asset_attrs(dirfd, e, owner, group) != MPORT_OK) {
+						close(dirfd);
 						goto ERROR;
 					}
-				} else if (e->owner != NULL && e->owner[0] != '\0') {
-					if (chown(e->data, mport_get_uid(e->owner), group) == -1) {
-						SET_ERROR(MPORT_ERR_FATAL, "Unable to change owner");
-						goto ERROR;
-					}
-				} else if (e->group != NULL && e->group[0] != '\0') {
-					if (chown(e->data, owner, mport_get_gid(e->group)) == -1) {
-						SET_ERROR(MPORT_ERR_FATAL, "Unable to change owner");
-						goto ERROR;
-					}
+					close(dirfd);
 				}
-
 				break;
 			case ASSET_EXEC:
 				if (mport_run_asset_exec(mport, e->data, cwd, file) != MPORT_OK)
