@@ -255,8 +255,10 @@ mport_install_depends(mportInstance *mport, const char *packageName, const char 
 			}
 			mport_pkgmeta_vec_free(packs);
 		} else {
-			mport_call_msg_cb(mport,
-			    "The most recent version of %s is already installed.", packageName);
+			if (getenv("MPORT_GUI") == NULL) {
+				mport_call_msg_cb(mport,
+			    	"The most recent version of %s is already installed.", packageName);
+			}
 			mport_pkgmeta_vec_free(packs);
 		}
 	}
