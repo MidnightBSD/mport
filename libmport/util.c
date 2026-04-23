@@ -56,8 +56,11 @@
 #include "mport.h"
 #include "mport_private.h"
 
+extern char **environ;
+
 static char *mport_get_osrelease_userland(void);
 static char *mport_get_osrelease_kern(void);
+static int mport_exec_command(mportInstance *, const char *, char *const[], bool);
 
 /* these two aren't really utilities, but there's no better place to put them */
 MPORT_PUBLIC_API mportCreateExtras *
@@ -542,6 +545,168 @@ mport_directory(const char *path)
  * If mport is non-NULL and has a root set, your command will run
  * chroot'ed into mport->root.
  */
+int
+mport_exec_linux_ldconfig(mportInstance *mport, const char *prefix)
+{
+	char *path;
+	char *argv[2];
+
+	if (prefix == NULL) {
+		path = strdup("/compat/linux/sbin/ldconfig");
+	} else {
+		if (asprintf(&path, "%s/sbin/ldconfig", prefix) == -1)
+			path = NULL;
+	}
+
+	if (path == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate ldconfig path.");
+
+	argv[0] = path;
+	argv[1] = NULL;
+
+	int ret = mport_exec_command(mport, path, argv, false);
+	free(path);
+
+	return ret;
+}
+
+int
+mport_exec_glib_compile_schemas(mportInstance *mport, const char *prefix)
+{
+	char *schema_dir;
+	char *argv[3];
+
+	if (prefix == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Schema prefix is undefined.");
+
+	if (asprintf(&schema_dir, "%s/share/glib-2.0/schemas", prefix) == -1)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate schemas path.");
+
+	argv[0] = "/usr/local/bin/glib-compile-schemas";
+	argv[1] = schema_dir;
+	argv[2] = NULL;
+
+	int ret = mport_exec_command(mport, argv[0], argv, true);
+	free(schema_dir);
+
+	return ret;
+}
+
+int
+mport_exec_indexinfo(mportInstance *mport, const char *info_dir)
+{
+	char *argv[3];
+
+	if (info_dir == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Info directory is undefined.");
+
+	argv[0] = "/usr/local/bin/indexinfo";
+	argv[1] = (char *)info_dir;
+	argv[2] = NULL;
+
+	return mport_exec_command(mport, argv[0], argv, false);
+}
+
+int
+mport_exec_kldxref(mportInstance *mport, const char *file)
+{
+	char *argv[3];
+
+	if (file == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "kldxref path is undefined.");
+
+	argv[0] = "/usr/sbin/kldxref";
+	argv[1] = (char *)file;
+	argv[2] = NULL;
+
+	return mport_exec_command(mport, argv[0], argv, false);
+}
+
+static int
+mport_exec_command(mportInstance *mport, const char *path, char *const argv[], bool quiet)
+{
+	posix_spawn_file_actions_t action;
+	pid_t pid;
+	int error;
+	int pstat;
+	int devnull = -1;
+	size_t argc = 0;
+	char **spawn_argv = NULL;
+	char *const *run_argv = argv;
+	const char *run_path = path;
+
+	while (argv[argc] != NULL)
+		argc++;
+
+	if (mport != NULL && *(mport->root) != '\0') {
+		spawn_argv = calloc(argc + 3, sizeof(char *));
+		if (spawn_argv == NULL)
+			RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate command argv.");
+
+		spawn_argv[0] = MPORT_CHROOT_BIN;
+		spawn_argv[1] = mport->root;
+		for (size_t i = 0; i < argc; i++)
+			spawn_argv[i + 2] = argv[i];
+
+		run_argv = spawn_argv;
+		run_path = MPORT_CHROOT_BIN;
+	}
+
+	if ((error = posix_spawn_file_actions_init(&action)) != 0) {
+		free(spawn_argv);
+		errno = error;
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't initialize spawn actions: %s", strerror(errno));
+	}
+
+	if (quiet) {
+		devnull = open("/dev/null", O_WRONLY);
+		if (devnull < 0) {
+			posix_spawn_file_actions_destroy(&action);
+			free(spawn_argv);
+			RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open /dev/null: %s", strerror(errno));
+		}
+
+		if ((error = posix_spawn_file_actions_adddup2(&action, devnull, STDOUT_FILENO)) != 0 ||
+		    (error = posix_spawn_file_actions_adddup2(&action, devnull, STDERR_FILENO)) != 0) {
+			close(devnull);
+			posix_spawn_file_actions_destroy(&action);
+			free(spawn_argv);
+			errno = error;
+			RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't redirect command output: %s", strerror(errno));
+		}
+	}
+
+	error = posix_spawn(&pid, run_path, &action, NULL, run_argv, environ);
+
+	if (devnull >= 0)
+		close(devnull);
+
+	posix_spawn_file_actions_destroy(&action);
+
+	if (error != 0) {
+		free(spawn_argv);
+		errno = error;
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't execute %s: %s", run_path, strerror(errno));
+	}
+
+	while (waitpid(pid, &pstat, 0) == -1) {
+		if (errno != EINTR) {
+			free(spawn_argv);
+			RETURN_ERRORX(MPORT_ERR_FATAL, "waitpid failed: %s", strerror(errno));
+		}
+	}
+
+	free(spawn_argv);
+
+	if (WIFSIGNALED(pstat) && (WTERMSIG(pstat) == SIGINT || WTERMSIG(pstat) == SIGQUIT))
+		RETURN_ERROR(MPORT_ERR_FATAL, "SIGINT or SIGQUIT while running command.");
+
+	if (WIFEXITED(pstat))
+		return MPORT_OK;
+
+	RETURN_ERROR(MPORT_ERR_FATAL, "Error executing command");
+}
+
 int
 mport_xsystem(mportInstance *mport, const char *fmt, ...)
 {
