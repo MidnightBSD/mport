@@ -282,8 +282,10 @@ fetch_bundle_to_dir(mportInstance *mport, const char *url, const char *directory
 	FILE *local = NULL;
 	int dirfd = -1;
 	int fd = -1;
+	char tmpname[FILENAME_MAX];
 	int result;
 	struct stat sb;
+	int len;
 
 	if (filename == NULL || filename[0] == '\0' || strchr(filename, '/') != NULL) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid bundle filename");
@@ -298,40 +300,64 @@ fetch_bundle_to_dir(mportInstance *mport, const char *url, const char *directory
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s: %s", directory, strerror(errno));
 	}
 
-	fd = openat(dirfd, filename, O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC,
-	    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+	for (int i = 0; i < 100; i++) {
+		len = snprintf(tmpname, sizeof(tmpname), ".%s.tmp.%08x", filename,
+		    arc4random());
+		if (len < 0 || (size_t)len >= sizeof(tmpname)) {
+			close(dirfd);
+			RETURN_ERROR(MPORT_ERR_FATAL, "Bundle filename is too long");
+		}
+
+		fd = openat(dirfd, tmpname,
+		    O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+		    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+		if (fd != -1)
+			break;
+		if (errno != EEXIST) {
+			close(dirfd);
+			RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s/%s: %s", directory, tmpname, strerror(errno));
+		}
+	}
+
 	if (fd == -1) {
 		close(dirfd);
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s/%s: %s", directory, filename, strerror(errno));
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to create temporary bundle file in %s", directory);
 	}
 
 	if (fstat(fd, &sb) == -1) {
 		close(fd);
+		unlinkat(dirfd, tmpname, 0);
 		close(dirfd);
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to stat %s/%s: %s", directory, filename, strerror(errno));
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to stat %s/%s: %s", directory, tmpname, strerror(errno));
 	}
 	if (!S_ISREG(sb.st_mode) || sb.st_nlink != 1) {
 		close(fd);
+		unlinkat(dirfd, tmpname, 0);
 		close(dirfd);
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Refusing unsafe bundle destination %s/%s", directory, filename);
-	}
-	if (ftruncate(fd, 0) == -1) {
-		close(fd);
-		close(dirfd);
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to truncate %s/%s: %s", directory, filename, strerror(errno));
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Refusing unsafe bundle destination %s/%s", directory, tmpname);
 	}
 
 	local = fdopen(fd, "w");
 	if (local == NULL) {
 		close(fd);
+		unlinkat(dirfd, tmpname, 0);
 		close(dirfd);
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s/%s: %s", directory, filename, strerror(errno));
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s/%s: %s", directory, tmpname, strerror(errno));
 	}
 	fd = -1;
 
 	result = fetch_to_file(mport, url, local, true);
 	if (result == MPORT_ERR_FATAL) {
-		unlinkat(dirfd, filename, 0);
+		unlinkat(dirfd, tmpname, 0);
+		close(dirfd);
+		return result;
+	}
+
+	if (renameat(dirfd, tmpname, dirfd, filename) == -1) {
+		unlinkat(dirfd, tmpname, 0);
+		close(dirfd);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to rename %s/%s to %s/%s: %s",
+		    directory, tmpname, directory, filename, strerror(errno));
 	}
 
 	close(dirfd);
