@@ -47,6 +47,7 @@
 static void usage(void);
 
 static void check_for_required_args(const mportPackageMeta *, const mportCreateExtras *);
+static void manifest_alloc_failure(ucl_object_t *, mportPackageMeta *, mportCreateExtras *);
 static void parse_manifest_ucl(const char *, mportPackageMeta *, mportCreateExtras *);
 
 int main(int argc, char *argv[])
@@ -270,6 +271,16 @@ static void usage(void)
 }
 
 static void
+manifest_alloc_failure(ucl_object_t *root, mportPackageMeta *pack, mportCreateExtras *extra)
+{
+	if (root != NULL)
+		ucl_object_unref(root);
+	mport_pkgmeta_free(pack);
+	mport_createextras_free(extra);
+	errx(EXIT_FAILURE, "Out of memory while parsing manifest");
+}
+
+static void
 parse_manifest_ucl(const char *manifest_file, mportPackageMeta *pack, mportCreateExtras *extra)
 {
 	struct ucl_parser *parser;
@@ -346,6 +357,8 @@ parse_manifest_ucl(const char *manifest_file, mportPackageMeta *pack, mportCreat
 		
 		if (count > 0) {
 			extra->depends = calloc(count + 1, sizeof(char *));
+			if (extra->depends == NULL)
+				manifest_alloc_failure(root, pack, extra);
 			extra->depends_count = count;
 			it = NULL;
 			size_t i = 0;
@@ -356,7 +369,9 @@ parse_manifest_ucl(const char *manifest_file, mportPackageMeta *pack, mportCreat
 				if (pkgname && origin_obj && version_obj &&
 				    ucl_object_type(origin_obj) == UCL_STRING &&
 				    ucl_object_type(version_obj) == UCL_STRING) {
-					asprintf(&extra->depends[i++], "%s:%s:%s", pkgname, ucl_object_tostring(origin_obj), ucl_object_tostring(version_obj));
+					if (asprintf(&extra->depends[i], "%s:%s:%s", pkgname, ucl_object_tostring(origin_obj), ucl_object_tostring(version_obj)) == -1)
+						manifest_alloc_failure(root, pack, extra);
+					i++;
 				}
 			}
 			extra->depends[i] = NULL;
@@ -371,7 +386,8 @@ parse_manifest_ucl(const char *manifest_file, mportPackageMeta *pack, mportCreat
 			const char *tag = ucl_object_key(ann);
 			if (tag && ucl_object_type(ann) == UCL_STRING) {
 				char *ann_str;
-				asprintf(&ann_str, "%s:%s", tag, ucl_object_tostring(ann));
+				if (asprintf(&ann_str, "%s:%s", tag, ucl_object_tostring(ann)) == -1)
+					manifest_alloc_failure(root, pack, extra);
 				tll_push_back(extra->annotations, ann_str);
 			}
 		}
@@ -389,4 +405,3 @@ parse_manifest_ucl(const char *manifest_file, mportPackageMeta *pack, mportCreat
 
 	ucl_object_unref(root);
 }
-
