@@ -434,6 +434,7 @@ create_dir_asset_fd(mportInstance *mport, const char *cwd, const char *path, mod
 	}
 
 	free(work);
+	work = NULL;
 	*dirfd = currentfd;
 	return (MPORT_OK);
 
