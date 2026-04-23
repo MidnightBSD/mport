@@ -33,6 +33,7 @@
 #include <termios.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/ioctl.h>
 #include "mport.h"
 #include "mport_private.h"
@@ -128,6 +129,70 @@ int mport_default_confirm_cb(const char *msg, const char *yes, const char *no, i
   
   /* Not reached */
   return (MPORT_OK);
+}
+
+int
+mport_default_select_cb(const char *msg, mportIndexEntry **choices, int def)
+{
+  size_t len;
+  char *ans;
+  char *endptr;
+  int count = 0;
+  bool color_terminal = mport_is_color_terminal();
+
+  if (choices == NULL || *choices == NULL)
+    return -1;
+
+  while (choices[count] != NULL) {
+    count++;
+  }
+
+  if (getenv("ASSUME_ALWAYS_YES") != NULL || getenv("MAGUS") != NULL) {
+    return def >= 0 ? def : 0;
+  }
+
+  if (color_terminal) {
+    (void)fprintf(stderr, "%s%s%s\n", KCYN, msg, KNRM);
+  } else {
+    (void)fprintf(stderr, "%s\n", msg);
+  }
+
+  for (int i = 0; i < count; i++) {
+    const char *comment = choices[i]->comment == NULL ? "" : choices[i]->comment;
+    (void)fprintf(stderr, " %d. %s-%s%s%s\n", i + 1,
+        choices[i]->pkgname, choices[i]->version,
+        comment[0] == '\0' ? "" : " - ", comment);
+  }
+
+  while (1) {
+    if (color_terminal) {
+      (void)fprintf(stderr, "%sSelect package [1-%d]%s: ", KCYN, count, KNRM);
+    } else {
+      (void)fprintf(stderr, "Select package [1-%d]: ", count);
+    }
+
+    ans = fgetln(stdin, &len);
+    if (ans == NULL)
+      return -1;
+    if (len == 1)
+      return def;
+
+    errno = 0;
+    long choice = strtol(ans, &endptr, 10);
+    while (endptr != NULL && (*endptr == '\n' || *endptr == '\r' || *endptr == ' ' || *endptr == '\t'))
+      endptr++;
+
+    if (errno == 0 && endptr != ans && (*endptr == '\0' || *endptr == '\n') &&
+        choice >= 1 && choice <= count) {
+      return (int)choice - 1;
+    }
+
+    if (color_terminal) {
+      (void)fprintf(stderr, "%sPlease enter a number between 1 and %d.%s\n", KRED, count, KNRM);
+    } else {
+      (void)fprintf(stderr, "Please enter a number between 1 and %d.\n", count);
+    }
+  }
 }
 
 

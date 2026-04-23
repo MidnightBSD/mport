@@ -47,6 +47,8 @@
 .Fn mport_call_progress_init_cb "mportInstance *mport" "const char *fmt" "..."
 .Ft bool
 .Fn mport_call_confirm_cb "mportInstance *mport" "const char *msg" "const char *yes" "const char *no" "int def"
+.Ft int
+.Fn mport_call_select_cb "mportInstance *mport" "const char *msg" "mportIndexEntry **choices" "int def"
 .Ft void
 .Fn mport_set_msg_cb "mportInstance *mport" "mport_msg_cb cb"
 .Ft void
@@ -58,9 +60,13 @@
 .Ft void
 .Fn mport_set_confirm_cb "mportInstance *mport" "mport_confirm_cb cb"
 .Ft void
+.Fn mport_set_select_cb "mportInstance *mport" "mport_select_cb cb"
+.Ft void
 .Fn mport_default_msg_cb "const char *msg"
 .Ft int
 .Fn mport_default_confirm_cb "const char *msg" "const char *yes" "const char *no" "int def"
+.Ft int
+.Fn mport_default_select_cb "const char *msg" "mportIndexEntry **choices" "int def"
 .Ft void
 .Fn mport_default_progress_init_cb "const char *title"
 .Ft void

@@ -43,6 +43,7 @@ static void usage(void);
 int
 main(int argc, char *argv[]) {
 	int ch;
+	int choice = 0;
 	mportInstance *mport;
 	mportIndexEntry **indexEntries;
 	bool verbose = false;
@@ -101,9 +102,16 @@ main(int argc, char *argv[]) {
 	}
 
 	if (indexEntries != NULL) {
-		/* TODO: currently only fetches first match */
 		if (*indexEntries != NULL) {
-			bundleFile = strdup((*indexEntries)->bundlefile);
+			if (indexEntries[1] != NULL) {
+				choice = mport_call_select_cb(mport, "Multiple packages match your query.", indexEntries, 0);
+				if (choice < 0) {
+					mport_instance_free(mport);
+					mport_index_entry_free_vec(indexEntries);
+					exit(3);
+				}
+			}
+			bundleFile = strdup(indexEntries[choice]->bundlefile);
 			mport_index_entry_free_vec(indexEntries);
 			indexEntries = NULL;
 		} else {

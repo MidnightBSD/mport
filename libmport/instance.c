@@ -127,6 +127,7 @@ mport_instance_init(mportInstance *mport, const char *root, const char *outputPa
 	mport->progress_step_cb = &mport_default_progress_step_cb;
 	mport->progress_free_cb = &mport_default_progress_free_cb;
 	mport->confirm_cb = &mport_default_confirm_cb;
+	mport->select_cb = &mport_default_select_cb;
 
 	int db_version = mport_get_database_version(mport->db);
 	if (db_version < 1) {
@@ -286,6 +287,11 @@ mport_set_confirm_cb(mportInstance *mport, mport_confirm_cb cb) {
     mport->confirm_cb = cb;
 }
 
+MPORT_PUBLIC_API void
+mport_set_select_cb(mportInstance *mport, mport_select_cb cb) {
+    mport->select_cb = cb;
+}
+
 /* callers for the callbacks (only for msg at the moment) */
 
 
@@ -344,6 +350,17 @@ mport_call_confirm_cb(mportInstance *mport, const char *msg, const char *yes, co
     }
 
     return (mport->confirm_cb)(msg, yes, no, def) == MPORT_OK ? true : false;
+}
+
+MPORT_PUBLIC_API int
+mport_call_select_cb(mportInstance *mport, const char *msg, mportIndexEntry **choices, int def) {
+    if (mport == NULL || mport->select_cb == NULL)
+        RETURN_ERROR(MPORT_ERR_FATAL, "No package selection callback configured");
+
+    if (choices == NULL || *choices == NULL)
+        RETURN_ERROR(MPORT_ERR_FATAL, "No package choices were provided");
+
+    return (mport->select_cb)(msg, choices, def);
 }
 
 
