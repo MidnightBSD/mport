@@ -43,9 +43,9 @@ static void usage(void);
 int
 main(int argc, char *argv[]) {
 	int ch;
-	int choice = 0;
 	mportInstance *mport;
 	mportIndexEntry **indexEntries;
+	mportIndexEntry *selected = NULL;
 	bool verbose = false;
 	char *bundleFile = NULL;
 	const char *chroot_path = NULL;
@@ -95,23 +95,16 @@ main(int argc, char *argv[]) {
 	if (mport_index_load(mport) != MPORT_OK)
 		errx(4, "Unable to load updates index");
 
-	if (mport_index_lookup_pkgname(mport, argv[0], &indexEntries) != MPORT_OK) {
+	if (mport_index_select_pkgname(mport, argv[0], "Multiple packages match your query.", &indexEntries, &selected) !=
+	    MPORT_OK) {
 		fprintf(stderr, "Error looking up package name %s: %d %s\n", argv[0], mport_err_code(), mport_err_string());
 		mport_instance_free(mport);
 		exit(mport_err_code());
 	}
 
 	if (indexEntries != NULL) {
-		if (*indexEntries != NULL) {
-			if (indexEntries[1] != NULL) {
-				choice = mport_call_select_cb(mport, "Multiple packages match your query.", indexEntries, 0);
-				if (choice < 0) {
-					mport_instance_free(mport);
-					mport_index_entry_free_vec(indexEntries);
-					exit(3);
-				}
-			}
-			bundleFile = strdup(indexEntries[choice]->bundlefile);
+		if (selected != NULL) {
+			bundleFile = strdup(selected->bundlefile);
 			mport_index_entry_free_vec(indexEntries);
 			indexEntries = NULL;
 		} else {

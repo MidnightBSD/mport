@@ -141,6 +141,7 @@ bool mport_check_answer_bool(char *answer);
 int mport_count_spaces(const char *str);
 char * mport_tokenize(char **args);
 char * mport_get_osreleasedate(void);
+int mport_index_select_pkgname(mportInstance *, const char *, const char *, mportIndexEntry ***, mportIndexEntry **);
 
 enum parse_states {
 	START,

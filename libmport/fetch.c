@@ -460,7 +460,8 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local, bool progress)
  */
 int
 mport_download(mportInstance *mport, const char *packageName, bool all, bool includeDependencies, char **path) {
-	mportIndexEntry **indexEntry = NULL;
+	mportIndexEntry **indexEntries = NULL;
+	mportIndexEntry *indexEntry = NULL;
 	mportDependsEntry **depends = NULL;
 	mportDependsEntry **depends_orig = NULL;
 	bool existed = true;
@@ -485,29 +486,33 @@ mport_download(mportInstance *mport, const char *packageName, bool all, bool inc
 		return (MPORT_OK);
 	}
 
-	if (mport_index_lookup_pkgname(mport, packageName, &indexEntry) != MPORT_OK) {
+	if (mport_index_select_pkgname(mport, packageName, "Multiple packages match your query.", &indexEntries, &indexEntry) !=
+	    MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
 	
-	if (indexEntry == NULL || (*indexEntry) == NULL) {
+	if (indexEntry == NULL) {
 		SET_ERRORX(1, "Package %s not found in index.\n", packageName);
+		mport_index_entry_free_vec(indexEntries);
 		RETURN_CURRENT_ERROR;
 	}
 
-	if ((*indexEntry)->bundlefile == NULL) {
+	if (indexEntry->bundlefile == NULL) {
 		SET_ERRORX(1, "Package %s does not contain a bundle file.\n", packageName);
+		mport_index_entry_free_vec(indexEntries);
 		RETURN_CURRENT_ERROR;
 	}
 	
-	if (asprintf(path, "%s/%s", mport->outputPath, (*indexEntry)->bundlefile) == -1) {
-		mport_index_entry_free_vec(indexEntry);
+	if (asprintf(path, "%s/%s", mport->outputPath, indexEntry->bundlefile) == -1) {
+		mport_index_entry_free_vec(indexEntries);
+		indexEntries = NULL;
 		indexEntry = NULL;
 		SET_ERRORX(1, "%s", "Unable to allocate memory for path.");
 		RETURN_CURRENT_ERROR;
 	}
 
 	if (includeDependencies) {
-		mport_index_depends_list(mport, (*indexEntry)->pkgname, (*indexEntry)->version, &depends_orig);
+		mport_index_depends_list(mport, indexEntry->pkgname, indexEntry->version, &depends_orig);
 		depends = depends_orig;
 
 		while (*depends != NULL) {
@@ -525,11 +530,12 @@ mport_download(mportInstance *mport, const char *packageName, bool all, bool inc
 
 getfile:
 	if (!mport_file_exists(*path)) {
-		if (mport_fetch_bundle(mport, mport->outputPath, (*indexEntry)->bundlefile) != MPORT_OK) {
+		if (mport_fetch_bundle(mport, mport->outputPath, indexEntry->bundlefile) != MPORT_OK) {
 			mport_call_msg_cb(mport, "Error fetching package %s, %s", packageName, mport_err_string());
 			free(*path);
 			path = NULL;
-			mport_index_entry_free_vec(indexEntry);
+			mport_index_entry_free_vec(indexEntries);
+			indexEntries = NULL;
 			indexEntry = NULL;
 			return mport_err_code();
 			
@@ -537,7 +543,7 @@ getfile:
 		existed = false;
 	}
 
-	if (!mport_verify_hash(*path, (*indexEntry)->hash)) {
+	if (!mport_verify_hash(*path, indexEntry->hash)) {
 		if (existed) {
 			if (unlink(*path) == 0)	{
 				retryCount++;
@@ -555,7 +561,8 @@ getfile:
 		}
 		free(*path);
 		path = NULL;
-		mport_index_entry_free_vec(indexEntry);
+		mport_index_entry_free_vec(indexEntries);
+		indexEntries = NULL;
 		indexEntry = NULL;
 		SET_ERRORX(1, "Package %s fails hash verification.", packageName);
 		RETURN_CURRENT_ERROR;
@@ -566,7 +573,8 @@ getfile:
 	else
 		mport_call_msg_cb(mport, "Package %s exists at %s\n", packageName, *path);
 
-	mport_index_entry_free_vec(indexEntry);
+	mport_index_entry_free_vec(indexEntries);
+	indexEntries = NULL;
 	indexEntry = NULL;
 
 	return (MPORT_OK);

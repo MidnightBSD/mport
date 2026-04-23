@@ -38,7 +38,8 @@
 
 MPORT_PUBLIC_API char *
 mport_info(mportInstance *mport, const char *packageName) {
-	mportIndexEntry **indexEntry = NULL;
+	mportIndexEntry **indexEntries = NULL;
+	mportIndexEntry *indexEntry = NULL;
 	mportPackageMeta **packs = NULL;
 	mportIndexMovedEntry **movedEntries = NULL;
 	char *status, *origin, *flavor, *deprecated;
@@ -65,12 +66,16 @@ mport_info(mportInstance *mport, const char *packageName) {
 		return (NULL);
 	}
 
-	if (mport_index_lookup_pkgname(mport, packageName, &indexEntry) != MPORT_OK) {
+	if (mport_index_select_pkgname(mport, packageName, "Multiple packages match your query.", &indexEntries, &indexEntry) !=
+	    MPORT_OK) {
 		return (NULL);
 	}
 
-	if (indexEntry == NULL || *indexEntry == NULL) {
+	if (indexEntry == NULL) {
 		SET_ERROR(MPORT_ERR_FATAL, "Could not resolve package.");
+		mport_index_entry_free_vec(indexEntries);
+		indexEntries = NULL;
+		return (NULL);
 	}
 
 	if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
@@ -96,7 +101,7 @@ mport_info(mportInstance *mport, const char *packageName) {
 		if (!status || !origin || !os_release || !cpe || !flavor || !deprecated || !options || !desc) {
 			free(status); free(origin); free(os_release); free(cpe);
 			free(flavor); free(deprecated); free(options); free(desc);
-			mport_index_entry_free_vec(indexEntry);
+			mport_index_entry_free_vec(indexEntries);
 			free(movedEntries);
 			SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
 			return (NULL);
@@ -165,9 +170,9 @@ mport_info(mportInstance *mport, const char *packageName) {
 		type = (*packs)->type;
 		flatsize = (*packs)->flatsize;
 
-		if (indexEntry == NULL || *indexEntry == NULL)
+		if (indexEntry == NULL)
 			purl[0] = '\0';
-		else if (packs != NULL && (*indexEntry)->pkgname != NULL && (*packs)->version != NULL) {
+		else if (packs != NULL && indexEntry->pkgname != NULL && (*packs)->version != NULL) {
 			char *tmppurl = mport_purl_uri(*packs);
 			if (tmppurl != NULL) {
 				snprintf(purl, sizeof(purl), "%s", tmppurl);
@@ -210,7 +215,7 @@ mport_info(mportInstance *mport, const char *packageName) {
 	if (annotations_str == NULL)
 		annotations_str = strdup("");
 
-	if (packs !=NULL && (indexEntry == NULL || *indexEntry == NULL)) {
+	if (packs !=NULL && indexEntry == NULL) {
 		asprintf(&info_text,
 	         "%s-%s\n"
 	         "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
@@ -237,12 +242,12 @@ mport_info(mportInstance *mport, const char *packageName) {
 	         "CPE             : %s\nPURL            : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date    : %s"
 	         "Comment         : %s\n%sOptions         : %s\nType            : %s\nFlat Size       : %s\nDescription     :\n%s\n",
 	         (*packs)->name, (*packs)->version,
-	         (*packs)->name, status, indexEntry == NULL ? "": (*indexEntry)->version, indexEntry == NULL ? "" : (*indexEntry)->license, origin,
+	         (*packs)->name, status, indexEntry == NULL ? "" : indexEntry->version, indexEntry == NULL ? "" : indexEntry->license, origin,
 	         flavor, os_release,
 		 cpe, purl, locked ? "yes" : "no", automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no", deprecated,
 	         expirationDate == 0 ? "" : ctime(&expirationDate),
 	         installDate == 0 ? "\n" : ctime(&installDate),
-	         indexEntry == NULL ? "" : (*indexEntry)->comment,
+	         indexEntry == NULL ? "" : indexEntry->comment,
 	         annotations_str,
 	         options,
 		 type == MPORT_TYPE_APP ? "Application" : "System", 
@@ -269,7 +274,8 @@ mport_info(mportInstance *mport, const char *packageName) {
 		packs = NULL;
 	}
 
-	mport_index_entry_free_vec(indexEntry);
+	mport_index_entry_free_vec(indexEntries);
+	indexEntries = NULL;
 	indexEntry = NULL;
 
 	free(movedEntries);

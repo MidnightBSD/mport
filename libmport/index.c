@@ -539,12 +539,58 @@ mport_index_lookup_pkgname(mportInstance *mport, const char *pkgname, mportIndex
 		}
 	}
 
-	DONE:
+DONE:
 	free(lookup);
 	lookup = NULL;
 	sqlite3_finalize(stmt);
 
 	return ret;
+}
+
+int
+mport_index_select_pkgname(mportInstance *mport, const char *pkgname, const char *msg, mportIndexEntry ***entry_vec,
+    mportIndexEntry **selected)
+{
+	mportIndexEntry **entries = NULL;
+	int choice = 0;
+	int count = 0;
+
+	if (entry_vec == NULL || selected == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Package selection arguments are invalid");
+
+	*entry_vec = NULL;
+	*selected = NULL;
+
+	if (mport_index_lookup_pkgname(mport, pkgname, &entries) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	*entry_vec = entries;
+
+	if (entries == NULL || entries[0] == NULL)
+		return MPORT_OK;
+
+	while (entries[count] != NULL)
+		count++;
+
+	if (count > 1) {
+		choice = mport_call_select_cb(mport, msg == NULL ? "Multiple packages match your query." : msg, entries, 0);
+		if (choice < 0) {
+			mport_index_entry_free_vec(entries);
+			*entry_vec = NULL;
+			SET_ERROR(MPORT_ERR_FATAL, "Package selection cancelled");
+			RETURN_CURRENT_ERROR;
+		}
+		if (choice >= count) {
+			mport_index_entry_free_vec(entries);
+			*entry_vec = NULL;
+			SET_ERROR(MPORT_ERR_FATAL, "Package selection callback returned an invalid choice");
+			RETURN_CURRENT_ERROR;
+		}
+	}
+
+	*selected = entries[choice];
+
+	return MPORT_OK;
 }
 
 
