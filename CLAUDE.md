@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**mport** is the MidnightBSD package manager, written in C for MidnightBSD 3.0+. It handles package installation, upgrades, deletion, verification, auditing, and dependency resolution. Current version: 2.7.7, DB master schema v14, bundle schema v6.
+**mport** is the MidnightBSD package manager, written in C for MidnightBSD 3.0+. It handles package installation, upgrades, deletion, verification, auditing, and dependency resolution. Current version: 2.7.8, DB master schema v14, bundle schema v6.
 
 ## Build Commands
 
