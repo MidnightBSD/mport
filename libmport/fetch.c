@@ -33,15 +33,18 @@
 #include "mport_private.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <fcntl.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <fetch.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 
 #define BUFFSIZE 1024 * 8
 
 static int fetch(mportInstance *, const char *, const char *);
+static int fetch_bundle_to_dir(mportInstance *, const char *, const char *, const char *);
 static int fetch_to_file(mportInstance *, const char *, FILE *, bool);
 
 
@@ -183,26 +186,20 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 	char **mirrors;
 	char **mirrorsPtr;
 	char *url;
-	char *dest;
+	const char *fetch_dir;
 	char *osrel;
 	int mirrorCount = 0;
-	struct stat sb;
 
 	MPORT_CHECK_FOR_INDEX(mport, "mport_fetch_bundle()");
+
+	if (filename == NULL || filename[0] == '\0' || strchr(filename, '/') != NULL) {
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid bundle filename");
+	}
 	
 	if (mport_index_get_mirror_list(mport, &mirrors, &mirrorCount) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	if (stat(directory == NULL ? MPORT_FETCH_STAGING_DIR : directory, &sb) != 0 || ! S_ISDIR(sb.st_mode)) {
-		if (mkdir(directory == NULL ? MPORT_FETCH_STAGING_DIR : directory, S_IRWXU | S_IRWXG)) {
-			RETURN_CURRENT_ERROR;
-		}
-	}
-		
-	if (asprintf(&dest, "%s/%s", directory == NULL ? MPORT_FETCH_STAGING_DIR : directory, filename) == -1) {
-		free(osrel);
-		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
-	}
+	fetch_dir = directory == NULL ? MPORT_FETCH_STAGING_DIR : directory;
  
 	mirrorsPtr = mirrors;
 	osrel = mport_get_osrelease(mport);
@@ -211,16 +208,13 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 		if (*mirrorsPtr == NULL)
 			break;
 		if (asprintf(&url, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, filename) == -1) {
-			free(dest);
 			free(osrel);
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
 		}
 
-		if (fetch(mport, url, dest) == MPORT_OK) {
+		if (fetch_bundle_to_dir(mport, url, fetch_dir, filename) == MPORT_OK) {
 			free(url);
 			url = NULL;
-			free(dest);
-			dest = NULL;
 			for (int mi = 0; mi < mirrorCount; mi++)
 				free(mirrors[mi]);
 			return MPORT_OK;
@@ -232,7 +226,6 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 	}
 
 	free(osrel);
-	free(dest);
 	for (int mi = 0; mi < mirrorCount; mi++)
 		free(mirrors[mi]);
 
@@ -279,6 +272,69 @@ fetch(mportInstance *mport, const char *url, const char *dest)
 		unlink(dest);
 	}
 
+	return result;
+}
+
+static int
+fetch_bundle_to_dir(mportInstance *mport, const char *url, const char *directory,
+    const char *filename)
+{
+	FILE *local = NULL;
+	int dirfd = -1;
+	int fd = -1;
+	int result;
+	struct stat sb;
+
+	if (filename == NULL || filename[0] == '\0' || strchr(filename, '/') != NULL) {
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid bundle filename");
+	}
+
+	if (mkdir(directory, S_IRWXU | S_IRWXG) == -1 && errno != EEXIST) {
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to create %s: %s", directory, strerror(errno));
+	}
+
+	dirfd = open(directory, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+	if (dirfd == -1) {
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s: %s", directory, strerror(errno));
+	}
+
+	fd = openat(dirfd, filename, O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC,
+	    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+	if (fd == -1) {
+		close(dirfd);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s/%s: %s", directory, filename, strerror(errno));
+	}
+
+	if (fstat(fd, &sb) == -1) {
+		close(fd);
+		close(dirfd);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to stat %s/%s: %s", directory, filename, strerror(errno));
+	}
+	if (!S_ISREG(sb.st_mode) || sb.st_nlink != 1) {
+		close(fd);
+		close(dirfd);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Refusing unsafe bundle destination %s/%s", directory, filename);
+	}
+	if (ftruncate(fd, 0) == -1) {
+		close(fd);
+		close(dirfd);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to truncate %s/%s: %s", directory, filename, strerror(errno));
+	}
+
+	local = fdopen(fd, "w");
+	if (local == NULL) {
+		close(fd);
+		close(dirfd);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to open %s/%s: %s", directory, filename, strerror(errno));
+	}
+	fd = -1;
+
+	result = fetch_to_file(mport, url, local, true);
+	if (result == MPORT_ERR_FATAL) {
+		unlinkat(dirfd, filename, 0);
+	}
+
+	close(dirfd);
 	return result;
 }
 
