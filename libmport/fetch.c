@@ -238,6 +238,7 @@ mport_fetch_cves(mportInstance *mport, char *cpe)
 {
 	int result;
 	char *url;
+	FILE *local;
 
 	char tmpfile2[] = _PATH_TMP "mport.cve.XXXXXXXX";
 	int fd;
@@ -249,7 +250,17 @@ mport_fetch_cves(mportInstance *mport, char *cpe)
 	if (asprintf(&url, "%s/api/cpe/partial-match?includeVersion=true&cpe=%s&startDate=2006-02-28", MPORT_SECURITY_URL, cpe) == -1)
 		return NULL;
 
-	result = fetch_to_file(mport, url, fdopen(fd, "w"), false);
+	local = fdopen(fd, "w");
+	if (local == NULL) {
+		close(fd);
+		free(url);
+		SET_ERRORX(MPORT_ERR_FATAL, "Unable to open %s: %s", tmpfile2, strerror(errno));
+		return NULL;
+	}
+
+	result = fetch_to_file(mport, url, local, false);
+	if (fclose(local) == EOF && result == MPORT_OK)
+		result = SET_ERRORX(MPORT_ERR_FATAL, "Unable to close %s: %s", tmpfile2, strerror(errno));
 	free(url);
 
     if (result!= MPORT_OK) {
@@ -268,6 +279,8 @@ fetch(mportInstance *mport, const char *url, const char *dest)
 	}
 
 	int result = fetch_to_file(mport, url, local, true);
+	if (fclose(local) == EOF && result == MPORT_OK)
+		result = SET_ERRORX(MPORT_ERR_FATAL, "Unable to close %s: %s", dest, strerror(errno));
 	if (result == MPORT_ERR_FATAL) {
 		unlink(dest);
 	}
@@ -347,6 +360,8 @@ fetch_bundle_to_dir(mportInstance *mport, const char *url, const char *directory
 	fd = -1;
 
 	result = fetch_to_file(mport, url, local, true);
+	if (fclose(local) == EOF && result == MPORT_OK)
+		result = SET_ERRORX(MPORT_ERR_FATAL, "Unable to close %s/%s: %s", directory, tmpname, strerror(errno));
 	if (result == MPORT_ERR_FATAL) {
 		unlinkat(dirfd, tmpname, 0);
 		close(dirfd);
@@ -364,6 +379,7 @@ fetch_bundle_to_dir(mportInstance *mport, const char *url, const char *directory
 	return result;
 }
 
+/* Copies url into local. The caller owns local and must fclose it. */
 static int 
 fetch_to_file(mportInstance *mport, const char *url, FILE *local, bool progress) 
 {
@@ -380,7 +396,6 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local, bool progress)
 		mport_call_progress_init_cb(mport, "Downloading %s", url);
 	
 	if ((remote = fetchXGetURL(url, &ustat, "p")) == NULL) {
-		fclose(local);
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Fetch error: %s: %s", url, fetchLastErrString);
 	}
 
@@ -398,7 +413,6 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local, bool progress)
 		
 		if (size < BUFFSIZE) {
 			if (ferror(remote)) {
-				fclose(local);
 				fclose(remote);
 				RETURN_ERRORX(MPORT_ERR_FATAL, "Fetch error: %s: %s", url, fetchLastErrString);	 
 			} else if (feof(remote)) {
@@ -420,7 +434,6 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local, bool progress)
 		for (ptr = buffer; size > 0; ptr += wrote, size -= wrote) {
 			wrote = fwrite(ptr, 1, size, local);
 			if (wrote < size) {
-				fclose(local); 
 				fclose(remote);
 				RETURN_ERRORX(MPORT_ERR_FATAL, "Write error %s", strerror(errno));
 			}
@@ -430,7 +443,6 @@ fetch_to_file(mportInstance *mport, const char *url, FILE *local, bool progress)
 			break;
 	}
 	
-	fclose(local);
 	fclose(remote);
 
 	if (progress)
