@@ -249,8 +249,10 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		}
 	}
 
-	if ((bundle = mport_bundle_read_new()) == NULL)
-		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+	if ((bundle = mport_bundle_read_new()) == NULL) {
+		ret = mport_set_errx(MPORT_ERR_FATAL, "Error at %s:(%d): %s", __FILE__, __LINE__, "Out of memory.");
+		goto cleanup;
+	}
 
 	GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_init(bundle, filename));
 	GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_prep_for_install(mport, bundle));
