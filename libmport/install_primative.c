@@ -322,8 +322,13 @@ cleanup:
 	}
 	free(dir);
 	dir = NULL;
-	free(dependencies);
-	dependencies = NULL;
+	if (dependencies != NULL) {
+		char **dptr = dependencies;
+		while (*dptr != NULL)
+			free(*dptr++);
+		free(dependencies);
+		dependencies = NULL;
+	}
 
 	return ret;
 }
