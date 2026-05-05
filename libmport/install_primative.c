@@ -205,7 +205,11 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		}
 		dependencies = get_dependencies(mport, pkgs[0]);
 
-		GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_finish(mport, bundle));
+		if (mport_bundle_read_finish(mport, bundle) != MPORT_OK) {
+			ret = mport_err_code();
+			bundle = NULL;
+			goto cleanup;
+		}
 		bundle = NULL;
 
 		if (pkgs != NULL) {
@@ -292,7 +296,11 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		}
 	}
 
-	GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_finish(mport, bundle));
+	if (mport_bundle_read_finish(mport, bundle) != MPORT_OK) {
+		ret = mport_err_code();
+		bundle = NULL;
+		goto cleanup;
+	}
 	bundle = NULL;
 
 cleanup:
