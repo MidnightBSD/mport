@@ -268,7 +268,22 @@ main(int argc, char *argv[])
 			mport_instance_free(mport);
 			usage();
 		}
-		resultCode = deleteMany(mport, argc, argv, true);
+		int local_argc = argc;
+		char **local_argv = argv;
+
+		if (local_argc > 1) {
+			int ch2;
+			while ((ch2 = getopt(local_argc, local_argv, "y")) != -1) {
+				switch (ch2) {
+				case 'y':
+					setenv("ASSUME_ALWAYS_YES", "1", 1);
+					break;
+				}
+			}
+			local_argc -= optind;
+			local_argv += optind;
+		}
+		resultCode = deleteMany(mport, local_argc, local_argv, false);
 	} else if (!strcmp(cmd, "update")) {
 		if (argc == 1) {
 			mport_instance_free(mport);

@@ -106,6 +106,10 @@ int mport_default_confirm_cb(const char *msg, const char *yes, const char *no, i
   while (1) {
     /* get answer, if just \n, then default. */
     ans = fgetln(stdin, &len);
+    if (ans == NULL) {
+      mport_set_errx(MPORT_ERR_FATAL, "Unable to read confirmation response.");
+      return -1;
+    }
 
     if (len == 1) { 
       /* user just hit return */
@@ -203,4 +207,3 @@ void mport_default_progress_free_cb(void)
   (void)printf("\n");
   (void)fflush(stdout);
 }
-

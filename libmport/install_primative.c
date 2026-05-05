@@ -148,9 +148,11 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 	mportPackageMeta **pkgs = NULL;
 	mportPackageMeta *pkg = NULL;
 	int i;
+	int ret = MPORT_OK;
 	bool error = false;
 	char **dependencies = NULL;
 	char **deps = NULL;
+	char *dir = NULL;
 
 	if (mport == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
@@ -166,17 +168,27 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
 		if (mport_bundle_read_init(bundle, filename) != MPORT_OK)
-			RETURN_CURRENT_ERROR;
+		{
+			ret = mport_err_code();
+			goto cleanup;
+		}
 
 		if (mport_bundle_read_prep_for_install(mport, bundle) != MPORT_OK)
-			RETURN_CURRENT_ERROR;
+		{
+			ret = mport_err_code();
+			goto cleanup;
+		}
 
 		if (mport_pkgmeta_read_stub(mport, &pkgs) != MPORT_OK)
-			RETURN_CURRENT_ERROR;
+		{
+			ret = mport_err_code();
+			goto cleanup;
+		}
 
 		if (!mport_is_age_verified(mport, pkgs[0])) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: package is age restricted and user does not meet the requirements.", pkgs[0]->name, pkgs[0]->version);
-			return MPORT_ERR_FATAL;
+			ret = MPORT_ERR_FATAL;
+			goto cleanup;
 		}
 
 		/* if we previously installed it and want to force, allow it.  
@@ -187,22 +199,32 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 				mport_delete_primative(mport, pkgs[0], 1);
 			} else {
 				mport_call_msg_cb(mport, "%s-%s: already installed.", pkgs[0]->name, pkgs[0]->version);
-				return MPORT_OK;
+				ret = MPORT_OK;
+				goto cleanup;
 			}
 		}
 
 		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_CONFLICTS) != MPORT_OK) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkgs[0]->name, pkgs[0]->version,
 			                  mport_err_string());
-			return MPORT_ERR_FATAL;
+			ret = MPORT_ERR_FATAL;
+			goto cleanup;
 		}
 		dependencies = get_dependencies(mport, pkgs[0]);
 
-		// close so we can safely process depdendencies. ignore errors for this one.
-		mport_bundle_read_finish(mport, bundle);
+		if (mport_bundle_read_finish(mport, bundle) != MPORT_OK) {
+			ret = mport_err_code();
+			goto cleanup;
+		}
+		bundle = NULL;
+
+		if (pkgs != NULL) {
+			mport_pkgmeta_vec_free(pkgs);
+			pkgs = NULL;
+		}
 
 		deps = dependencies;
-		char *dir = mport_directory(filename);
+		dir = mport_directory(filename);
 		while (deps!= NULL && *deps != NULL) {
 			char *dep_filename = NULL; 
 			if (asprintf(&dep_filename, "%s/%s.mport", dir, *deps) == -1) {
@@ -222,27 +244,37 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 
 			if (mport_install_primative(mport, dep_filename, prefix, MPORT_AUTOMATIC)!= MPORT_OK) {
 				mport_call_msg_cb(mport, "Unable to install %s: %s", *deps, mport_err_string());
-				if (!mport->ignoreMissing)
-					return MPORT_ERR_FATAL;
+				if (!mport->ignoreMissing) {
+					free(dep_filename);
+					ret = MPORT_ERR_FATAL;
+					goto cleanup;
+				}
 			}
 			free(dep_filename);
 			deps++;
 		}
-		free(dir);
-		free(dependencies);
 	}
 
 	if ((bundle = mport_bundle_read_new()) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
 	if (mport_bundle_read_init(bundle, filename) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
+	{
+		ret = mport_err_code();
+		goto cleanup;
+	}
 
 	if (mport_bundle_read_prep_for_install(mport, bundle) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
+	{
+		ret = mport_err_code();
+		goto cleanup;
+	}
 
 	if (mport_pkgmeta_read_stub(mport, &pkgs) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
+	{
+		ret = mport_err_code();
+		goto cleanup;
+	}
 
 	for (i = 0; *(pkgs + i) != NULL; i++) {
 		pkg = pkgs[i];
@@ -252,6 +284,7 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 
 		if (!mport_is_age_verified(mport, pkg)) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: package is age restricted and user does not meet the requirements.", pkg->name, pkg->version);
+			error = true;
 			break; /* do not keep going if we have an age verification failure! */
 		}
 
@@ -261,14 +294,17 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 					pkg->automatic = already_installed[0]->automatic; // honor old flag
 				}
 				mport_pkgmeta_vec_free(already_installed);
+				already_installed = NULL;
 			}
 		}
 
 		if (prefix != NULL) {
 			/* override the default prefix with the given prefix */
 			free(pkg->prefix);
-			if ((pkg->prefix = strdup(prefix)) == NULL) /* all hope is lost! bail */
-				RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+			if ((pkg->prefix = strdup(prefix)) == NULL) { /* all hope is lost! bail */
+				ret = mport_set_errx(MPORT_ERR_FATAL, "Error at %s:(%d): %s", __FILE__, __LINE__, "Out of memory.");
+				goto cleanup;
+			}
 		}
 
 		if ((mport_check_preconditions(mport, pkg, MPORT_PRECHECK_INSTALLED | MPORT_PRECHECK_DEPENDS | MPORT_PRECHECK_CONFLICTS) != MPORT_OK)
@@ -280,11 +316,27 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		}
 	}
 
-	if (mport_bundle_read_finish(mport, bundle) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
+	if (mport_bundle_read_finish(mport, bundle) != MPORT_OK) {
+		ret = mport_err_code();
+		goto cleanup;
+	}
+	bundle = NULL;
 
 	if (error)
-		return MPORT_ERR_FATAL;
+		ret = MPORT_ERR_FATAL;
 
-	return MPORT_OK;
+cleanup:
+	if (bundle != NULL) {
+		if (mport_bundle_read_finish(mport, bundle) != MPORT_OK && ret == MPORT_OK)
+			ret = mport_err_code();
+	}
+
+	if (already_installed != NULL)
+		mport_pkgmeta_vec_free(already_installed);
+	if (pkgs != NULL)
+		mport_pkgmeta_vec_free(pkgs);
+	free(dir);
+	free(dependencies);
+
+	return ret;
 }
