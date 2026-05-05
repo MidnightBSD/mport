@@ -341,7 +341,7 @@ mport_call_msg_cb(mportInstance *mport, const char *fmt, ...) {
  * @param def The default option (1 for yes, 0 for no). (an int so custom logic can be expressed)
  *
  * @return true if the user confirms or if ASSUME_ALWAYS_YES is set,
- *         false if the user declines.
+ *         false if the user declines or the callback reports an error.
  */
 MPORT_PUBLIC_API bool
 mport_call_confirm_cb(mportInstance *mport, const char *msg, const char *yes, const char *no, int def) {
