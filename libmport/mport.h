@@ -53,6 +53,12 @@ typedef void (*mport_msg_cb)(const char *);
 typedef void (*mport_progress_init_cb)(const char *);
 typedef void (*mport_progress_step_cb)(int, int, const char *);
 typedef void (*mport_progress_free_cb)(void);
+/*
+ * Confirmation callbacks return MPORT_OK when the action is confirmed.
+ * Any non-OK value is treated as a declined or failed confirmation.
+ * Callbacks may set the mport error state to distinguish I/O failures
+ * from an explicit "no" response.
+ */
 typedef int (*mport_confirm_cb)(const char *, const char *, const char *, int);
 
 typedef tll(char *) stringlist_t;

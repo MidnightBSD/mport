@@ -108,7 +108,7 @@ int mport_default_confirm_cb(const char *msg, const char *yes, const char *no, i
     ans = fgetln(stdin, &len);
     if (ans == NULL) {
       mport_set_errx(MPORT_ERR_FATAL, "Unable to read confirmation response.");
-      return -1;
+      return mport_err_code();
     }
 
     if (len == 1) { 

@@ -273,6 +273,10 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
+#if defined(__MidnightBSD__)
+			optreset = 1;
+#endif
+			optind = 1;
 			while ((ch2 = getopt(local_argc, local_argv, "y")) != -1) {
 				switch (ch2) {
 				case 'y':

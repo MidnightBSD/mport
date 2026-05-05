@@ -36,6 +36,14 @@
 static char ** get_dependencies(mportInstance *mport, mportPackageMeta *pack);
 static char *find_file_with_prefix(const char *dir, const char *prefix);
 
+#define GOTO_CLEANUP_ON_MPORT_ERR(expr) \
+	do { \
+		if ((expr) != MPORT_OK) { \
+			ret = mport_err_code(); \
+			goto cleanup; \
+		} \
+	} while (0)
+
 static char **
 get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
 {
@@ -149,7 +157,6 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 	mportPackageMeta *pkg = NULL;
 	int i;
 	int ret = MPORT_OK;
-	bool error = false;
 	char **dependencies = NULL;
 	char **deps = NULL;
 	char *dir = NULL;
@@ -167,23 +174,9 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		if ((bundle = mport_bundle_read_new()) == NULL)
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
-		if (mport_bundle_read_init(bundle, filename) != MPORT_OK)
-		{
-			ret = mport_err_code();
-			goto cleanup;
-		}
-
-		if (mport_bundle_read_prep_for_install(mport, bundle) != MPORT_OK)
-		{
-			ret = mport_err_code();
-			goto cleanup;
-		}
-
-		if (mport_pkgmeta_read_stub(mport, &pkgs) != MPORT_OK)
-		{
-			ret = mport_err_code();
-			goto cleanup;
-		}
+		GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_init(bundle, filename));
+		GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_prep_for_install(mport, bundle));
+		GOTO_CLEANUP_ON_MPORT_ERR(mport_pkgmeta_read_stub(mport, &pkgs));
 
 		if (!mport_is_age_verified(mport, pkgs[0])) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: package is age restricted and user does not meet the requirements.", pkgs[0]->name, pkgs[0]->version);
@@ -212,10 +205,7 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		}
 		dependencies = get_dependencies(mport, pkgs[0]);
 
-		if (mport_bundle_read_finish(mport, bundle) != MPORT_OK) {
-			ret = mport_err_code();
-			goto cleanup;
-		}
+		GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_finish(mport, bundle));
 		bundle = NULL;
 
 		if (pkgs != NULL) {
@@ -258,23 +248,9 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 	if ((bundle = mport_bundle_read_new()) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
-	if (mport_bundle_read_init(bundle, filename) != MPORT_OK)
-	{
-		ret = mport_err_code();
-		goto cleanup;
-	}
-
-	if (mport_bundle_read_prep_for_install(mport, bundle) != MPORT_OK)
-	{
-		ret = mport_err_code();
-		goto cleanup;
-	}
-
-	if (mport_pkgmeta_read_stub(mport, &pkgs) != MPORT_OK)
-	{
-		ret = mport_err_code();
-		goto cleanup;
-	}
+	GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_init(bundle, filename));
+	GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_prep_for_install(mport, bundle));
+	GOTO_CLEANUP_ON_MPORT_ERR(mport_pkgmeta_read_stub(mport, &pkgs));
 
 	for (i = 0; *(pkgs + i) != NULL; i++) {
 		pkg = pkgs[i];
@@ -284,7 +260,7 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 
 		if (!mport_is_age_verified(mport, pkg)) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: package is age restricted and user does not meet the requirements.", pkg->name, pkg->version);
-			error = true;
+			ret = MPORT_ERR_FATAL;
 			break; /* do not keep going if we have an age verification failure! */
 		}
 
@@ -311,32 +287,33 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
                    || (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name, pkg->version,
 			                  mport_err_string());
-			error = true;
+			ret = MPORT_ERR_FATAL;
 			break; /* do not keep going if we have a package failure! */
 		}
 	}
 
-	if (mport_bundle_read_finish(mport, bundle) != MPORT_OK) {
-		ret = mport_err_code();
-		goto cleanup;
-	}
+	GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_finish(mport, bundle));
 	bundle = NULL;
-
-	if (error)
-		ret = MPORT_ERR_FATAL;
 
 cleanup:
 	if (bundle != NULL) {
 		if (mport_bundle_read_finish(mport, bundle) != MPORT_OK && ret == MPORT_OK)
 			ret = mport_err_code();
+		bundle = NULL;
 	}
 
-	if (already_installed != NULL)
+	if (already_installed != NULL) {
 		mport_pkgmeta_vec_free(already_installed);
-	if (pkgs != NULL)
+		already_installed = NULL;
+	}
+	if (pkgs != NULL) {
 		mport_pkgmeta_vec_free(pkgs);
+		pkgs = NULL;
+	}
 	free(dir);
+	dir = NULL;
 	free(dependencies);
+	dependencies = NULL;
 
 	return ret;
 }
