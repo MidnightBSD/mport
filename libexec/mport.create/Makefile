@@ -4,9 +4,9 @@ MAN= mport.create.1
 CFLAGS+=	-I${.CURDIR}/../../libmport/ -I/usr/include/private/ucl -I ${.CURDIR}/../../external/tllist/ -I/usr/include/private/zstd 
 WARNS?= 	6
 
-LIBADD= mport pthread
+LIBADD= mport pthread privateucl
 
-LDFLAGS += -L ${.CURDIR}/../../libmport -lmport -lpthread
+LDFLAGS += -L ${.CURDIR}/../../libmport -lmport -lpthread -lprivateucl
 
 BINDIR=/usr/libexec
 
