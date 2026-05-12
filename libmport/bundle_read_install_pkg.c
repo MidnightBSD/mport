@@ -700,6 +700,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 	char *orig_cwd = NULL;
 	uid_t owner = 0; /* root */
 	gid_t group = 0; /* wheel */
+	struct stat sb;
 	mode_t *set = NULL;
 	mode_t newmode;
 	char *mode = NULL;
