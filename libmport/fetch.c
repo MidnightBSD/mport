@@ -46,6 +46,20 @@
 static int fetch(mportInstance *, const char *, const char *);
 static int fetch_bundle_to_dir(mportInstance *, const char *, const char *, const char *);
 static int fetch_to_file(mportInstance *, const char *, FILE *, bool);
+static bool is_valid_bundle_filename(const char *);
+
+static bool
+is_valid_bundle_filename(const char *filename)
+{
+	if (filename == NULL || filename[0] == '\0')
+		return false;
+	if (strcmp(filename, ".") == 0 || strcmp(filename, "..") == 0)
+		return false;
+	if (strchr(filename, '/') != NULL)
+		return false;
+
+	return true;
+}
 
 
 /* mport_fetch_index(mport)
@@ -192,7 +206,7 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 
 	MPORT_CHECK_FOR_INDEX(mport, "mport_fetch_bundle()");
 
-	if (filename == NULL || filename[0] == '\0' || strchr(filename, '/') != NULL) {
+	if (!is_valid_bundle_filename(filename)) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid bundle filename");
 	}
 	
@@ -300,7 +314,7 @@ fetch_bundle_to_dir(mportInstance *mport, const char *url, const char *directory
 	struct stat sb;
 	int len;
 
-	if (filename == NULL || filename[0] == '\0' || strchr(filename, '/') != NULL) {
+	if (!is_valid_bundle_filename(filename)) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid bundle filename");
 	}
 
@@ -499,6 +513,12 @@ mport_download(mportInstance *mport, const char *packageName, bool all, bool inc
 
 	if (indexEntry->bundlefile == NULL) {
 		SET_ERRORX(1, "Package %s does not contain a bundle file.\n", packageName);
+		mport_index_entry_free_vec(indexEntries);
+		RETURN_CURRENT_ERROR;
+	}
+
+	if (!is_valid_bundle_filename(indexEntry->bundlefile)) {
+		SET_ERRORX(1, "Package %s has an invalid bundle filename.\n", packageName);
 		mport_index_entry_free_vec(indexEntries);
 		RETURN_CURRENT_ERROR;
 	}
