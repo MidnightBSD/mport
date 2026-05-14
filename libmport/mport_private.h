@@ -279,6 +279,7 @@ int mport_script_run_child(mportInstance *, int, int *, int, const char*);
 #define MPORT_MAX_INDEX_AGE (MPORT_DAY * 7) /* one week */
 #define MPORT_SETTING_INDEX_LAST_CHECKED "index_last_check"
 #define MPORT_SETTING_REPO_AUTOUPDATE "index_autoupdate"
+#define MPORT_SETTING_REPO_AUTOUPDATE_LEGACY "REPO_AUTOUPDATE"
 #define MPORT_SETTING_HANDLE_RC_SCRIPTS "handle_rc_scripts"
 
 /* Binaries we use */

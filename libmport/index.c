@@ -95,10 +95,15 @@ mport_index_load(mportInstance *mport)
 	bool noIndex = mport->noIndex; /* must come after index file path call */
 
 	char *autoupdate = mport_setting_get(mport, MPORT_SETTING_REPO_AUTOUPDATE);
+	if (autoupdate == NULL) {
+		autoupdate = mport_setting_get(mport, MPORT_SETTING_REPO_AUTOUPDATE_LEGACY);
+	}
 	if (autoupdate != NULL && (strcmp("FALSE", autoupdate) == 0 || strcmp("false", autoupdate) == 0 ||
 			strcmp("NO", autoupdate) == 0 || strcmp("no", autoupdate) == 0)) {
 		noIndex = true;
 	}
+	if (autoupdate != NULL)
+		free(autoupdate);
 	
 	if (mport_file_exists(indexFile)) {
 		if (attach_index_db(mport->db) != MPORT_OK) {
