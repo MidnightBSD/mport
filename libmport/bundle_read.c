@@ -149,16 +149,12 @@ mport_bundle_read_extract_metafiles(mportBundleRead *bundle, char **dirnamep)
 	char *tmpdir;
 
 	/*
-	 * If running with elevated privileges, do not trust TMPDIR from the
-	 * environment for security-sensitive metadata extraction.
+	 * Do not trust TMPDIR when running with elevated privileges or in a
+	 * setuid/setgid context to prevent environment-based attacks.
 	 */
-	if (geteuid() == 0) {
+	tmpdir = (issetugid() || geteuid() == 0) ? NULL : getenv("TMPDIR");
+	if (tmpdir == NULL || *tmpdir == '\0')
 		tmpdir = "/tmp";
-	} else {
-		tmpdir = getenv("TMPDIR");
-		if (tmpdir == NULL)
-			tmpdir = "/tmp";
-	}
 
 	strlcpy(dirtmpl, tmpdir, sizeof(dirtmpl));
 	strlcat(dirtmpl, "/mport.XXXXXXXX", sizeof(dirtmpl));
