@@ -34,6 +34,7 @@
 #include <string.h>
 #include <errno.h>
 #include <archive_entry.h>
+#include <unistd.h>
 
 /*
  * mport_bundle_read_new()
@@ -147,8 +148,12 @@ mport_bundle_read_extract_metafiles(mportBundleRead *bundle, char **dirnamep)
 	char dirtmpl[MAXPATHLEN];
 	char *tmpdir;
 
-	tmpdir = getenv("TMPDIR");
-	if (tmpdir == NULL)
+	/*
+	 * Do not trust TMPDIR when running with elevated privileges or in a
+	 * setuid/setgid context to prevent environment-based attacks.
+	 */
+	tmpdir = (issetugid() || geteuid() == 0) ? NULL : getenv("TMPDIR");
+	if (tmpdir == NULL || *tmpdir == '\0')
 		tmpdir = "/tmp";
 
 	strlcpy(dirtmpl, tmpdir, sizeof(dirtmpl));
