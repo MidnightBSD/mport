@@ -546,13 +546,13 @@ create_sample_file(mportInstance *mport, char *cwd, const char *file)
 	if (file[0] != '/')
 		(void) snprintf(nonSample, FILENAME_MAX, "%s%s/%s", mport->root, cwd, file);
 	else
-		strlcpy(nonSample, file, FILENAME_MAX * 2);
+		(void) snprintf(nonSample, FILENAME_MAX * 2, "%s%s", mport->root, file);
 
 	char **fileargv = parse_sample(nonSample);
 
 	if (fileargv[1] != NULL) {
 		if (fileargv[1][0] == '/')
-			strlcpy(secondFile, fileargv[1], FILENAME_MAX);
+			(void) snprintf(secondFile, FILENAME_MAX, "%s%s", mport->root, fileargv[1]);
 		else
 			(void) snprintf(secondFile, FILENAME_MAX, "%s%s/%s", mport->root, cwd, fileargv[1]);
 
