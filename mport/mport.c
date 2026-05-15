@@ -54,7 +54,7 @@ static mportIndexEntry **lookupIndex(mportInstance *, const char *);
 static int add(mportInstance *mport, const char *filename, mportAutomatic automatic);
 static int install(mportInstance *, const char *, mportAutomatic);
 static int reinstall_dependents(mportInstance *, const char *);
-static int reinstall_dependents_impl(mportInstance *, const char *, char **, int *, int);
+static int reinstall_dependents_impl(mportInstance *, const char *, char ***, size_t *, size_t *);
 
 static int cpeList(mportInstance *);
 static int cpeGet(mportInstance *mport, const char *packageName);
@@ -1053,10 +1053,12 @@ install(mportInstance *mport, const char *packageName, mportAutomatic automatic)
  * Inner recursive worker for reinstall_dependents.
  * visited/visit_count/visit_max guard against reinstalling the same package
  * twice when it appears as a dependent via multiple paths in the tree.
+ * The visited array grows dynamically; visit_count and visit_cap are updated
+ * in place so callers can free every entry on return.
  */
 static int
 reinstall_dependents_impl(mportInstance *mport, const char *baseName,
-    char **visited, int *visit_count, int visit_max)
+    char ***visited_p, size_t *visit_count, size_t *visit_cap)
 {
 	mportPackageMeta **packs = NULL;
 	mportPackageMeta **updepends = NULL;
@@ -1080,8 +1082,8 @@ reinstall_dependents_impl(mportInstance *mport, const char *baseName,
 
 	for (mportPackageMeta **dep = updepends; *dep != NULL; dep++) {
 		bool already_visited = false;
-		for (int v = 0; v < *visit_count; v++) {
-			if (strcmp(visited[v], (*dep)->name) == 0) {
+		for (size_t v = 0; v < *visit_count; v++) {
+			if (strcmp((*visited_p)[v], (*dep)->name) == 0) {
 				already_visited = true;
 				break;
 			}
@@ -1089,14 +1091,25 @@ reinstall_dependents_impl(mportInstance *mport, const char *baseName,
 		if (already_visited)
 			continue;
 
-		if (*visit_count < visit_max) {
-			char *n = strdup((*dep)->name);
-			if (n != NULL)
-				visited[(*visit_count)++] = n;
+		/* grow visited array if needed */
+		if (*visit_count >= *visit_cap) {
+			size_t new_cap = *visit_cap * 2;
+			char **grown = reallocarray(*visited_p, new_cap, sizeof(char *));
+			if (grown == NULL) {
+				warnx("reinstall_dependents: out of memory growing visited set");
+				resultCode = MPORT_ERR_FATAL;
+				break;
+			}
+			*visited_p = grown;
+			*visit_cap = new_cap;
 		}
 
+		char *n = strdup((*dep)->name);
+		if (n != NULL)
+			(*visited_p)[(*visit_count)++] = n;
+
 		if (install(mport, (*dep)->name, (*dep)->automatic) == MPORT_OK) {
-			if (reinstall_dependents_impl(mport, (*dep)->name, visited, visit_count, visit_max) != MPORT_OK)
+			if (reinstall_dependents_impl(mport, (*dep)->name, visited_p, visit_count, visit_cap) != MPORT_OK)
 				resultCode = MPORT_ERR_FATAL;
 		} else {
 			resultCode = MPORT_ERR_FATAL;
@@ -1137,14 +1150,15 @@ reinstall_dependents(mportInstance *mport, const char *packageName)
 		}
 	}
 
-	char **visited = calloc(256, sizeof(char *));
-	int visit_count = 0;
+	size_t visit_cap = 32;
+	size_t visit_count = 0;
+	char **visited = calloc(visit_cap, sizeof(char *));
 	int ret = MPORT_ERR_FATAL;
 
 	if (visited != NULL)
-		ret = reinstall_dependents_impl(mport, baseName, visited, &visit_count, 256);
+		ret = reinstall_dependents_impl(mport, baseName, &visited, &visit_count, &visit_cap);
 
-	for (int i = 0; i < visit_count; i++)
+	for (size_t i = 0; i < visit_count; i++)
 		free(visited[i]);
 	free(visited);
 	mport_index_entry_free_vec(ie);

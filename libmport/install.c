@@ -255,7 +255,7 @@ mport_install_depends(mportInstance *mport, const char *packageName, const char 
 			}
 			mport_pkgmeta_vec_free(packs);
 		} else if (mport->force) {
-			/* force reinstall of already-installed package at the same version */
+			/* force reinstall of already-installed package, regardless of version */
 			mport_pkgmeta_vec_free(packs);
 			packs = NULL;
 			if (mport_install_single(mport, packageName, version, NULL, automatic) != MPORT_OK) {
