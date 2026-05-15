@@ -53,6 +53,7 @@ static mportIndexEntry **lookupIndex(mportInstance *, const char *);
 
 static int add(mportInstance *mport, const char *filename, mportAutomatic automatic);
 static int install(mportInstance *, const char *, mportAutomatic);
+static int reinstall_dependents(mportInstance *, const char *, mportAutomatic);
 
 static int cpeList(mportInstance *);
 static int cpeGet(mportInstance *mport, const char *packageName);
@@ -240,16 +241,24 @@ main(int argc, char *argv[])
 		int local_argc = argc;
 		char *const *local_argv = argv;
 		int aflag = 0;
+		int rflag = 0;
 
 		if (local_argc > 1) {
 			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "AMy")) != -1) {
+#if defined(__MidnightBSD__)
+			optreset = 1;
+#endif
+			optind = 1;
+			while ((ch2 = getopt(local_argc, local_argv, "AMry")) != -1) {
 				switch (ch2) {
 				case 'A':
 					aflag = 1;
 					break;
 				case 'M':
 					mport->ignoreMissing = true;
+					break;
+				case 'r':
+					rflag = 1;
 					break;
 				case 'y':
 					setenv("ASSUME_ALWAYS_YES", "1", 1);
@@ -261,10 +270,16 @@ main(int argc, char *argv[])
 		}
 
 		loadIndex(mport);
-		for (i = 1; i < argc; i++) {
-			tempResultCode = install(mport, argv[i], aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
+		for (i = 0; i < local_argc; i++) {
+			tempResultCode = install(mport, local_argv[i], aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
 			if (tempResultCode != 0)
 				resultCode = tempResultCode;
+			if (rflag && mport->force) {
+				tempResultCode = reinstall_dependents(mport, local_argv[i],
+				    aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
+				if (tempResultCode != 0)
+					resultCode = tempResultCode;
+			}
 		}
 	} else if (!strcmp(cmd, "delete")) {
 		if (argc == 1) {
@@ -702,7 +717,7 @@ usage(void)
 	    "Commands:\n"
 	    "  Package Management:\n"
 	    "    add [-A] <package file>     Install package from file\n"
-	    "    install [-AMy] <package>      Install package from repository\n"
+	    "    install [-AMry] <package>     Install package from repository\n"
 	    "    delete <package>            Remove installed package\n"
 	    "    update [package]            Update installed package(s)\n"
 	    "    upgrade                     Upgrade all outdated packages\n"
@@ -1032,6 +1047,66 @@ install(mportInstance *mport, const char *packageName, mportAutomatic automatic)
 	mport_index_entry_free_vec(ie);
 
 	return (resultCode);
+}
+
+/*
+ * Reinstall all installed packages that directly depend on packageName.
+ * Used with -f -r to force-reinstall consumers of a library or base package.
+ */
+static int
+reinstall_dependents(mportInstance *mport, const char *packageName, mportAutomatic automatic)
+{
+	mportPackageMeta **packs = NULL;
+	mportPackageMeta **updepends = NULL;
+	char **names = NULL;
+	int count = 0;
+	int resultCode = MPORT_OK;
+
+	if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", packageName) != MPORT_OK ||
+	    packs == NULL || packs[0] == NULL) {
+		mport_pkgmeta_vec_free(packs);
+		return MPORT_OK;
+	}
+
+	if (mport_pkgmeta_get_updepends(mport, packs[0], &updepends) != MPORT_OK) {
+		mport_pkgmeta_vec_free(packs);
+		warnx("%s", mport_err_string());
+		return MPORT_ERR_FATAL;
+	}
+	mport_pkgmeta_vec_free(packs);
+
+	if (updepends == NULL)
+		return MPORT_OK;
+
+	for (mportPackageMeta **dep = updepends; *dep != NULL; dep++)
+		count++;
+
+	names = calloc(count + 1, sizeof(char *));
+	if (names == NULL) {
+		mport_pkgmeta_vec_free(updepends);
+		return MPORT_ERR_FATAL;
+	}
+
+	for (int idx = 0; idx < count; idx++) {
+		names[idx] = strdup(updepends[idx]->name);
+		if (names[idx] == NULL) {
+			for (int j = 0; j < idx; j++)
+				free(names[j]);
+			free(names);
+			mport_pkgmeta_vec_free(updepends);
+			return MPORT_ERR_FATAL;
+		}
+	}
+	mport_pkgmeta_vec_free(updepends);
+
+	for (int idx = 0; idx < count; idx++) {
+		if (install(mport, names[idx], automatic) != MPORT_OK)
+			resultCode = MPORT_ERR_FATAL;
+		free(names[idx]);
+	}
+	free(names);
+
+	return resultCode;
 }
 
 int

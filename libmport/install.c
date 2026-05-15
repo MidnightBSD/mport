@@ -254,6 +254,14 @@ mport_install_depends(mportInstance *mport, const char *packageName, const char 
 				return mport_err_code();
 			}
 			mport_pkgmeta_vec_free(packs);
+		} else if (mport->force) {
+			/* force reinstall of already-installed package at the same version */
+			mport_pkgmeta_vec_free(packs);
+			packs = NULL;
+			if (mport_install_single(mport, packageName, version, NULL, automatic) != MPORT_OK) {
+				mport_call_msg_cb(mport, "%s", mport_err_string());
+				return mport_err_code();
+			}
 		} else {
 			if (getenv("MPORT_GUI") == NULL) {
 				mport_call_msg_cb(mport,
