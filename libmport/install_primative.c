@@ -32,6 +32,8 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <string.h>
+#include <sys/statvfs.h>
+#include <libutil.h>
 
 static char ** get_dependencies(mportInstance *mport, mportPackageMeta *pack);
 static char *find_file_with_prefix(const char *dir, const char *prefix);
@@ -286,6 +288,30 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 			if ((pkg->prefix = strdup(prefix)) == NULL) { /* all hope is lost! bail */
 				ret = mport_set_errx(MPORT_ERR_FATAL, "Error at %s:(%d): %s", __FILE__, __LINE__, "Out of memory.");
 				goto cleanup;
+			}
+		}
+
+		if (pkg->flatsize > 0) {
+			struct statvfs sfs;
+			const char *check_path = (mport->root != NULL && mport->root[0] != '\0') ? mport->root : pkg->prefix;
+			if (statvfs(check_path, &sfs) == 0) {
+				int64_t avail_bytes;
+				if (sfs.f_frsize != 0 &&
+				    (uintmax_t)sfs.f_bavail > (uintmax_t)INT64_MAX / (uintmax_t)sfs.f_frsize) {
+					avail_bytes = INT64_MAX;
+				} else {
+					avail_bytes = (int64_t)((uintmax_t)sfs.f_bavail * (uintmax_t)sfs.f_frsize);
+				}
+				if (pkg->flatsize > avail_bytes) {
+					char avail_str[32], need_str[32];
+					humanize_number(avail_str, sizeof(avail_str), avail_bytes, "B",
+					    HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
+					humanize_number(need_str, sizeof(need_str), pkg->flatsize, "B",
+					    HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
+					mport_call_msg_cb(mport,
+					    "Warning: %s-%s requires %s but only %s is available on %s.",
+					    pkg->name, pkg->version, need_str, avail_str, check_path);
+				}
 			}
 		}
 
