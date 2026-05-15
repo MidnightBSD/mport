@@ -31,14 +31,22 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <errno.h>
 #include <string.h>
 #include <sqlite3.h>
 #include <md5.h>
 #include <sha256.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <spawn.h>
 #include "mport.h"
 #include "mport_private.h"
+
+extern char **environ;
+
+static void verify_mtree(mportInstance *, mportPackageMeta *);
 
 MPORT_PUBLIC_API int
 mport_verify_package(mportInstance *mport, mportPackageMeta *pack)
@@ -145,8 +153,97 @@ mport_verify_package(mportInstance *mport, mportPackageMeta *pack)
 	}
 
 	sqlite3_finalize(stmt);
-	
+
+	verify_mtree(mport, pack);
+
 	return (MPORT_OK);
+}
+
+static void
+verify_mtree(mportInstance *mport, mportPackageMeta *pack)
+{
+	char mtree_path[FILENAME_MAX];
+	char prefix[FILENAME_MAX];
+	int pipefd[2];
+	posix_spawn_file_actions_t action;
+	pid_t pid;
+	int error, pstat;
+
+	(void)snprintf(mtree_path, sizeof(mtree_path), "%s%s/%s-%s/%s",
+	    mport->root, MPORT_INST_INFRA_DIR, pack->name, pack->version,
+	    MPORT_MTREE_FILE);
+
+	if (!mport_file_exists(mtree_path))
+		return;
+
+	(void)snprintf(prefix, sizeof(prefix), "%s%s", mport->root, pack->prefix);
+
+	if (pipe(pipefd) == -1) {
+		mport_call_msg_cb(mport, "mtree verify: pipe: %s", strerror(errno));
+		return;
+	}
+
+	if ((error = posix_spawn_file_actions_init(&action)) != 0) {
+		close(pipefd[0]);
+		close(pipefd[1]);
+		mport_call_msg_cb(mport, "mtree verify: posix_spawn_file_actions_init: %s",
+		    strerror(error));
+		return;
+	}
+	if ((error = posix_spawn_file_actions_adddup2(&action, pipefd[1], STDOUT_FILENO)) != 0 ||
+	    (error = posix_spawn_file_actions_addclose(&action, pipefd[0])) != 0) {
+		posix_spawn_file_actions_destroy(&action);
+		close(pipefd[0]);
+		close(pipefd[1]);
+		mport_call_msg_cb(mport, "mtree verify: file actions setup: %s", strerror(error));
+		return;
+	}
+
+	char *const args[] = { MPORT_MTREE_BIN, "-f", mtree_path, "-d", "-e",
+	    "-p", prefix, NULL };
+
+	error = posix_spawn(&pid, MPORT_MTREE_BIN, &action, NULL, args, environ);
+	posix_spawn_file_actions_destroy(&action);
+	close(pipefd[1]);
+
+	if (error != 0) {
+		close(pipefd[0]);
+		mport_call_msg_cb(mport, "mtree verify: posix_spawn: %s", strerror(error));
+		return;
+	}
+
+	FILE *fp = fdopen(pipefd[0], "r");
+	if (fp != NULL) {
+		char line[FILENAME_MAX * 2];
+		while (fgets(line, sizeof(line), fp) != NULL) {
+			size_t len = strlen(line);
+			if (len > 0 && line[len - 1] == '\n')
+				line[len - 1] = '\0';
+			if (line[0] != '\0')
+				mport_call_msg_cb(mport, "mtree %s-%s: %s",
+				    pack->name, pack->version, line);
+		}
+		fclose(fp);
+	} else {
+		close(pipefd[0]);
+	}
+
+	int wres;
+	do {
+		wres = waitpid(pid, &pstat, 0);
+	} while (wres == -1 && errno == EINTR);
+
+	if (wres == -1) {
+		mport_call_msg_cb(mport, "mtree %s-%s: waitpid failed: %s",
+		    pack->name, pack->version, strerror(errno));
+	} else if (WIFSIGNALED(pstat)) {
+		mport_call_msg_cb(mport, "mtree %s-%s: terminated by signal %d",
+		    pack->name, pack->version, WTERMSIG(pstat));
+	} else if (WIFEXITED(pstat) && WEXITSTATUS(pstat) > 1) {
+		/* exit 1 means discrepancies found (normal); >1 indicates a tool error */
+		mport_call_msg_cb(mport, "mtree %s-%s: exited with status %d",
+		    pack->name, pack->version, WEXITSTATUS(pstat));
+	}
 }
 
 MPORT_PUBLIC_API int
