@@ -46,7 +46,9 @@
 static int fetch(mportInstance *, const char *, const char *);
 static int fetch_bundle_to_dir(mportInstance *, const char *, const char *, const char *);
 static int fetch_to_file(mportInstance *, const char *, FILE *, bool);
+
 static bool is_valid_bundle_filename(const char *);
+static bool url_is_https(const char *);
 
 static bool
 is_valid_bundle_filename(const char *filename)
@@ -93,6 +95,11 @@ mport_fetch_index(mportInstance *mport)
 	while (mirrorsPtr != NULL) {
 		if (*mirrorsPtr == NULL)
 			break;
+		if (!url_is_https(*mirrorsPtr)) {
+			mport_call_msg_cb(mport, "Skipping non-HTTPS mirror URL: %s\n", *mirrorsPtr);
+			mirrorsPtr++;
+			continue;
+		}
 		
 		if (asprintf(&url, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE) == -1 ||
 		    asprintf(&hashUrl, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE ".sha256") == -1) {
@@ -158,6 +165,10 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 	char *osrel;
 
 	osrel = mport_get_osrelease(mport);
+	if (!url_is_https(MPORT_BOOTSTRAP_INDEX_URL)) {
+		free(osrel);
+		RETURN_ERROR(MPORT_ERR_FATAL, "Bootstrap index URL must use HTTPS");
+	}
 
 	if (asprintf(&url, "%s/%s/%s/%s", MPORT_BOOTSTRAP_INDEX_URL, MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE) == -1 ||
 	    asprintf(&hashUrl, "%s/%s/%s/%s", MPORT_BOOTSTRAP_INDEX_URL,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE ".sha256") == -1) {
@@ -221,6 +232,11 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 	while (mirrorsPtr != NULL) {
 		if (*mirrorsPtr == NULL)
 			break;
+		if (!url_is_https(*mirrorsPtr)) {
+			mport_call_msg_cb(mport, "Skipping non-HTTPS mirror URL: %s\n", *mirrorsPtr);
+			mirrorsPtr++;
+			continue;
+		}
 		if (asprintf(&url, "%s/%s/%s/%s", *mirrorsPtr,  MPORT_ARCH, osrel, filename) == -1) {
 			free(osrel);
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
@@ -244,6 +260,15 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 		free(mirrors[mi]);
 
 	RETURN_CURRENT_ERROR; 
+}
+
+static bool
+url_is_https(const char *url)
+{
+	if (url == NULL)
+		return false;
+
+	return strncasecmp(url, "https://", 8) == 0;
 }
 
 
