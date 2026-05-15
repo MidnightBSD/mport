@@ -295,9 +295,15 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 			struct statvfs sfs;
 			const char *check_path = (mport->root != NULL && mport->root[0] != '\0') ? mport->root : pkg->prefix;
 			if (statvfs(check_path, &sfs) == 0) {
-				int64_t avail_bytes = (int64_t)sfs.f_bavail * (int64_t)sfs.f_frsize;
+				int64_t avail_bytes;
+				if (sfs.f_frsize != 0 &&
+				    (uintmax_t)sfs.f_bavail > (uintmax_t)INT64_MAX / (uintmax_t)sfs.f_frsize) {
+					avail_bytes = INT64_MAX;
+				} else {
+					avail_bytes = (int64_t)((uintmax_t)sfs.f_bavail * (uintmax_t)sfs.f_frsize);
+				}
 				if (pkg->flatsize > avail_bytes) {
-					char avail_str[8], need_str[8];
+					char avail_str[32], need_str[32];
 					humanize_number(avail_str, sizeof(avail_str), avail_bytes, "B",
 					    HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
 					humanize_number(need_str, sizeof(need_str), pkg->flatsize, "B",
