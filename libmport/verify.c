@@ -44,6 +44,8 @@
 #include "mport.h"
 #include "mport_private.h"
 
+extern char **environ;
+
 static void verify_mtree(mportInstance *, mportPackageMeta *);
 
 MPORT_PUBLIC_API int
@@ -188,14 +190,19 @@ verify_mtree(mportInstance *mport, mportPackageMeta *pack)
 		    strerror(error));
 		return;
 	}
-	posix_spawn_file_actions_adddup2(&action, pipefd[1], STDOUT_FILENO);
-	posix_spawn_file_actions_addclose(&action, pipefd[0]);
+	if ((error = posix_spawn_file_actions_adddup2(&action, pipefd[1], STDOUT_FILENO)) != 0 ||
+	    (error = posix_spawn_file_actions_addclose(&action, pipefd[0])) != 0) {
+		posix_spawn_file_actions_destroy(&action);
+		close(pipefd[0]);
+		close(pipefd[1]);
+		mport_call_msg_cb(mport, "mtree verify: file actions setup: %s", strerror(error));
+		return;
+	}
 
 	char *const args[] = { MPORT_MTREE_BIN, "-f", mtree_path, "-d", "-e",
 	    "-p", prefix, NULL };
-	char *const envp[] = { NULL };
 
-	error = posix_spawn(&pid, MPORT_MTREE_BIN, &action, NULL, args, envp);
+	error = posix_spawn(&pid, MPORT_MTREE_BIN, &action, NULL, args, environ);
 	posix_spawn_file_actions_destroy(&action);
 	close(pipefd[1]);
 
@@ -207,7 +214,7 @@ verify_mtree(mportInstance *mport, mportPackageMeta *pack)
 
 	FILE *fp = fdopen(pipefd[0], "r");
 	if (fp != NULL) {
-		char line[FILENAME_MAX + 64];
+		char line[FILENAME_MAX * 2];
 		while (fgets(line, sizeof(line), fp) != NULL) {
 			size_t len = strlen(line);
 			if (len > 0 && line[len - 1] == '\n')
@@ -221,9 +228,21 @@ verify_mtree(mportInstance *mport, mportPackageMeta *pack)
 		close(pipefd[0]);
 	}
 
-	while (waitpid(pid, &pstat, 0) == -1) {
-		if (errno != EINTR)
-			break;
+	int wres;
+	do {
+		wres = waitpid(pid, &pstat, 0);
+	} while (wres == -1 && errno == EINTR);
+
+	if (wres == -1) {
+		mport_call_msg_cb(mport, "mtree %s-%s: waitpid failed: %s",
+		    pack->name, pack->version, strerror(errno));
+	} else if (WIFSIGNALED(pstat)) {
+		mport_call_msg_cb(mport, "mtree %s-%s: terminated by signal %d",
+		    pack->name, pack->version, WTERMSIG(pstat));
+	} else if (WIFEXITED(pstat) && WEXITSTATUS(pstat) > 1) {
+		/* exit 1 means discrepancies found (normal); >1 indicates a tool error */
+		mport_call_msg_cb(mport, "mtree %s-%s: exited with status %d",
+		    pack->name, pack->version, WEXITSTATUS(pstat));
 	}
 }
 
