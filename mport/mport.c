@@ -632,6 +632,7 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
+			optind = 1;
 			while ((ch2 = getopt(local_argc, local_argv, "dr")) != -1) {
 				switch (ch2) {
 				case 'd':
