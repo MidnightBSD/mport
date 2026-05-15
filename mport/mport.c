@@ -628,11 +628,15 @@ main(int argc, char *argv[])
 		int local_argc = argc;
 		char *const *local_argv = argv;
 		int rflag = 0;
+		int dflag = 0;
 
 		if (local_argc > 1) {
 			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "r")) != -1) {
+			while ((ch2 = getopt(local_argc, local_argv, "dr")) != -1) {
 				switch (ch2) {
+				case 'd':
+					dflag = 1;
+					break;
 				case 'r':
 					rflag = 1;
 					break;
@@ -642,7 +646,20 @@ main(int argc, char *argv[])
 			local_argv += optind;
 		}
 
-		if (rflag) {
+		if (dflag) {
+			int nmissing = mport_check_missing_depends(mport);
+			if (nmissing < 0) {
+				warnx("%s", mport_err_string());
+				resultCode = mport_err_code();
+			} else if (nmissing == 0) {
+				printf("All dependencies are satisfied.\n");
+				resultCode = MPORT_OK;
+			} else {
+				printf("%d missing dependenc%s found.\n",
+				    nmissing, nmissing == 1 ? "y" : "ies");
+				resultCode = MPORT_ERR_WARN;
+			}
+		} else if (rflag) {
 			resultCode = MPORT_OK;
 			for (int x = 0; x < local_argc; x++) {
 				mportPackageMeta **packs = lookup_package(mport, local_argv[x]);
@@ -749,7 +766,8 @@ usage(void)
 	    "    upgrade                     Upgrade all outdated packages\n"
 	    "    autoremove                  Remove automatically installed packages\n"
 	    "    clean                       Clean package cache\n"
-	    "    verify [-r] [package]            Verify installed packages\n"
+	    "    verify [-d] [-r] [package]       Verify installed packages\n"
+	    "      -d                            Check for missing dependencies\n"
 	    "    deleteall                   Remove all installed packages\n\n"
 	    "  Information:\n"
 	    "    search <query>              Search for packages\n"

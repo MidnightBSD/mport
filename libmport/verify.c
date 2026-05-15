@@ -379,3 +379,54 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 
 	return (MPORT_OK);
 }
+
+/*
+ * mport_check_missing_depends(mport)
+ *
+ * Scan all installed packages and report any whose recorded dependencies are
+ * not currently installed.  Returns the number of missing dependency
+ * relationships found, or -1 on a fatal error.
+ */
+MPORT_PUBLIC_API int
+mport_check_missing_depends(mportInstance *mport)
+{
+	sqlite3_stmt *stmt;
+	int missing = 0;
+	int ret;
+
+	if (mport_db_prepare(mport->db, &stmt,
+	    "SELECT d.pkg, d.depend_pkgname, d.depend_pkgversion "
+	    "FROM depends d "
+	    "WHERE NOT EXISTS ("
+	    "  SELECT 1 FROM packages p WHERE p.pkg = d.depend_pkgname"
+	    ") "
+	    "ORDER BY d.pkg, d.depend_pkgname") != MPORT_OK) {
+		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+	}
+
+	while ((ret = sqlite3_step(stmt)) == SQLITE_ROW) {
+		const char *pkg     = (const char *)sqlite3_column_text(stmt, 0);
+		const char *dep     = (const char *)sqlite3_column_text(stmt, 1);
+		const char *ver     = (const char *)sqlite3_column_text(stmt, 2);
+
+		if (ver != NULL && *ver != '\0') {
+			mport_call_msg_cb(mport,
+			    "Missing dependency: %s requires %s-%s (not installed)",
+			    pkg, dep, ver);
+		} else {
+			mport_call_msg_cb(mport,
+			    "Missing dependency: %s requires %s (not installed)",
+			    pkg, dep);
+		}
+		missing++;
+	}
+
+	sqlite3_finalize(stmt);
+
+	if (ret != SQLITE_DONE) {
+		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		return (-1);
+	}
+
+	return (missing);
+}
