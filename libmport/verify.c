@@ -404,7 +404,8 @@ mport_check_missing_depends(mportInstance *mport)
 	    "  SELECT 1 FROM packages p2 WHERE p2.pkg = d.depend_pkgname"
 	    ") "
 	    "ORDER BY d.pkg, d.depend_pkgname") != MPORT_OK) {
-		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		return (-1);
 	}
 
 	while ((ret = sqlite3_step(stmt)) == SQLITE_ROW) {
