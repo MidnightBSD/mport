@@ -53,7 +53,8 @@ static mportIndexEntry **lookupIndex(mportInstance *, const char *);
 
 static int add(mportInstance *mport, const char *filename, mportAutomatic automatic);
 static int install(mportInstance *, const char *, mportAutomatic);
-static int reinstall_dependents(mportInstance *, const char *, mportAutomatic);
+static int reinstall_dependents(mportInstance *, const char *);
+static int reinstall_dependents_impl(mportInstance *, const char *, char **, int *, int);
 
 static int cpeList(mportInstance *);
 static int cpeGet(mportInstance *mport, const char *packageName);
@@ -274,9 +275,8 @@ main(int argc, char *argv[])
 			tempResultCode = install(mport, local_argv[i], aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
 			if (tempResultCode != 0)
 				resultCode = tempResultCode;
-			if (rflag && mport->force) {
-				tempResultCode = reinstall_dependents(mport, local_argv[i],
-				    aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
+			if (tempResultCode == 0 && rflag && mport->force) {
+				tempResultCode = reinstall_dependents(mport, local_argv[i]);
 				if (tempResultCode != 0)
 					resultCode = tempResultCode;
 			}
@@ -1050,19 +1050,19 @@ install(mportInstance *mport, const char *packageName, mportAutomatic automatic)
 }
 
 /*
- * Reinstall all installed packages that directly depend on packageName.
- * Used with -f -r to force-reinstall consumers of a library or base package.
+ * Inner recursive worker for reinstall_dependents.
+ * visited/visit_count/visit_max guard against reinstalling the same package
+ * twice when it appears as a dependent via multiple paths in the tree.
  */
 static int
-reinstall_dependents(mportInstance *mport, const char *packageName, mportAutomatic automatic)
+reinstall_dependents_impl(mportInstance *mport, const char *baseName,
+    char **visited, int *visit_count, int visit_max)
 {
 	mportPackageMeta **packs = NULL;
 	mportPackageMeta **updepends = NULL;
-	char **names = NULL;
-	int count = 0;
 	int resultCode = MPORT_OK;
 
-	if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", packageName) != MPORT_OK ||
+	if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", baseName) != MPORT_OK ||
 	    packs == NULL || packs[0] == NULL) {
 		mport_pkgmeta_vec_free(packs);
 		return MPORT_OK;
@@ -1078,35 +1078,79 @@ reinstall_dependents(mportInstance *mport, const char *packageName, mportAutomat
 	if (updepends == NULL)
 		return MPORT_OK;
 
-	for (mportPackageMeta **dep = updepends; *dep != NULL; dep++)
-		count++;
+	for (mportPackageMeta **dep = updepends; *dep != NULL; dep++) {
+		bool already_visited = false;
+		for (int v = 0; v < *visit_count; v++) {
+			if (strcmp(visited[v], (*dep)->name) == 0) {
+				already_visited = true;
+				break;
+			}
+		}
+		if (already_visited)
+			continue;
 
-	names = calloc(count + 1, sizeof(char *));
-	if (names == NULL) {
-		mport_pkgmeta_vec_free(updepends);
-		return MPORT_ERR_FATAL;
-	}
+		if (*visit_count < visit_max) {
+			char *n = strdup((*dep)->name);
+			if (n != NULL)
+				visited[(*visit_count)++] = n;
+		}
 
-	for (int idx = 0; idx < count; idx++) {
-		names[idx] = strdup(updepends[idx]->name);
-		if (names[idx] == NULL) {
-			for (int j = 0; j < idx; j++)
-				free(names[j]);
-			free(names);
-			mport_pkgmeta_vec_free(updepends);
-			return MPORT_ERR_FATAL;
+		if (install(mport, (*dep)->name, (*dep)->automatic) == MPORT_OK) {
+			if (reinstall_dependents_impl(mport, (*dep)->name, visited, visit_count, visit_max) != MPORT_OK)
+				resultCode = MPORT_ERR_FATAL;
+		} else {
+			resultCode = MPORT_ERR_FATAL;
 		}
 	}
+
 	mport_pkgmeta_vec_free(updepends);
-
-	for (int idx = 0; idx < count; idx++) {
-		if (install(mport, names[idx], automatic) != MPORT_OK)
-			resultCode = MPORT_ERR_FATAL;
-		free(names[idx]);
-	}
-	free(names);
-
 	return resultCode;
+}
+
+/*
+ * Recursively reinstall all installed packages that depend on packageName.
+ * Resolves versioned inputs (e.g. "openssl-3.1.0") to the base package name
+ * via the index before walking the reverse-dependency tree.
+ */
+static int
+reinstall_dependents(mportInstance *mport, const char *packageName)
+{
+	mportIndexEntry **ie = NULL;
+	const char *baseName = packageName;
+	char *stripped = NULL;
+
+	/* resolve actual pkgname from index to handle "name-version" inputs */
+	if (mport_index_lookup_pkgname(mport, packageName, &ie) == MPORT_OK &&
+	    ie != NULL && *ie != NULL) {
+		baseName = (*ie)->pkgname;
+	} else {
+		mport_index_entry_free_vec(ie);
+		ie = NULL;
+		const char *dash = strrchr(packageName, '-');
+		if (dash != NULL && dash != packageName) {
+			stripped = strndup(packageName, (size_t)(dash - packageName));
+			if (stripped != NULL &&
+			    mport_index_lookup_pkgname(mport, stripped, &ie) == MPORT_OK &&
+			    ie != NULL && *ie != NULL) {
+				baseName = (*ie)->pkgname;
+			}
+		}
+	}
+
+	char **visited = calloc(256, sizeof(char *));
+	int visit_count = 0;
+	int ret = MPORT_ERR_FATAL;
+
+	if (visited != NULL)
+		ret = reinstall_dependents_impl(mport, baseName, visited, &visit_count, 256);
+
+	for (int i = 0; i < visit_count; i++)
+		free(visited[i]);
+	free(visited);
+	mport_index_entry_free_vec(ie);
+	free(stripped);
+
+	return ret;
 }
 
 int
