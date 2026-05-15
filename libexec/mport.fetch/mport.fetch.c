@@ -41,34 +41,35 @@
 static void usage(void);
 
 int
-main(int argc, char *argv[]) {
+main(int argc, char *argv[])
+{
 	int ch;
 	mportInstance *mport;
-	mportIndexEntry **indexEntries;
+	/*@only@*/ mportIndexEntry **indexEntries;
 	mportIndexEntry *selected = NULL;
 	bool verbose = false;
-	char *bundleFile = NULL;
+	/*@null@*/ /*@only@*/ char *bundleFile = NULL;
 	const char *chroot_path = NULL;
-	const char *directory = NULL;
+	/*@null@*/ const char *directory = NULL;
 
 	if (argc < 2)
 		usage();
 
 	while ((ch = getopt(argc, argv, "c:o:v")) != -1) {
 		switch (ch) {
-			case 'c':
-				chroot_path = optarg;
-				break;
-			case 'o':
-				directory = optarg;
-				break;
-			case 'v':
-				verbose = true;
-				break;
-			case '?':
-			default:
-				usage();
-				break;
+		case 'c':
+			chroot_path = optarg;
+			break;
+		case 'o':
+			directory = optarg;
+			break;
+		case 'v':
+			verbose = true;
+			break;
+		case '?':
+		default:
+			usage();
+			break;
 		}
 	}
 
@@ -95,9 +96,10 @@ main(int argc, char *argv[]) {
 	if (mport_index_load(mport) != MPORT_OK)
 		errx(4, "Unable to load updates index");
 
-	if (mport_index_select_pkgname(mport, argv[0], "Multiple packages match your query.", &indexEntries, &selected) !=
-	    MPORT_OK) {
-		fprintf(stderr, "Error looking up package name %s: %d %s\n", argv[0], mport_err_code(), mport_err_string());
+	if (mport_index_select_pkgname(mport, argv[0], "Multiple packages match your query.",
+		&indexEntries, &selected) != MPORT_OK) {
+		fprintf(stderr, "Error looking up package name %s: %d %s\n", argv[0],
+		    mport_err_code(), mport_err_string());
 		mport_instance_free(mport);
 		exit(mport_err_code());
 	}
@@ -105,6 +107,8 @@ main(int argc, char *argv[]) {
 	if (indexEntries != NULL) {
 		if (selected != NULL) {
 			bundleFile = strdup(selected->bundlefile);
+			if (bundleFile == NULL)
+				err(EXIT_FAILURE, "strdup failed");
 			mport_index_entry_free_vec(indexEntries);
 			indexEntries = NULL;
 		} else {
@@ -116,13 +120,16 @@ main(int argc, char *argv[]) {
 
 		if (verbose)
 			printf("Fetching %s\n", bundleFile);
-		if (mport_fetch_bundle(mport, directory == NULL ? MPORT_LOCAL_PKG_PATH: directory, bundleFile) != MPORT_OK) {
+		/*@-nullpass@*/
+		if (mport_fetch_bundle(mport, directory == NULL ? MPORT_LOCAL_PKG_PATH : directory,
+			bundleFile) != MPORT_OK) {
+			/*@=nullpass@*/
 			fprintf(stderr, "%s\n", mport_err_string());
 			free(bundleFile);
 			mport_instance_free(mport);
-			mport_index_entry_free_vec(indexEntries);
 			exit(mport_err_code());
 		}
+		/*@=nullpass@*/
 
 		free(bundleFile);
 	}
@@ -133,9 +140,9 @@ main(int argc, char *argv[]) {
 	return (0);
 }
 
-
 static void
-usage(void) {
+usage(void)
+{
 	fprintf(stderr, "Usage: mport.fetch [-c <chroot directory>] <package name>\n");
 	exit(2);
 }
