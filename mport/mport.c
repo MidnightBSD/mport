@@ -653,14 +653,14 @@ main(int argc, char *argv[])
 				resultCode = mport_err_code();
 			} else if (nmissing == 0) {
 				printf("All dependencies are satisfied.\n");
-				resultCode = MPORT_OK;
 			} else {
 				printf("%d missing dependenc%s found.\n",
 				    nmissing, nmissing == 1 ? "y" : "ies");
 				resultCode = MPORT_ERR_WARN;
 			}
-		} else if (rflag) {
-			resultCode = MPORT_OK;
+		}
+
+		if (rflag) {
 			for (int x = 0; x < local_argc; x++) {
 				mportPackageMeta **packs = lookup_package(mport, local_argv[x]);
 				if (packs == NULL) {
@@ -671,7 +671,9 @@ main(int argc, char *argv[])
 					resultCode = tempResultCode;
 				mport_pkgmeta_vec_free(packs);
 			}
-		} else {
+		}
+
+		if (!dflag && !rflag) {
 			if (argc > 1) {
 				resultCode = verify_many(mport, argc, argv, true);
 			} else {

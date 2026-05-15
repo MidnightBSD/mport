@@ -397,8 +397,11 @@ mport_check_missing_depends(mportInstance *mport)
 	if (mport_db_prepare(mport->db, &stmt,
 	    "SELECT d.pkg, d.depend_pkgname, d.depend_pkgversion "
 	    "FROM depends d "
-	    "WHERE NOT EXISTS ("
-	    "  SELECT 1 FROM packages p WHERE p.pkg = d.depend_pkgname"
+	    "WHERE EXISTS ("
+	    "  SELECT 1 FROM packages p WHERE p.pkg = d.pkg"
+	    ") "
+	    "AND NOT EXISTS ("
+	    "  SELECT 1 FROM packages p2 WHERE p2.pkg = d.depend_pkgname"
 	    ") "
 	    "ORDER BY d.pkg, d.depend_pkgname") != MPORT_OK) {
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
