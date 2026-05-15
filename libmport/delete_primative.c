@@ -337,7 +337,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 					mport_call_msg_cb(mport, "Could not remove directory '%s': %s",
 				    	file, mport_err_string());
 				}
-			} else {
+			} else if (type != ASSET_DIRRMTRY) {
 				mport_call_msg_cb(mport, "Directory in use by another package? '%s'", file);
 			}
 
