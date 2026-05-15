@@ -88,7 +88,7 @@ pick_clang_tidy() {
 
 clang_tidy_bin="$(pick_clang_tidy)"
 
-mapfile -t staged_files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.c' '*.h' || true)
+mapfile -t staged_files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.c' '*.h' ':!external/*' || true)
 if ((${#staged_files[@]} == 0)); then
   echo "No staged *.c/*.h files; skipping clang-format/clang-tidy/cppcheck."
   exit 0

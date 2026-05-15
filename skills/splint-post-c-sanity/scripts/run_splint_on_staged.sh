@@ -14,7 +14,7 @@ if ! command -v rg >/dev/null 2>&1; then
   die "rg (ripgrep) not found in PATH"
 fi
 
-mapfile -t staged_c_files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.c' | rg -N '\\.c$' || true)
+mapfile -t staged_c_files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.c' ':!external/*' | rg -N '\\.c$' || true)
 if ((${#staged_c_files[@]} == 0)); then
   echo "No staged *.c files; skipping splint."
   exit 0
@@ -61,4 +61,3 @@ if [[ -n "$findings" ]]; then
 fi
 
 echo "splint: clean."
-
