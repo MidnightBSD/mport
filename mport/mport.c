@@ -53,6 +53,8 @@ static mportIndexEntry **lookupIndex(mportInstance *, const char *);
 
 static int add(mportInstance *mport, const char *filename, mportAutomatic automatic);
 static int install(mportInstance *, const char *, mportAutomatic);
+static int reinstall_dependents(mportInstance *, const char *);
+static int reinstall_dependents_impl(mportInstance *, const char *, char ***, size_t *, size_t *);
 
 static int cpeList(mportInstance *);
 static int cpeGet(mportInstance *mport, const char *packageName);
@@ -240,16 +242,24 @@ main(int argc, char *argv[])
 		int local_argc = argc;
 		char *const *local_argv = argv;
 		int aflag = 0;
+		int rflag = 0;
 
 		if (local_argc > 1) {
 			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "AMy")) != -1) {
+#if defined(__MidnightBSD__)
+			optreset = 1;
+#endif
+			optind = 1;
+			while ((ch2 = getopt(local_argc, local_argv, "AMry")) != -1) {
 				switch (ch2) {
 				case 'A':
 					aflag = 1;
 					break;
 				case 'M':
 					mport->ignoreMissing = true;
+					break;
+				case 'r':
+					rflag = 1;
 					break;
 				case 'y':
 					setenv("ASSUME_ALWAYS_YES", "1", 1);
@@ -261,10 +271,15 @@ main(int argc, char *argv[])
 		}
 
 		loadIndex(mport);
-		for (i = 1; i < argc; i++) {
-			tempResultCode = install(mport, argv[i], aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
+		for (i = 0; i < local_argc; i++) {
+			tempResultCode = install(mport, local_argv[i], aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
 			if (tempResultCode != 0)
 				resultCode = tempResultCode;
+			if (tempResultCode == 0 && rflag && mport->force) {
+				tempResultCode = reinstall_dependents(mport, local_argv[i]);
+				if (tempResultCode != 0)
+					resultCode = tempResultCode;
+			}
 		}
 	} else if (!strcmp(cmd, "delete")) {
 		if (argc == 1) {
@@ -702,7 +717,7 @@ usage(void)
 	    "Commands:\n"
 	    "  Package Management:\n"
 	    "    add [-A] <package file>     Install package from file\n"
-	    "    install [-AMy] <package>      Install package from repository\n"
+	    "    install [-AMry] <package>     Install package from repository\n"
 	    "    delete <package>            Remove installed package\n"
 	    "    update [package]            Update installed package(s)\n"
 	    "    upgrade                     Upgrade all outdated packages\n"
@@ -1032,6 +1047,124 @@ install(mportInstance *mport, const char *packageName, mportAutomatic automatic)
 	mport_index_entry_free_vec(ie);
 
 	return (resultCode);
+}
+
+/*
+ * Inner recursive worker for reinstall_dependents.
+ * visited/visit_count/visit_max guard against reinstalling the same package
+ * twice when it appears as a dependent via multiple paths in the tree.
+ * The visited array grows dynamically; visit_count and visit_cap are updated
+ * in place so callers can free every entry on return.
+ */
+static int
+reinstall_dependents_impl(mportInstance *mport, const char *baseName,
+    char ***visited_p, size_t *visit_count, size_t *visit_cap)
+{
+	mportPackageMeta **packs = NULL;
+	mportPackageMeta **updepends = NULL;
+	int resultCode = MPORT_OK;
+
+	if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", baseName) != MPORT_OK ||
+	    packs == NULL || packs[0] == NULL) {
+		mport_pkgmeta_vec_free(packs);
+		return MPORT_OK;
+	}
+
+	if (mport_pkgmeta_get_updepends(mport, packs[0], &updepends) != MPORT_OK) {
+		mport_pkgmeta_vec_free(packs);
+		warnx("%s", mport_err_string());
+		return MPORT_ERR_FATAL;
+	}
+	mport_pkgmeta_vec_free(packs);
+
+	if (updepends == NULL)
+		return MPORT_OK;
+
+	for (mportPackageMeta **dep = updepends; *dep != NULL; dep++) {
+		bool already_visited = false;
+		for (size_t v = 0; v < *visit_count; v++) {
+			if (strcmp((*visited_p)[v], (*dep)->name) == 0) {
+				already_visited = true;
+				break;
+			}
+		}
+		if (already_visited)
+			continue;
+
+		/* grow visited array if needed */
+		if (*visit_count >= *visit_cap) {
+			size_t new_cap = *visit_cap * 2;
+			char **grown = reallocarray(*visited_p, new_cap, sizeof(char *));
+			if (grown == NULL) {
+				warnx("reinstall_dependents: out of memory growing visited set");
+				resultCode = MPORT_ERR_FATAL;
+				break;
+			}
+			*visited_p = grown;
+			*visit_cap = new_cap;
+		}
+
+		char *n = strdup((*dep)->name);
+		if (n != NULL)
+			(*visited_p)[(*visit_count)++] = n;
+
+		if (install(mport, (*dep)->name, (*dep)->automatic) == MPORT_OK) {
+			if (reinstall_dependents_impl(mport, (*dep)->name, visited_p, visit_count, visit_cap) != MPORT_OK)
+				resultCode = MPORT_ERR_FATAL;
+		} else {
+			resultCode = MPORT_ERR_FATAL;
+		}
+	}
+
+	mport_pkgmeta_vec_free(updepends);
+	return resultCode;
+}
+
+/*
+ * Recursively reinstall all installed packages that depend on packageName.
+ * Resolves versioned inputs (e.g. "openssl-3.1.0") to the base package name
+ * via the index before walking the reverse-dependency tree.
+ */
+static int
+reinstall_dependents(mportInstance *mport, const char *packageName)
+{
+	mportIndexEntry **ie = NULL;
+	const char *baseName = packageName;
+	char *stripped = NULL;
+
+	/* resolve actual pkgname from index to handle "name-version" inputs */
+	if (mport_index_lookup_pkgname(mport, packageName, &ie) == MPORT_OK &&
+	    ie != NULL && *ie != NULL) {
+		baseName = (*ie)->pkgname;
+	} else {
+		mport_index_entry_free_vec(ie);
+		ie = NULL;
+		const char *dash = strrchr(packageName, '-');
+		if (dash != NULL && dash != packageName) {
+			stripped = strndup(packageName, (size_t)(dash - packageName));
+			if (stripped != NULL &&
+			    mport_index_lookup_pkgname(mport, stripped, &ie) == MPORT_OK &&
+			    ie != NULL && *ie != NULL) {
+				baseName = (*ie)->pkgname;
+			}
+		}
+	}
+
+	size_t visit_cap = 32;
+	size_t visit_count = 0;
+	char **visited = calloc(visit_cap, sizeof(char *));
+	int ret = MPORT_ERR_FATAL;
+
+	if (visited != NULL)
+		ret = reinstall_dependents_impl(mport, baseName, &visited, &visit_count, &visit_cap);
+
+	for (size_t i = 0; i < visit_count; i++)
+		free(visited[i]);
+	free(visited);
+	mport_index_entry_free_vec(ie);
+	free(stripped);
+
+	return ret;
 }
 
 int
