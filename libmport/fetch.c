@@ -160,9 +160,9 @@ int
 mport_fetch_bootstrap_index(mportInstance *mport)
 {
 	int result;
-	char *url;
-	char *hashUrl;
-	char *osrel;
+	char *url = NULL;
+	char *hashUrl = NULL;
+	char *osrel = NULL;
 
 	osrel = mport_get_osrelease(mport);
 	if (!url_is_https(MPORT_BOOTSTRAP_INDEX_URL)) {
@@ -174,12 +174,12 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 	    asprintf(&hashUrl, "%s/%s/%s/%s", MPORT_BOOTSTRAP_INDEX_URL,  MPORT_ARCH, osrel, MPORT_INDEX_FILE_SOURCE ".sha256") == -1) {
 		free(url);
 		free(hashUrl);
+		free(osrel);
 		return MPORT_ERR_FATAL;
 	}
 
 	result = fetch(mport, url, MPORT_INDEX_FILE_COMPRESSED);
 	if (result == MPORT_OK && fetch(mport, hashUrl, MPORT_INDEX_FILE_HASH) == MPORT_OK) {
-		free(hashUrl);
 		char *hash = mport_extract_hash_from_file(MPORT_INDEX_FILE_HASH);
 
 		if (hash == NULL || mport_verify_hash(MPORT_INDEX_FILE_COMPRESSED, hash) == 0) {
