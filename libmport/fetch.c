@@ -183,11 +183,11 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 		char *hash = mport_extract_hash_from_file(MPORT_INDEX_FILE_HASH);
 
 		if (hash == NULL || mport_verify_hash(MPORT_INDEX_FILE_COMPRESSED, hash) == 0) {
-			mport_call_msg_cb(mport, "Bootstrap index hash failed verification: %s\n", hash);
+			mport_call_msg_cb(mport, "Bootstrap index hash failed verification: %s\n",
+			    hash != NULL ? hash : "(null)");
 			result = MPORT_ERR_FATAL;
-        } else {
-			mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
-			result = MPORT_OK;
+		} else {
+			result = mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
 		}
 		free(hash);
 	} else {
