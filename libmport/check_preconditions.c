@@ -523,7 +523,7 @@ check_file_conflicts(mportInstance *mport, mportPackageMeta *pack)
 		sqlite3_reset(lookup);
 		sqlite3_clear_bindings(lookup);
 
-		if (sqlite3_bind_text(lookup, 1, masterpath, -1, SQLITE_STATIC) != SQLITE_OK ||
+		if (sqlite3_bind_text(lookup, 1, masterpath, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
 		    sqlite3_bind_text(lookup, 2, pack->name, -1, SQLITE_STATIC) != SQLITE_OK) {
 			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 			sqlite3_finalize(lookup);
