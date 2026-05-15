@@ -1034,6 +1034,7 @@ mport_decompress_zstd(const char *input, const char *output)
         RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't open file for writing");
     }
 
+    const char *outpath = output;
     size_t toRead = buffInSize;
     size_t result = 1;
     while (1) {
@@ -1065,6 +1066,7 @@ mport_decompress_zstd(const char *input, const char *output)
             if (output.pos > 0 && fwrite(buffOut, 1, output.pos, fout) != output.pos) {
                 fclose(f);
                 fclose(fout);
+                unlink(outpath);
                 free(buffIn);
                 free(buffOut);
                 ZSTD_freeDStream(dstream);
@@ -1076,6 +1078,7 @@ mport_decompress_zstd(const char *input, const char *output)
     if (result != 0) {
         fclose(f);
         fclose(fout);
+        unlink(outpath);
         free(buffIn);
         free(buffOut);
         ZSTD_freeDStream(dstream);

@@ -124,6 +124,7 @@ mport_fetch_index(mportInstance *mport)
 					if (mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path()) != MPORT_OK) {
 						free(url);
 						free(hash);
+						free(osrel);
 						for (int mi = 0; mi < mirrorCount; mi++)
 							free(mirrors[mi]);
 						free(mirrors);
@@ -131,6 +132,7 @@ mport_fetch_index(mportInstance *mport)
 					}
 					free(url);
 					free(hash);
+					free(osrel);
 					for (int mi = 0; mi < mirrorCount; mi++)
 						free(mirrors[mi]);
 					free(mirrors);
@@ -192,6 +194,7 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 
 		if (hash == NULL || mport_verify_hash(MPORT_INDEX_FILE_COMPRESSED, hash) == 0) {
 			mport_call_msg_cb(mport, "Bootstrap index hash failed verification: %s\n", hash);
+			result = MPORT_ERR_FATAL;
 		} else {
 			result = mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED, mport_index_file_path());
 		}
