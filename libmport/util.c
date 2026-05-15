@@ -1034,15 +1034,27 @@ mport_decompress_zstd(const char *input, const char *output)
         RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't open file for writing");
     }
 
+    const char *outpath = output;
     size_t toRead = buffInSize;
+    size_t result = 1;
     while (1) {
         size_t const read = fread(buffIn, 1, toRead, f);
-        if (read == 0) break;
+        if (read == 0) {
+            if (ferror(f) != 0) {
+                fclose(f);
+                fclose(fout);
+                free(buffIn);
+                free(buffOut);
+                ZSTD_freeDStream(dstream);
+                RETURN_ERROR(MPORT_ERR_FATAL, "Error reading zstd input file");
+            }
+            break;
+        }
 
         ZSTD_inBuffer input = { buffIn, read, 0 };
         while (input.pos < input.size) {
             ZSTD_outBuffer output = { buffOut, buffOutSize, 0 };
-            size_t const result = ZSTD_decompressStream(dstream, &output, &input);
+            result = ZSTD_decompressStream(dstream, &output, &input);
             if (ZSTD_isError(result)) {
                 fclose(f);
                 fclose(fout);
@@ -1051,8 +1063,26 @@ mport_decompress_zstd(const char *input, const char *output)
                 ZSTD_freeDStream(dstream);
                 RETURN_ERROR(MPORT_ERR_FATAL, "Error decompressing zstd file");
             }
-            fwrite(buffOut, 1, output.pos, fout);
+            if (output.pos > 0 && fwrite(buffOut, 1, output.pos, fout) != output.pos) {
+                fclose(f);
+                fclose(fout);
+                unlink(outpath);
+                free(buffIn);
+                free(buffOut);
+                ZSTD_freeDStream(dstream);
+                RETURN_ERROR(MPORT_ERR_FATAL, "Error writing decompressed output file");
+            }
         }
+    }
+
+    if (result != 0) {
+        fclose(f);
+        fclose(fout);
+        unlink(outpath);
+        free(buffIn);
+        free(buffOut);
+        ZSTD_freeDStream(dstream);
+        RETURN_ERROR(MPORT_ERR_FATAL, "Incomplete zstd stream");
     }
 
     fclose(f);
