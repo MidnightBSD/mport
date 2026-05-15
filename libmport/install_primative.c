@@ -315,7 +315,10 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 			}
 		}
 
-		if ((mport_check_preconditions(mport, pkg, MPORT_PRECHECK_INSTALLED | MPORT_PRECHECK_DEPENDS | MPORT_PRECHECK_CONFLICTS) != MPORT_OK)
+		long precheck_flags = MPORT_PRECHECK_INSTALLED | MPORT_PRECHECK_DEPENDS | MPORT_PRECHECK_CONFLICTS;
+		if (!mport->force)
+			precheck_flags |= MPORT_PRECHECK_FILE_CONFLICTS;
+		if ((mport_check_preconditions(mport, pkg, precheck_flags) != MPORT_OK)
                    || (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name, pkg->version,
 			                  mport_err_string());

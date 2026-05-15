@@ -27,6 +27,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -40,6 +42,7 @@ static int check_conflicts(mportInstance *mport, mportPackageMeta *);
 static int check_depends(mportInstance *mport, mportPackageMeta *);
 static int check_if_older_installed(mportInstance *, mportPackageMeta *);
 static int check_if_older_os(mportInstance *, mportPackageMeta *);
+static int check_file_conflicts(mportInstance *, mportPackageMeta *);
 
 /* Run the checks requested by the flags given.
  *
@@ -73,6 +76,8 @@ int mport_check_preconditions(mportInstance *mport, mportPackageMeta *pack, long
 	if (flags & MPORT_PRECHECK_DEPENDS && check_depends(mport, pack) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 	if (flags & MPORT_PRECHECK_OS && check_if_older_os(mport, pack) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+	if (flags & MPORT_PRECHECK_FILE_CONFLICTS && check_file_conflicts(mport, pack) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	return MPORT_OK;
@@ -423,4 +428,132 @@ check_if_older_os(mportInstance *mport, mportPackageMeta *pkg)
 	free((char*) os_release);
 
 	return ret;
+}
+
+static int
+check_file_conflicts(mportInstance *mport, mportPackageMeta *pack)
+{
+	sqlite3_stmt *stmt, *lookup;
+	int ret;
+	mportAssetListEntryType type;
+	const char *data;
+	char cwd[FILENAME_MAX];
+	char masterpath[FILENAME_MAX];
+	char fullpath[FILENAME_MAX];
+	char datastr[FILENAME_MAX];
+	struct stat st;
+
+	strlcpy(cwd, pack->prefix, sizeof(cwd));
+
+	if (mport_db_prepare(mport->db, &stmt,
+	    "SELECT type, data FROM stub.assets WHERE pkg=%Q ORDER BY rowid",
+	    pack->name) != MPORT_OK) {
+		sqlite3_finalize(stmt);
+		RETURN_CURRENT_ERROR;
+	}
+
+	if (mport_db_prepare(mport->db, &lookup,
+	    "SELECT pkg FROM assets WHERE data=? AND pkg!=?") != MPORT_OK) {
+		sqlite3_finalize(stmt);
+		sqlite3_finalize(lookup);
+		RETURN_CURRENT_ERROR;
+	}
+
+	while (1) {
+		ret = sqlite3_step(stmt);
+
+		if (ret == SQLITE_DONE)
+			break;
+
+		if (ret != SQLITE_ROW) {
+			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+			sqlite3_finalize(lookup);
+			sqlite3_finalize(stmt);
+			RETURN_CURRENT_ERROR;
+		}
+
+		type = (mportAssetListEntryType)sqlite3_column_int(stmt, 0);
+		data = sqlite3_column_text(stmt, 1);
+
+		if (type == ASSET_CWD) {
+			if (data != NULL)
+				strlcpy(cwd, data, sizeof(cwd));
+			else
+				strlcpy(cwd, pack->prefix, sizeof(cwd));
+			continue;
+		}
+
+		switch (type) {
+		case ASSET_FILE_OWNER_MODE:
+		case ASSET_FILE:
+		case ASSET_SHELL:
+		case ASSET_SAMPLE:
+		case ASSET_INFO:
+		case ASSET_SAMPLE_OWNER_MODE:
+			break;
+		default:
+			continue;
+		}
+
+		if (data == NULL)
+			continue;
+
+		strlcpy(datastr, data, sizeof(datastr));
+		if (type == ASSET_SAMPLE || type == ASSET_SAMPLE_OWNER_MODE) {
+			/* sample entries may have a destination separated by whitespace; use only the source */
+			char *sp = datastr;
+			while (*sp != '\0' && *sp != ' ' && *sp != '\t')
+				sp++;
+			*sp = '\0';
+		}
+
+		if (datastr[0] == '/')
+			strlcpy(masterpath, datastr, sizeof(masterpath));
+		else
+			snprintf(masterpath, sizeof(masterpath), "%s/%s", cwd, datastr);
+
+		snprintf(fullpath, sizeof(fullpath), "%s%s", mport->root, masterpath);
+
+		if (lstat(fullpath, &st) != 0)
+			continue;
+
+		if (S_ISDIR(st.st_mode))
+			continue;
+
+		sqlite3_reset(lookup);
+		sqlite3_clear_bindings(lookup);
+
+		if (sqlite3_bind_text(lookup, 1, masterpath, -1, SQLITE_STATIC) != SQLITE_OK ||
+		    sqlite3_bind_text(lookup, 2, pack->name, -1, SQLITE_STATIC) != SQLITE_OK) {
+			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+			sqlite3_finalize(lookup);
+			sqlite3_finalize(stmt);
+			RETURN_CURRENT_ERROR;
+		}
+
+		int lret = sqlite3_step(lookup);
+		if (lret == SQLITE_ROW) {
+			const char *owner = sqlite3_column_text(lookup, 0);
+			SET_ERRORX(MPORT_ERR_FATAL,
+			    "%s is owned by %s; use -f to overwrite.", fullpath, owner);
+			sqlite3_finalize(lookup);
+			sqlite3_finalize(stmt);
+			RETURN_CURRENT_ERROR;
+		} else if (lret == SQLITE_DONE) {
+			SET_ERRORX(MPORT_ERR_FATAL,
+			    "%s already exists but is not managed by mport; use -f to overwrite.", fullpath);
+			sqlite3_finalize(lookup);
+			sqlite3_finalize(stmt);
+			RETURN_CURRENT_ERROR;
+		} else {
+			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+			sqlite3_finalize(lookup);
+			sqlite3_finalize(stmt);
+			RETURN_CURRENT_ERROR;
+		}
+	}
+
+	sqlite3_finalize(lookup);
+	sqlite3_finalize(stmt);
+	return MPORT_OK;
 }

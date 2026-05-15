@@ -74,6 +74,7 @@ struct ohash {
 #define MPORT_PRECHECK_OS          16
 #define MPORT_PRECHECK_MOVED       32
 #define MPORT_PRECHECK_DEPRECATED  64
+#define MPORT_PRECHECK_FILE_CONFLICTS 128
 int mport_check_preconditions(mportInstance *, mportPackageMeta *, long);
 
 /* schema */
