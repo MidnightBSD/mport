@@ -113,32 +113,26 @@ mport_verify_package(mportInstance *mport, mportPackageMeta *pack)
 			}
 
 			if (S_ISREG(st.st_mode)) {
-				if (checksum == NULL) {
+				if (checksum == NULL || *checksum == '\0') {
 					mport_call_msg_cb(
 					    mport, "Source checksum missing %s", file);
-				} else if (strlen(checksum) < 34) {
-					if (MD5File(file, hash) == NULL)
-						mport_call_msg_cb(mport, "Can't MD5 %s: %s", file,
-						    strerror(errno));
-
-					if (hash == NULL)
-						mport_call_msg_cb(mport,
-						    "Destination checksum could not be computed %s",
-						    file);
-					else if (strcmp(hash, checksum) != 0)
-						mport_call_msg_cb(mport,
-						    "Checksum mismatch: %s %s %s", file, hash,
-						    checksum);
 				} else {
-					if (SHA256_File(file, hash) == NULL)
-						mport_call_msg_cb(mport, "Can't SHA256 %s: %s",
-						    file, strerror(errno));
+                    size_t len = strlen(checksum);
+                    if (len < 34) {
+					    if (MD5File(file, hash) == NULL) {
+						    mport_call_msg_cb(mport, "Can't MD5 %s: %s", file,
+						        strerror(errno));
+                            continue;
+                        }
+                    } else {
+					    if (SHA256_File(file, hash) == NULL) {
+						    mport_call_msg_cb(mport, "Can't SHA256 %s: %s",
+						        file, strerror(errno));
+                            continue;
+                        }
+                    }
 
-					if (hash == NULL)
-						mport_call_msg_cb(mport,
-						    "Destination checksum could not be computed %s",
-						    file);
-					else if (strcmp(hash, checksum) != 0)
+					if (strcmp(hash, checksum) != 0)
 						mport_call_msg_cb(mport,
 						    "Checksum mismatch: %s %s %s", file, hash,
 						    checksum);
@@ -271,6 +265,12 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 		RETURN_CURRENT_ERROR;
 	}
 
+    if (mport_db_do(mport->db, "BEGIN TRANSACTION") != MPORT_OK) {
+		sqlite3_finalize(stmt);
+		sqlite3_finalize(update_stmt);
+		RETURN_CURRENT_ERROR;
+    }
+
 	while (1) {
 		ret = sqlite3_step(stmt);
 
@@ -280,6 +280,7 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 		if (ret != SQLITE_ROW) {
 			/* some error occured */
 			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+            mport_db_do(mport->db, "ROLLBACK");
 			sqlite3_finalize(stmt);
 			sqlite3_finalize(update_stmt);
 			RETURN_CURRENT_ERROR;
@@ -322,11 +323,12 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 			}
 
 			if (S_ISREG(st.st_mode)) {
-				if (checksum == NULL) {
+				if (checksum == NULL || *checksum == '\0') {
 					mport_call_msg_cb(
 					    mport, "Source checksum missing %s", file);
 				} else {
-					if (strlen(checksum) < 34) {
+                    size_t len = strlen(checksum);
+					if (len < 34) {
 						if (MD5File(file, hash) == NULL) {
 							mport_call_msg_cb(mport, "Can't MD5 %s: %s",
 							    file, strerror(errno));
@@ -341,11 +343,7 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 						}
 					}
 
-					if (hash == NULL) {
-						mport_call_msg_cb(mport,
-						    "Destination checksum could not be computed %s",
-						    file);
-					} else if (strcmp(hash, checksum) != 0) {
+					if (strcmp(hash, checksum) != 0) {
 						mport_call_msg_cb(mport,
 						    "Updating checksum for %s: %s -> %s", file,
 						    checksum, hash);
@@ -376,6 +374,9 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 
 	sqlite3_finalize(stmt);
 	sqlite3_finalize(update_stmt);
+
+    if (mport_db_do(mport->db, "COMMIT") != MPORT_OK)
+        RETURN_CURRENT_ERROR;
 
 	return (MPORT_OK);
 }
