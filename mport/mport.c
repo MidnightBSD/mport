@@ -75,6 +75,8 @@ static int delete(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
 static int deleteMany(
     /*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *argv[], bool skipFirst);
 
+static int updateMany(mportInstance *mport, int argc, char **argv);
+
 static int deleteAll(/*@notnull@*/ mportInstance *);
 
 static int info(/*@notnull@*/ mportInstance *, /*@null@*/ const char *);
@@ -111,6 +113,231 @@ static int annotate_delete(/*@notnull@*/ mportInstance *mport,
     /*@notnull@*/ const char *packageName, /*@notnull@*/ const char *tagName);
 static int annotate_add(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageName,
     /*@notnull@*/ const char *tagName, /*@notnull@*/ const char *tagValue);
+
+
+static mportPackageMeta **
+sort_dependencies_topological(mportInstance *mport, mportPackageMeta ***results, size_t count, int package_count, bool reverse_edges)
+{
+	mportPackageMeta **flat_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
+	mportPackageMeta **sorted_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
+	int *in_degree = calloc((size_t)package_count, sizeof(int));
+	bool *queued = calloc((size_t)package_count, sizeof(bool));
+
+	struct edge {
+		int to;
+		struct edge *next;
+	};
+	struct edge **adj = calloc((size_t)package_count, sizeof(struct edge *));
+
+	if (flat_packs == NULL || sorted_packs == NULL || in_degree == NULL || adj == NULL ||
+	    queued == NULL) {
+		warnx("Out of memory");
+		goto error;
+	}
+
+	int flat_idx = 0;
+	for (size_t i = 0; i < count; i++) {
+		if (results[i] == NULL)
+			continue;
+		mportPackageMeta **packs = results[i];
+		while (*packs != NULL) {
+			if (flat_idx < package_count) {
+				flat_packs[flat_idx++] = *packs;
+			}
+			packs++;
+		}
+	}
+
+	if (flat_idx != package_count) {
+		package_count = flat_idx;
+	}
+
+	// Build the dependency graph
+	for (int i = 0; i < package_count; i++) {
+		mportPackageMeta **downdeps = NULL;
+		if (mport_pkgmeta_get_downdepends(mport, flat_packs[i], &downdeps) == MPORT_OK &&
+		    downdeps != NULL) {
+			for (mportPackageMeta **d = downdeps; *d != NULL; d++) {
+				for (int j = 0; j < package_count; j++) {
+					if (i == j)
+						continue;
+					if (strcmp((*d)->name, flat_packs[j]->name) == 0) {
+						// i depends on j. 
+						// If reverse_edges is false (delete), i must be deleted before j (i -> j)
+						// If reverse_edges is true (update), j must be updated before i (j -> i)
+						int from = reverse_edges ? j : i;
+						int to = reverse_edges ? i : j;
+
+						// Check for duplicate edges before adding
+						bool duplicate = false;
+						struct edge *curr = adj[from];
+						while (curr != NULL) {
+							if (curr->to == to) {
+								duplicate = true;
+								break;
+							}
+							curr = curr->next;
+						}
+
+						if (!duplicate) {
+							struct edge *new_edge = malloc(sizeof(struct edge));
+							if (new_edge == NULL) {
+								warnx("Out of memory");
+								mport_pkgmeta_vec_free(downdeps);
+								goto error;
+							}
+							new_edge->to = to;
+							new_edge->next = adj[from];
+							adj[from] = new_edge;
+							in_degree[to]++;
+						}
+						break;
+					}
+				}
+			}
+			mport_pkgmeta_vec_free(downdeps);
+		}
+	}
+
+	// Kahn's algorithm for topological sort
+	int sorted_count = 0;
+	while (sorted_count < package_count) {
+		int i;
+		for (i = 0; i < package_count; i++) {
+			if (!queued[i] && in_degree[i] == 0) {
+				break;
+			}
+		}
+
+		if (i == package_count) {
+			// Cycle detected, pick any unqueued
+			warnx("Dependency cycle detected among packages. Ordering may be sub-optimal.");
+			for (i = 0; i < package_count; i++) {
+				if (!queued[i])
+					break;
+			}
+		}
+
+		queued[i] = true;
+		sorted_packs[sorted_count++] = flat_packs[i];
+
+		struct edge *curr = adj[i];
+		while (curr != NULL) {
+			in_degree[curr->to]--;
+			curr = curr->next;
+		}
+	}
+
+	for (int i = 0; i < package_count; i++) {
+		struct edge *curr = adj[i];
+		while (curr != NULL) {
+			struct edge *next = curr->next;
+			free(curr);
+			curr = next;
+		}
+	}
+
+	free(flat_packs);
+	free(in_degree);
+	free(adj);
+	free(queued);
+	return sorted_packs;
+
+error:
+	if (adj != NULL) {
+		for (int i = 0; i < package_count; i++) {
+			struct edge *curr = adj[i];
+			while (curr != NULL) {
+				struct edge *next = curr->next;
+				free(curr);
+				curr = next;
+			}
+		}
+	}
+	free(flat_packs);
+	free(sorted_packs);
+	free(in_degree);
+	free(adj);
+	free(queued);
+	return NULL;
+}
+
+static int
+updateMany(mportInstance *mport, int argc, char **argv)
+{
+	mportPackageMeta **packs = NULL;
+	int package_count = 0;
+	int resultCode = MPORT_OK;
+
+	mportPackageMeta ***results = calloc((size_t)argc, sizeof(mportPackageMeta **));
+	if (results == NULL) {
+		warnx("Out of memory");
+		return MPORT_ERR_FATAL;
+	}
+
+	if (argc > 1 && strchr(argv[1], '*') != NULL) {
+		char *pkg = mport_string_replace(argv[1], "*", "%");
+		if (mport_pkgmeta_search_master(mport, &results[0], "pkg like %Q", pkg) != MPORT_OK) {
+			warnx("%s", mport_err_string());
+			free(pkg);
+			free(results);
+			return (MPORT_ERR_FATAL);
+		}
+		free(pkg);
+		if (results[0] == NULL) {
+			warnx("No packages installed matching '%s'", argv[1]);
+			free(results);
+			return (MPORT_ERR_FATAL);
+		}
+		packs = results[0];
+		while (*packs != NULL) {
+			package_count++;
+			packs++;
+		}
+	} else {
+		for (int i = 1; i < argc; i++) {
+			results[i - 1] = lookup_package(mport, argv[i]);
+			if (results[i - 1] != NULL) {
+				packs = results[i - 1];
+				while (*packs != NULL) {
+					package_count++;
+					packs++;
+				}
+			}
+		}
+	}
+
+	if (package_count == 0) {
+		free(results);
+		return MPORT_OK;
+	}
+
+	mportPackageMeta **sorted_packs = sort_dependencies_topological(mport, results, (size_t)argc, package_count, true);
+	if (sorted_packs == NULL) {
+		resultCode = MPORT_ERR_FATAL;
+		goto cleanup;
+	}
+
+	// Update in sorted order
+	for (int i = 0; i < package_count; i++) {
+		int tempResultCode = mport_update(mport, sorted_packs[i]->name);
+		if (tempResultCode != MPORT_OK) {
+			resultCode = tempResultCode;
+			mport_call_msg_cb(mport, "Error updating package %s: %s", sorted_packs[i]->name,
+			    mport_err_string());
+		}
+	}
+
+cleanup:
+	for (int i = 0; i < argc; i++) {
+		if (results[i] != NULL)
+			mport_pkgmeta_vec_free(results[i]);
+	}
+
+	free(sorted_packs);
+	free(results);
+	return (resultCode);
+}
 
 int
 main(int argc, char *argv[])
@@ -325,39 +552,7 @@ main(int argc, char *argv[])
 			usage();
 		}
 		loadIndex(mport);
-
-		if (strchr(argv[1], '*') != NULL) {
-			mportPackageMeta **packs = NULL;
-			mportPackageMeta **packs_orig = NULL;
-			char *pkg = mport_string_replace(argv[1], "*", "%");
-			if (mport_pkgmeta_search_master(mport, &packs, "pkg like %Q", pkg) !=
-			    MPORT_OK) {
-				warnx("%s", mport_err_string());
-				mport_instance_free(mport);
-				return (MPORT_ERR_FATAL);
-			}
-
-			if (packs == NULL) {
-				warnx("No packages installed matching '%s'", argv[1]);
-				return (MPORT_ERR_FATAL);
-			}
-
-			packs_orig = packs;
-			while (*packs != NULL) {
-				mport_update(mport, (*packs)->name);
-				packs++;
-			}
-			mport_pkgmeta_free(*packs_orig);
-		} else {
-			for (i = 1; i < argc; i++) {
-				tempResultCode = mport_update(mport, argv[i]);
-				if (tempResultCode != MPORT_OK) {
-					resultCode = tempResultCode;
-					mport_call_msg_cb(mport, "Error updating package %s: %s",
-					    argv[i], mport_err_string());
-				}
-			}
-		}
+		resultCode = updateMany(mport, argc, argv);
 	} else if (!strcmp(cmd, "download")) {
 		loadIndex(mport);
 		char *path;
