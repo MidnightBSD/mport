@@ -1318,29 +1318,153 @@ deleteMany(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *arg
 		return (MPORT_ERR_WARN); // User chose not to proceed
 	}
 
-	// Second pass: delete using retained metadata, no DB re-query
+	// Second pass: topological sort to handle dependencies correctly
+	mportPackageMeta **flat_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
+	mportPackageMeta **sorted_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
+	int *in_degree = calloc((size_t)package_count, sizeof(int));
+	bool *queued = calloc((size_t)package_count, sizeof(bool));
+
+	struct edge {
+		int to;
+		struct edge *next;
+	};
+	struct edge **adj = calloc((size_t)package_count, sizeof(struct edge *));
+
+	if (flat_packs == NULL || sorted_packs == NULL || in_degree == NULL || adj == NULL ||
+	    queued == NULL) {
+		warnx("Out of memory");
+		resultCode = MPORT_ERR_FATAL;
+		goto cleanup;
+	}
+
+	int flat_idx = 0;
 	for (size_t i = 0; i < count; i++) {
 		if (results[i] == NULL)
 			continue;
-
 		packs = results[i];
 		while (*packs != NULL) {
-			if (mport_lock_islocked((*packs)) == MPORT_LOCKED) {
-				warnx("Package '%s' is locked. skipping", argv[start + i]);
-				packs++;
-				continue;
-			}
-
-			(*packs)->action = MPORT_ACTION_DELETE;
-			if (mport_delete_primative(mport, *packs, mport->force) != MPORT_OK) {
-				warnx("%s", mport_err_string());
+			if (flat_idx < package_count) {
+				flat_packs[flat_idx++] = *packs;
 			}
 			packs++;
 		}
-
-		mport_pkgmeta_vec_free(results[i]);
 	}
 
+	if (flat_idx != package_count) {
+		warnx("Warning: package count mismatch during deletion (%d != %d)", flat_idx,
+		    package_count);
+		package_count = flat_idx;
+	}
+
+	// Build the dependency graph
+	for (int i = 0; i < package_count; i++) {
+		mportPackageMeta **downdeps = NULL;
+		if (mport_pkgmeta_get_downdepends(mport, flat_packs[i], &downdeps) == MPORT_OK &&
+		    downdeps != NULL) {
+			for (mportPackageMeta **d = downdeps; *d != NULL; d++) {
+				for (int j = 0; j < package_count; j++) {
+					if (i == j)
+						continue;
+					if (strcmp((*d)->name, flat_packs[j]->name) == 0) {
+						// i depends on j, so i must be deleted before j
+						// Check for duplicate edges before adding
+						bool duplicate = false;
+						struct edge *curr = adj[i];
+						while (curr != NULL) {
+							if (curr->to == j) {
+								duplicate = true;
+								break;
+							}
+							curr = curr->next;
+						}
+
+						if (!duplicate) {
+							struct edge *new_edge = malloc(sizeof(struct edge));
+							if (new_edge == NULL) {
+								warnx("Out of memory");
+								mport_pkgmeta_vec_free(downdeps);
+								resultCode = MPORT_ERR_FATAL;
+								goto cleanup;
+							}
+							new_edge->to = j;
+							new_edge->next = adj[i];
+							adj[i] = new_edge;
+							in_degree[j]++;
+						}
+						break;
+					}
+				}
+			}
+			mport_pkgmeta_vec_free(downdeps);
+		}
+	}
+
+	// Kahn's algorithm for topological sort
+	int sorted_count = 0;
+	while (sorted_count < package_count) {
+		int i;
+		for (i = 0; i < package_count; i++) {
+			if (!queued[i] && in_degree[i] == 0) {
+				break;
+			}
+		}
+
+		if (i == package_count) {
+			// Cycle detected, pick any unqueued
+			warnx("Dependency cycle detected among packages to be deleted. Removal order may be sub-optimal.");
+			for (i = 0; i < package_count; i++) {
+				if (!queued[i])
+					break;
+			}
+		}
+
+		queued[i] = true;
+		sorted_packs[sorted_count++] = flat_packs[i];
+
+		struct edge *curr = adj[i];
+		while (curr != NULL) {
+			in_degree[curr->to]--;
+			curr = curr->next;
+		}
+	}
+
+	// Third pass: delete in sorted order
+	for (int i = 0; i < package_count; i++) {
+		mportPackageMeta *pack = sorted_packs[i];
+		if (mport_lock_islocked(pack) == MPORT_LOCKED) {
+			warnx("Package '%s' is locked. skipping", pack->name);
+			continue;
+		}
+
+		pack->action = MPORT_ACTION_DELETE;
+		if (mport_delete_primative(mport, pack, mport->force) != MPORT_OK) {
+			warnx("%s", mport_err_string());
+			resultCode = MPORT_ERR_FATAL;
+		}
+	}
+
+cleanup:
+	for (size_t i = 0; i < count; i++) {
+		if (results[i] != NULL)
+			mport_pkgmeta_vec_free(results[i]);
+	}
+
+	if (adj != NULL) {
+		for (int i = 0; i < package_count; i++) {
+			struct edge *curr = adj[i];
+			while (curr != NULL) {
+				struct edge *next = curr->next;
+				free(curr);
+				curr = next;
+			}
+		}
+	}
+
+	free(flat_packs);
+	free(sorted_packs);
+	free(in_degree);
+	free(adj);
+	free(queued);
 	free(results);
 	return (resultCode);
 }
