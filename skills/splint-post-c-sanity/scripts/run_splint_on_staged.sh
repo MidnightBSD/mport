@@ -10,21 +10,28 @@ if ! command -v splint >/dev/null 2>&1; then
   die "splint not found in PATH"
 fi
 
-if ! command -v rg >/dev/null 2>&1; then
-  die "rg (ripgrep) not found in PATH"
-fi
-
-mapfile -t staged_c_files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.c' ':!external/*' | rg -N '\\.c$' || true)
+mapfile -t staged_c_files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.c' ':!external/*')
 if ((${#staged_c_files[@]} == 0)); then
   echo "No staged *.c files; skipping splint."
   exit 0
 fi
 
-INCLUDE_DIRS=(-I. -Ilibmport -Ilibexec)
+INCLUDE_DIRS=(
+  -I.
+  -Ilibmport
+  -Ilibexec
+  -Iexternal/tllist
+  -I/usr/include/private/ucl
+  -I/usr/include/private/zstd
+)
 
 # Focus on memory/ownership, API misuse, and basic contracts; avoid ultra-strict noise.
 SPLINT_FLAGS=(
   -standard
+  +posixlib -warnposixheaders
+  "-D__aligned(x)="
+  "-D_Alignof(x)=sizeof(x)"
+  "-D__va_list=void *"
   +boundsread +boundswrite +likelybounds
   +nullpass +nullret
   +bufferoverflowhigh
@@ -36,9 +43,10 @@ SPLINT_FLAGS=(
 )
 
 tmp_out="${TMPDIR:-/tmp}/splint.$$.txt"
-trap 'rm -f "$tmp_out"' EXIT
+keep_tmp=0
+trap 'if [[ "$keep_tmp" -eq 0 ]]; then rm -f "$tmp_out"; fi' EXIT
 
-echo "Running splint on staged .c files..."
+printf 'Running splint on %d staged .c file(s)...\n' "${#staged_c_files[@]}"
 : >"$tmp_out"
 
 for f in "${staged_c_files[@]}"; do
@@ -49,9 +57,18 @@ done
 
 # Splint output isn't always labeled as warning/error; fail if it reports any file diagnostics.
 # Heuristic: ignore file headers and blank lines; treat remaining lines as findings.
-findings="$(rg -n '^(?!== ).\\S' "$tmp_out" || true)"
+findings="$(
+  awk '
+    NF == 0 { next }
+    /^== / { next }
+    /^Splint [0-9]/ { next }
+    /^Command Line: Setting .* redundant with current value$/ { next }
+    { printf "%d:%s\n", NR, $0 }
+  ' "$tmp_out"
+)"
 
 if [[ -n "$findings" ]]; then
+  keep_tmp=1
   echo
   echo "splint findings:"
   echo "$findings"
