@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <err.h>
+#include <locale.h>
 #include <string.h>
 #include <unistd.h>
 #include <stddef.h>
@@ -95,6 +96,8 @@ main(int argc, char *argv[])
 	mportAssetList *assetlist;
 	FILE *fp;
 	const char *chroot_path = NULL;
+
+	(void)setlocale(LC_ALL, "");
 
 	while ((ch = getopt(argc, argv, "c:f:d:s:p:")) != -1) {
 		switch (ch) {

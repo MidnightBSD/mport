@@ -67,7 +67,7 @@ main(int argc, char *argv[])
 	struct tm expDate;
 	int result = EXIT_SUCCESS;
 
-	setlocale(LC_ALL, "");
+	(void)setlocale(LC_ALL, "");
 
 	if (mport == NULL || pack == NULL || extra == NULL || assetlist == NULL) {
 		errx(EXIT_FAILURE, "Failed to allocate memory");

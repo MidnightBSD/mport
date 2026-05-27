@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <err.h>
+#include <locale.h>
 #include <sysexits.h>
 #include <string.h>
 #include <unistd.h>
@@ -48,6 +49,8 @@ main(int argc, char *argv[])
 	/*@only@*/ const char **inputfiles;
 	mportInstance *mport;
 	const char *chroot_path = NULL;
+
+	(void)setlocale(LC_ALL, "");
 
 	if (argc == 1)
 		usage();

@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <err.h>
+#include <locale.h>
 #include <string.h>
 #include <unistd.h>
 #include <getopt.h>
@@ -49,6 +50,8 @@ main(int argc, char *argv[])
 	int error_code = 0;
 	bool automatic = false;
 	const char *chroot_path = NULL;
+
+	(void)setlocale(LC_ALL, "");
 
 	while ((ch = getopt(argc, argv, "Ac:p:")) != -1) {
 		switch (ch) {

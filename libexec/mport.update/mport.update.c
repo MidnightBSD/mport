@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <err.h>
+#include <locale.h>
 #include <string.h>
 #include <unistd.h>
 #include <getopt.h>
@@ -42,6 +43,8 @@ int main(int argc, char *argv[]) {
 	int i, ch;
 	mportInstance *mport;
 	const char *chroot_path = NULL;
+
+	(void)setlocale(LC_ALL, "");
 
 	while ((ch = getopt(argc, argv, "c:")) != -1) {
 		switch (ch) {
