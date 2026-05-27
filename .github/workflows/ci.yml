@@ -25,3 +25,4 @@ jobs:
           shell: sh
           run: |
             make
+            kyua test -k tests/Kyuafile
