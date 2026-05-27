@@ -283,6 +283,7 @@ main(int argc, char *argv[])
 		}
 
 		loadIndex(mport);
+		resultCode = MPORT_OK;
 		for (i = 0; i < local_argc; i++) {
 			tempResultCode = install(
 			    mport, local_argv[i], aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
