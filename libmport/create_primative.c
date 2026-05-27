@@ -32,6 +32,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -66,6 +67,8 @@ static int archive_assetlistfiles(mportBundleWrite *, mportPackageMeta *, mportC
 
 static int clean_up(const char *);
 
+static int checked_snprintf(char *, size_t, const char *, ...);
+
 MPORT_PUBLIC_API int
 mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPackageMeta *pack, mportCreateExtras *extra)
 {
@@ -84,7 +87,7 @@ mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPac
 
 	if (tmpdir == NULL) {
 		error_code = SET_ERROR(MPORT_ERR_FATAL, strerror(errno));
-		goto CLEANUP;
+		return error_code;
 	}
 
 	if ((error_code = create_stub_db(mport, &db, tmpdir)) != MPORT_OK)
@@ -185,9 +188,17 @@ insert_assetlist(sqlite3 *db, mportAssetList *assetlist, mportPackageMeta *pack,
 		    e->type == ASSET_INFO) {
 			/* Don't prepend cwd onto absolute file paths (this is useful for update) */
 			if (e->data[0] == '/') {
-				(void) snprintf(file, FILENAME_MAX, "%s%s", extra->sourcedir, e->data);
+				if (checked_snprintf(file, FILENAME_MAX, "%s%s", extra->sourcedir,
+					e->data) != MPORT_OK) {
+					sqlite3_finalize(stmnt);
+					RETURN_CURRENT_ERROR;
+				}
 			} else {
-				(void) snprintf(file, FILENAME_MAX, "%s/%s", cwd, e->data);
+				if (checked_snprintf(file, FILENAME_MAX, "%s/%s", cwd,
+					e->data) != MPORT_OK) {
+					sqlite3_finalize(stmnt);
+					RETURN_CURRENT_ERROR;
+				}
 			}
 
 			if (e->type == ASSET_SAMPLE || e->type == ASSET_SAMPLE_OWNER_MODE) {
@@ -719,9 +730,13 @@ archive_assetlistfiles(mportBundleWrite *bundle, mportPackageMeta *pack, mportCr
 
 		/* don't prepend the cwd if the path is abs. */
 		if (*(e->data) == '/') {
-			(void) snprintf(filename, FILENAME_MAX, "%s%s", extra->sourcedir, e->data);
+			if (checked_snprintf(filename, FILENAME_MAX, "%s%s", extra->sourcedir,
+				e->data) != MPORT_OK)
+				RETURN_CURRENT_ERROR;
 		} else {
-			(void) snprintf(filename, FILENAME_MAX, "%s/%s/%s", extra->sourcedir, cwd, e->data);
+			if (checked_snprintf(filename, FILENAME_MAX, "%s/%s/%s", extra->sourcedir,
+				cwd, e->data) != MPORT_OK)
+				RETURN_CURRENT_ERROR;
 		}
 
 		if (e->type == ASSET_SAMPLE || e->type == ASSET_SAMPLE_OWNER_MODE) {
@@ -747,7 +762,23 @@ archive_assetlistfiles(mportBundleWrite *bundle, mportPackageMeta *pack, mportCr
 static int
 clean_up(const char *tmpdir)
 {
+	if (tmpdir == NULL)
+		return MPORT_OK;
 	return mport_rmtree(tmpdir);
 }
 
+static int
+checked_snprintf(char *buf, size_t bufsize, const char *fmt, ...)
+{
+	va_list ap;
+	int len;
 
+	va_start(ap, fmt);
+	len = vsnprintf(buf, bufsize, fmt, ap);
+	va_end(ap);
+
+	if (len < 0 || (size_t)len >= bufsize)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Path is too long");
+
+	return MPORT_OK;
+}

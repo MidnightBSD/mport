@@ -53,6 +53,10 @@ static void manifest_alloc_failure(
     /*@null@*/ ucl_object_t *, /*@notnull@*/ mportPackageMeta *, /*@notnull@*/ mportCreateExtras *);
 static void parse_manifest_ucl(/*@notnull@*/ const char *, /*@notnull@*/ mportPackageMeta *,
     /*@notnull@*/ mportCreateExtras *);
+static void checked_strlcpy(/*@notnull@*/ char *, /*@notnull@*/ const char *, size_t,
+    /*@notnull@*/ const char *);
+static void manifest_strdup_field(/*@null@*/ ucl_object_t *, /*@notnull@*/ mportPackageMeta *,
+    /*@notnull@*/ mportCreateExtras *, /*@notnull@*/ char **, /*@notnull@*/ const char *);
 
 int
 main(int argc, char *argv[])
@@ -87,7 +91,8 @@ main(int argc, char *argv[])
 	    -1) {
 		switch (ch) {
 		case 'o':
-			strlcpy(extra->pkg_filename, optarg, sizeof(extra->pkg_filename));
+			checked_strlcpy(
+			    extra->pkg_filename, optarg, sizeof(extra->pkg_filename), "package filename");
 			break;
 		case 'n':
 			if (optarg != NULL) {
@@ -132,7 +137,7 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 's':
-			strlcpy(extra->sourcedir, optarg, sizeof(extra->sourcedir));
+			checked_strlcpy(extra->sourcedir, optarg, sizeof(extra->sourcedir), "source dir");
 			break;
 		case 'd':
 			if (optarg != NULL) {
@@ -185,8 +190,12 @@ main(int argc, char *argv[])
 			mport_parselist_tll(optarg, &(extra->annotations));
 			break;
 		case 'E':
-			strptime(optarg, "%Y-%m-%d", &expDate);
+			memset(&expDate, 0, sizeof(expDate));
+			if (strptime(optarg, "%Y-%m-%d", &expDate) == NULL)
+				errx(EXIT_FAILURE, "Invalid expiration date '%s'", optarg);
 			pack->expiration_date = mktime(&expDate);
+			if (pack->expiration_date == (time_t)-1)
+				errx(EXIT_FAILURE, "Invalid expiration date '%s'", optarg);
 			break;
 		case 'S':
 			if (optarg[0] == '1' || optarg[0] == 'Y' || optarg[0] == 'y' ||
@@ -289,6 +298,13 @@ check_for_required_args(const mportPackageMeta *pkg, const mportCreateExtras *ex
 }
 
 static void
+checked_strlcpy(char *dst, const char *src, size_t dstlen, const char *field_name)
+{
+	if (strlcpy(dst, src, dstlen) >= dstlen)
+		errx(EXIT_FAILURE, "%s is too long", field_name);
+}
+
+static void
 usage(void)
 {
 	fprintf(stderr, "\nmport.create <arguments>\n");
@@ -327,6 +343,15 @@ manifest_alloc_failure(ucl_object_t *root, mportPackageMeta *pack, mportCreateEx
 }
 
 static void
+manifest_strdup_field(ucl_object_t *root, mportPackageMeta *pack, mportCreateExtras *extra,
+    char **field, const char *value)
+{
+	*field = strdup(value);
+	if (*field == NULL)
+		manifest_alloc_failure(root, pack, extra);
+}
+
+static void
 parse_manifest_ucl(const char *manifest_file, mportPackageMeta *pack, mportCreateExtras *extra)
 {
 	struct ucl_parser *parser;
@@ -350,27 +375,27 @@ parse_manifest_ucl(const char *manifest_file, mportPackageMeta *pack, mportCreat
 	}
 
 	if ((obj = ucl_object_lookup(root, "name")) != NULL && ucl_object_type(obj) == UCL_STRING)
-		pack->name = strdup(ucl_object_tostring(obj));
+		manifest_strdup_field(root, pack, extra, &pack->name, ucl_object_tostring(obj));
 
 	if ((obj = ucl_object_lookup(root, "version")) != NULL &&
 	    ucl_object_type(obj) == UCL_STRING)
-		pack->version = strdup(ucl_object_tostring(obj));
+		manifest_strdup_field(root, pack, extra, &pack->version, ucl_object_tostring(obj));
 
 	if ((obj = ucl_object_lookup(root, "comment")) != NULL &&
 	    ucl_object_type(obj) == UCL_STRING)
-		pack->comment = strdup(ucl_object_tostring(obj));
+		manifest_strdup_field(root, pack, extra, &pack->comment, ucl_object_tostring(obj));
 
 	if ((obj = ucl_object_lookup(root, "desc")) != NULL && ucl_object_type(obj) == UCL_STRING)
-		pack->desc = strdup(ucl_object_tostring(obj));
+		manifest_strdup_field(root, pack, extra, &pack->desc, ucl_object_tostring(obj));
 
 	if ((obj = ucl_object_lookup(root, "prefix")) != NULL && ucl_object_type(obj) == UCL_STRING)
-		pack->prefix = strdup(ucl_object_tostring(obj));
+		manifest_strdup_field(root, pack, extra, &pack->prefix, ucl_object_tostring(obj));
 
 	if ((obj = ucl_object_lookup(root, "origin")) != NULL && ucl_object_type(obj) == UCL_STRING)
-		pack->origin = strdup(ucl_object_tostring(obj));
+		manifest_strdup_field(root, pack, extra, &pack->origin, ucl_object_tostring(obj));
 
 	if ((obj = ucl_object_lookup(root, "cpe")) != NULL && ucl_object_type(obj) == UCL_STRING)
-		pack->cpe = strdup(ucl_object_tostring(obj));
+		manifest_strdup_field(root, pack, extra, &pack->cpe, ucl_object_tostring(obj));
 
 	if ((obj = ucl_object_lookup(root, "categories")) != NULL &&
 	    ucl_object_type(obj) == UCL_ARRAY) {
@@ -384,12 +409,15 @@ parse_manifest_ucl(const char *manifest_file, mportPackageMeta *pack, mportCreat
 		}
 		if (count > 0) {
 			pack->categories = calloc(count + 1, sizeof(char *));
+			if (pack->categories == NULL)
+				manifest_alloc_failure(root, pack, extra);
 			pack->categories_count = count;
 			it = NULL;
 			size_t i = 0;
 			while ((cat = ucl_object_iterate(obj, &it, true)) != NULL) {
 				if (ucl_object_type(cat) == UCL_STRING) {
-					pack->categories[i++] = strdup(ucl_object_tostring(cat));
+					manifest_strdup_field(root, pack, extra,
+					    &pack->categories[i++], ucl_object_tostring(cat));
 				}
 			}
 			pack->categories[i] = NULL;
