@@ -71,14 +71,20 @@ mport_info(mportInstance *mport, const char *packageName) {
 		return (NULL);
 	}
 
-	if (indexEntry == NULL) {
-		SET_ERROR(MPORT_ERR_FATAL, "Could not resolve package.");
+	if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
 		mport_index_entry_free_vec(indexEntries);
-		indexEntries = NULL;
 		return (NULL);
 	}
 
-	if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
+	/*
+	 * Resolution only fails when the package is neither in the index nor
+	 * installed locally. A package that is installed but no longer in the
+	 * index still has local metadata to display.
+	 */
+	if (indexEntry == NULL && packs == NULL) {
+		SET_ERROR(MPORT_ERR_FATAL, "Could not resolve package.");
+		mport_index_entry_free_vec(indexEntries);
+		indexEntries = NULL;
 		return (NULL);
 	}
 
