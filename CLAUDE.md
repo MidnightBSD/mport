@@ -239,3 +239,5 @@ SQLite database lives at `/var/db/mport/`. Schema versioning is managed in `libm
 4. Deploys assets via `mport.install` / `install_primative.c`
 5. Runs Lua pre/post-install hooks via `libmport/lua.c`
 6. Updates master SQLite registry
+
+Load @AGENTS.md for skills
