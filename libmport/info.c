@@ -36,6 +36,12 @@
 #include <unistd.h>
 #include <libutil.h>
 
+/*
+ * ctime_r(3) requires a caller-supplied buffer of at least 26 bytes to hold
+ * the formatted "Www Mmm dd hh:mm:ss yyyy\n\0" time string.
+ */
+#define CTIME_R_BUFLEN 26
+
 MPORT_PUBLIC_API char *
 mport_info(mportInstance *mport, const char *packageName) {
 	mportIndexEntry **indexEntries = NULL;
@@ -221,6 +227,20 @@ mport_info(mportInstance *mport, const char *packageName) {
 	if (annotations_str == NULL)
 		annotations_str = strdup("");
 
+	/*
+	 * ctime() returns a pointer to a single static buffer, so calling it
+	 * twice within one asprintf() argument list makes both date fields
+	 * print the same (last evaluated) value. Format each date into its
+	 * own buffer with ctime_r() up front instead.
+	 */
+	char expdate_buf[CTIME_R_BUFLEN], insdate_buf[CTIME_R_BUFLEN];
+	const char *expdate_str = expirationDate == 0 ? "" : ctime_r(&expirationDate, expdate_buf);
+	const char *insdate_str = installDate == 0 ? "\n" : ctime_r(&installDate, insdate_buf);
+	if (expdate_str == NULL)
+		expdate_str = "";
+	if (insdate_str == NULL)
+		insdate_str = "\n";
+
 	if (packs !=NULL && indexEntry == NULL) {
 		asprintf(&info_text,
 	         "%s-%s\n"
@@ -232,8 +252,8 @@ mport_info(mportInstance *mport, const char *packageName) {
 	         (*packs)->name, status, "", "", origin,
 	         flavor, os_release,
 		 cpe, purl, locked ? "yes" : "no", automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no", deprecated,
-	         expirationDate == 0 ? "" : ctime(&expirationDate),
-	         installDate == 0 ? "\n" : ctime(&installDate),
+	         expdate_str,
+	         insdate_str,
 	         "",
 	         annotations_str,
 	         options,
@@ -251,8 +271,8 @@ mport_info(mportInstance *mport, const char *packageName) {
 	         (*packs)->name, status, indexEntry == NULL ? "" : indexEntry->version, indexEntry == NULL ? "" : indexEntry->license, origin,
 	         flavor, os_release,
 		 cpe, purl, locked ? "yes" : "no", automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no", deprecated,
-	         expirationDate == 0 ? "" : ctime(&expirationDate),
-	         installDate == 0 ? "\n" : ctime(&installDate),
+	         expdate_str,
+	         insdate_str,
 	         indexEntry == NULL ? "" : indexEntry->comment,
 	         annotations_str,
 	         options,
