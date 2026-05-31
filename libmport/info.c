@@ -36,6 +36,12 @@
 #include <unistd.h>
 #include <libutil.h>
 
+/*
+ * ctime_r(3) requires a caller-supplied buffer of at least 26 bytes to hold
+ * the formatted "Www Mmm dd hh:mm:ss yyyy\n\0" time string.
+ */
+#define CTIME_R_BUFLEN 26
+
 MPORT_PUBLIC_API char *
 mport_info(mportInstance *mport, const char *packageName) {
 	mportIndexEntry **indexEntries = NULL;
@@ -221,7 +227,7 @@ mport_info(mportInstance *mport, const char *packageName) {
 	 * print the same (last evaluated) value. Format each date into its
 	 * own buffer with ctime_r() up front instead.
 	 */
-	char expdate_buf[26], insdate_buf[26];
+	char expdate_buf[CTIME_R_BUFLEN], insdate_buf[CTIME_R_BUFLEN];
 	const char *expdate_str = expirationDate == 0 ? "" : ctime_r(&expirationDate, expdate_buf);
 	const char *insdate_str = installDate == 0 ? "\n" : ctime_r(&installDate, insdate_buf);
 	if (expdate_str == NULL)
