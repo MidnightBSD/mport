@@ -250,7 +250,27 @@ mport_info(mportInstance *mport, const char *packageName) {
 	         indexEntry == NULL ? "" : indexEntry->comment,
 	         annotations_str,
 	         options,
-		 type == MPORT_TYPE_APP ? "Application" : "System", 
+		 type == MPORT_TYPE_APP ? "Application" : "System",
+		 flatsize_str,
+		 desc);
+	} else {
+		/* Not installed locally; report index information only. */
+		asprintf(&info_text,
+	         "%s-%s\n"
+	         "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
+	         "Flavor          : %s\nOS              : %s\n"
+	         "CPE             : %s\nPURL            : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date    : %s"
+	         "Comment         : %s\n%sOptions         : %s\nType            : %s\nFlat Size       : %s\nDescription     :\n%s\n",
+	         indexEntry->pkgname, indexEntry->version,
+	         indexEntry->pkgname, status, indexEntry->version, indexEntry->license == NULL ? "" : indexEntry->license, origin,
+	         flavor, os_release,
+		 cpe, purl, locked ? "yes" : "no", automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no", deprecated,
+	         expirationDate == 0 ? "" : ctime(&expirationDate),
+	         installDate == 0 ? "\n" : ctime(&installDate),
+	         indexEntry->comment == NULL ? "" : indexEntry->comment,
+	         annotations_str,
+	         options,
+		 type == MPORT_TYPE_APP ? "Application" : "System",
 		 flatsize_str,
 		 desc);
 	}
