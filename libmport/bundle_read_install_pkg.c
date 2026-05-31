@@ -704,6 +704,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 	mode_t *set = NULL;
 	mode_t newmode;
 	char *mode = NULL;
+	int filefd = -1;
 	char file[FILENAME_MAX], cwd[FILENAME_MAX];
 	sqlite3_stmt *insert = NULL;
 
@@ -847,12 +848,31 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 					}
 				}
 
-				if (lstat(file, &sb)) {
+				/*
+				 * Open the freshly extracted file with O_NOFOLLOW before
+				 * touching its ownership or mode. Operating on the file
+				 * descriptor (fchown/fchmod) instead of re-resolving the
+				 * path closes a symlink TOCTOU: an attacker who replaces the
+				 * file with a symlink after extraction cannot redirect the
+				 * privileged chown/chmod at another file. O_NONBLOCK avoids
+				 * blocking if the path was swapped for a FIFO. This mirrors
+				 * the fd-based directory handling in apply_dir_asset_attrs().
+				 * A symlink final component (EMLINK/ELOOP) or any other
+				 * non-regular file is left unmodified, as before, but is
+				 * still recorded in the database below.
+				 */
+				filefd = open(file, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+				if (filefd == -1 && errno != EMLINK && errno != ELOOP) {
+					SET_ERRORX(MPORT_ERR_FATAL, "Unable to open file %s: %s", file,
+					    strerror(errno));
+					goto ERROR;
+				}
+				if (filefd != -1 && fstat(filefd, &sb) != 0) {
 					SET_ERRORX(MPORT_ERR_FATAL, "Unable to stat file %s", file);
 					goto ERROR;
 				}
 
-				if (S_ISREG(sb.st_mode)) {
+				if (filefd != -1 && S_ISREG(sb.st_mode)) {
 					if (e->type == ASSET_FILE_OWNER_MODE || e->type == ASSET_SAMPLE_OWNER_MODE) {
 						/* Test for owner and group settings, otherwise roll with our default. */
 						if (e->owner != NULL && e->group != NULL && e->owner[0] != '\0' &&
@@ -860,7 +880,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 #ifdef DEBUG
 							mport_call_msg_cb(mport, "owner %s and group %s\n", e->owner, e->group);
 #endif
-							if (chown(file, mport_get_uid(e->owner),
+							if (fchown(filefd, mport_get_uid(e->owner),
 							          mport_get_gid(e->group)) == -1) {
 								SET_ERROR(MPORT_ERR_FATAL, "Unable to change owner");
 								goto ERROR;
@@ -869,7 +889,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 #ifdef DEBUG
 							mport_call_msg_cb(mport, "owner %s\n", e->owner);
 #endif
-							if (chown(file, mport_get_uid(e->owner), group) == -1) {
+							if (fchown(filefd, mport_get_uid(e->owner), group) == -1) {
 								SET_ERROR(MPORT_ERR_FATAL, "Unable to change owner");
 								goto ERROR;
 							}
@@ -877,20 +897,20 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 #ifdef DEBUG
 							mport_call_msg_cb(mport, "group %s\n", e->group);
 #endif
-							if (chown(file, owner, mport_get_gid(e->group)) == -1) {
+							if (fchown(filefd, owner, mport_get_gid(e->group)) == -1) {
 								SET_ERROR(MPORT_ERR_FATAL, "Unable to change owner");
 								goto ERROR;
 							}
 						} else {
 							// use default.
-							if (chown(file, owner, group) == -1) {
+							if (fchown(filefd, owner, group) == -1) {
 								SET_ERROR(MPORT_ERR_FATAL, "Unable to change owner");
 								goto ERROR;
 							}
 						}
 					} else {
 						/* Set the owner and group */
-						if (chown(file, owner, group) == -1) {
+						if (fchown(filefd, owner, group) == -1) {
 							SET_ERRORX(MPORT_ERR_FATAL,
 							           "Unable to set permissions on file %s", file);
 							goto ERROR;
@@ -900,7 +920,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 					/* Set the file permissions, assumes non NFSv4 */
 					if (mode != NULL || (e->mode != NULL && e->mode[0] != '\0' &&
 					                     (e->type == ASSET_SAMPLE_OWNER_MODE || e->type == ASSET_FILE_OWNER_MODE))) {
-						if (stat(file, &sb)) {
+						if (fstat(filefd, &sb)) {
 							SET_ERRORX(MPORT_ERR_FATAL, "Unable to stat file %s", file);
 							goto ERROR;
 						}
@@ -925,7 +945,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 						newmode = getmode(set, sb.st_mode);
 						free(set);
 
-						if (chmod(file, newmode)) {
+						if (fchmod(filefd, newmode)) {
 							SET_ERROR(MPORT_ERR_FATAL, "Unable to set file permissions");
 							goto ERROR;
 						}
@@ -986,6 +1006,11 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 						}
 						free(age_annotation);
 					}
+				}
+
+				if (filefd != -1) {
+					close(filefd);
+					filefd = -1;
 				}
 
 				/* for sample files, if we don't have an existing file, make a new one */
@@ -1148,6 +1173,8 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 	return (MPORT_OK);
 
 	ERROR:
+		if (filefd != -1)
+			close(filefd);
 		sqlite3_finalize(insert);
 		(mport->progress_free_cb)();
 		free(orig_cwd);
