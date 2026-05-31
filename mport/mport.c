@@ -149,7 +149,7 @@ sort_dependencies_topological(mportInstance *mport, mportPackageMeta **flat_pack
 						int to = reverse_edges ? i : j;
 
 						bool duplicate = false;
-						struct edge *curr = adj[from];
+						const struct edge *curr = adj[from];
 						while (curr != NULL) {
 							if (curr->to == to) {
 								duplicate = true;
@@ -198,7 +198,7 @@ sort_dependencies_topological(mportInstance *mport, mportPackageMeta **flat_pack
 		queued[i] = true;
 		sorted_packs[sorted_count++] = flat_packs[i];
 
-		struct edge *curr = adj[i];
+		const struct edge *curr = adj[i];
 		while (curr != NULL) {
 			in_degree[curr->to]--;
 			curr = curr->next;
@@ -441,7 +441,7 @@ main(int argc, char *argv[])
 		exit(EXIT_SUCCESS);
 	}
 
-	char *cmd = argv[0];
+	const char *cmd = argv[0];
 
 	if (cmd == NULL)
 		usage();
@@ -563,34 +563,33 @@ main(int argc, char *argv[])
 	} else if (!strcmp(cmd, "download")) {
 		loadIndex(mport);
 		char *path;
-
-		int local_argc = argc;
-		char *const *local_argv = argv;
 		int aflag = 0;
 		int dflag = 0;
+		int ch2;
 
-		if (local_argc > 1) {
-			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "ad")) != -1) {
-				switch (ch2) {
-				case 'a':
-					aflag = 1;
-					break;
-				case 'd':
-					dflag = 1;
-					break;
-				}
+#if defined(__MidnightBSD__)
+		optreset = 1;
+#endif
+		optind = 1;
+		while ((ch2 = getopt(argc, argv, "ad")) != -1) {
+			switch (ch2) {
+			case 'a':
+				aflag = 1;
+				break;
+			case 'd':
+				dflag = 1;
+				break;
 			}
-			local_argc -= optind;
-			local_argv += optind;
 		}
+		int local_argc = argc - optind;
+		char *const *local_argv = argv + optind;
 
 		if (aflag) {
 			resultCode = mport_download(mport, NULL, true, false, &path);
 		} else {
-			for (i = 1; i < argc; i++) {
-				tempResultCode =
-				    mport_download(mport, argv[i], aflag == 1, dflag == 1, &path);
+			for (i = 0; i < local_argc; i++) {
+				tempResultCode = mport_download(
+				    mport, local_argv[i], false, dflag == 1, &path);
 				if (tempResultCode != 0) {
 					resultCode = tempResultCode;
 				} else if (path != NULL) {
@@ -655,26 +654,25 @@ main(int argc, char *argv[])
 		}
 	} else if (!strcmp(cmd, "audit")) {
 		loadIndex(mport);
-
-		int local_argc = argc;
-		char *const *local_argv = argv;
 		int rflag = 0;
+		int ch2;
 
-		if (local_argc > 1) {
-			int ch2;
-			while ((ch2 = getopt(local_argc, local_argv, "r")) != -1) {
-				switch (ch2) {
-				case 'r':
-					rflag = 1;
-					break;
-				}
+#if defined(__MidnightBSD__)
+		optreset = 1;
+#endif
+		optind = 1;
+		while ((ch2 = getopt(argc, argv, "r")) != -1) {
+			switch (ch2) {
+			case 'r':
+				rflag = 1;
+				break;
 			}
-			local_argc -= optind;
-			local_argv += optind;
 		}
+		int local_argc = argc - optind;
+		char *const *local_argv = argv + optind;
 
-		if (argc > 1) {
-			resultCode = audit_package(mport, argv[1], rflag > 0);
+		if (local_argc > 0) {
+			resultCode = audit_package(mport, local_argv[0], rflag > 0);
 		} else {
 			resultCode = audit(mport, rflag > 0);
 		}
@@ -1268,11 +1266,11 @@ install(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageNam
 				fprintf(stderr, "strdup failed\n");
 				exit(EXIT_FAILURE);
 			}
-			char *v = &d[loc + 1];
+			const char *v = &d[loc + 1];
 			d[loc] = '\0'; /* hack off the version number */
 			mport_index_entry_free_vec(indexEntry); /* free the empty result from the full-name lookup */
 			indexEntry = lookupIndex(mport, d);
-			if (indexEntry == NULL || v == NULL || (*indexEntry) == NULL ||
+			if (indexEntry == NULL || (*indexEntry) == NULL ||
 			    strcmp(v, (*indexEntry)->version) != 0) {
 				fprintf(
 				    stderr, "Package %s not found in the index.\n", packageName);
