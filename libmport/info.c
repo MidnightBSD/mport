@@ -265,8 +265,8 @@ mport_info(mportInstance *mport, const char *packageName) {
 	         indexEntry->pkgname, status, indexEntry->version, indexEntry->license == NULL ? "" : indexEntry->license, origin,
 	         flavor, os_release,
 		 cpe, purl, locked ? "yes" : "no", automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no", deprecated,
-	         expirationDate == 0 ? "" : ctime(&expirationDate),
-	         installDate == 0 ? "\n" : ctime(&installDate),
+	         "",  /* expiration date: not installed, always empty */
+	         "\n", /* install date: not installed, always empty */
 	         indexEntry->comment == NULL ? "" : indexEntry->comment,
 	         annotations_str,
 	         options,
