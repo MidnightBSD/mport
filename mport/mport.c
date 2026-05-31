@@ -1085,6 +1085,7 @@ selectMirror(/*@notnull@*/ mportInstance *mport)
 
 	if (result != MPORT_OK) {
 		warnx("%s", mport_err_string());
+		mport_index_mirror_entry_free_vec(mirrorEntry_orig);
 		return mport_err_code();
 	}
 
@@ -1105,18 +1106,14 @@ search(/*@notnull@*/ mportInstance *mport, /*@null@*/ char **query)
 
 	while (query != NULL && *query != NULL) {
 		mport_index_search_term(mport, &indexEntry, *query);
-		if (indexEntry == NULL || *indexEntry == NULL) {
-			query++;
-			continue;
+		if (indexEntry != NULL) {
+			for (mportIndexEntry **e = indexEntry; *e != NULL; e++) {
+				fprintf(stdout, "%s\t%s\t%s\n", (*e)->pkgname,
+				    (*e)->version, (*e)->comment);
+			}
+			mport_index_entry_free_vec(indexEntry);
+			indexEntry = NULL;
 		}
-
-		while (indexEntry != NULL && *indexEntry != NULL) {
-			fprintf(stdout, "%s\t%s\t%s\n", (*indexEntry)->pkgname,
-			    (*indexEntry)->version, (*indexEntry)->comment);
-			indexEntry++;
-		}
-
-		mport_index_entry_free_vec(indexEntry);
 		query++;
 	}
 
@@ -1130,7 +1127,7 @@ lock(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageName)
 
 	if (packs != NULL) {
 		mport_lock_lock(mport, (*packs));
-		mport_pkgmeta_free(*packs);
+		mport_pkgmeta_vec_free(packs);
 		return (MPORT_OK);
 	}
 
@@ -1144,7 +1141,7 @@ unlock(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageName
 
 	if (packs != NULL) {
 		mport_lock_unlock(mport, (*packs));
-		mport_pkgmeta_free(*packs);
+		mport_pkgmeta_vec_free(packs);
 		return (MPORT_OK);
 	}
 
@@ -1265,6 +1262,7 @@ install(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageNam
 			}
 			char *v = &d[loc + 1];
 			d[loc] = '\0'; /* hack off the version number */
+			mport_index_entry_free_vec(indexEntry); /* free the empty result from the full-name lookup */
 			indexEntry = lookupIndex(mport, d);
 			if (indexEntry == NULL || v == NULL || (*indexEntry) == NULL ||
 			    strcmp(v, (*indexEntry)->version) != 0) {
@@ -1643,6 +1641,7 @@ configGet(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *settingN
 
 	if (val != NULL) {
 		printf("Setting %s value is %s\n", settingName, val);
+		free(val);
 	} else {
 		printf("Setting %s is undefined.\n", settingName);
 	}
@@ -1891,17 +1890,18 @@ deleteAll(/*@notnull@*/ mportInstance *mport)
 
 	if ((mport->confirm_cb)("Proceed with removing all packages on the system?", "Delete",
 		"Don't delete", 0) != MPORT_OK) {
+		mport_pkgmeta_vec_free(packs);
 		return (MPORT_ERR_WARN); // User chose not to proceed
 	}
 
 	while (1) {
 		skip = 0;
-		while (*packs != NULL) {
-			if (mport_pkgmeta_get_updepends(mport, *packs, &depends) == MPORT_OK) {
+		for (mportPackageMeta **p = packs; *p != NULL; p++) {
+			if (mport_pkgmeta_get_updepends(mport, *p, &depends) == MPORT_OK) {
 				if (depends == NULL) {
-					if (delete (mport, (*packs)->name) != MPORT_OK) {
+					if (delete (mport, (*p)->name) != MPORT_OK) {
 						fprintf(
-						    stderr, "Error deleting %s\n", (*packs)->name);
+						    stderr, "Error deleting %s\n", (*p)->name);
 						errors++;
 					}
 					total++;
@@ -1910,7 +1910,6 @@ deleteAll(/*@notnull@*/ mportInstance *mport)
 					mport_pkgmeta_vec_free(depends);
 				}
 			}
-			packs++;
 		}
 		if (skip == 0)
 			break;
@@ -1971,8 +1970,8 @@ audit(/*@notnull@*/ mportInstance *mport, bool dependsOn)
 		return (1);
 	}
 
-	while (*packs != NULL) {
-		char *output = mport_audit(mport, (*packs)->name, dependsOn);
+	for (mportPackageMeta **pack = packs; *pack != NULL; pack++) {
+		char *output = mport_audit(mport, (*pack)->name, dependsOn);
 		if (output != NULL && output[0] != '\0') {
 			if (mport->verbosity == MPORT_VQUIET)
 				printf("%s", output);
@@ -1980,7 +1979,6 @@ audit(/*@notnull@*/ mportInstance *mport, bool dependsOn)
 				printf("%s\n", output);
 			free(output);
 		}
-		packs++;
 	}
 
 	mport_pkgmeta_vec_free(packs);
