@@ -156,7 +156,57 @@ Format changed files with `clang-format -i <file>`.
 
 ## Testing
 
-There is no automated test suite. CI runs via Jenkins (`Jenkinsfile`, matrix builds on amd64/i386) and GitHub Actions CodeQL (`.github/workflows/c-cpp.yml`). Testing is manual and integration-based. Correctness validation is primarily compile-time (strict warnings as errors).
+There is a small ATF/Kyua test suite in `tests/` (not yet comprehensive). It
+drives the built binaries from the build tree — no installed `mport` or
+populated registry is required for most cases. CI also runs via Jenkins
+(`Jenkinsfile`, matrix builds on amd64/i386) and GitHub Actions CodeQL
+(`.github/workflows/c-cpp.yml`). Correctness validation is still largely
+compile-time (strict warnings as errors).
+
+### Test programs (`tests/`)
+
+| File | Covers |
+|------|--------|
+| `mport_create_test` | `mport.create` — package creation, invalid `-E` date, overlong `-o` path |
+| `mport_libexec_test` | `version_cmp`, `check_fake`, frontend missing-arg rejection, `list` extra-args, `init`/`update` bad-chroot |
+| `mport_cli_test` | `mport(8)` front end — usage, invalid global flag, bad chroot; registry-gated runtime smoke test for the package-vector paths |
+
+Tests locate binaries relative to `$(atf_get_srcdir)` (e.g. `../libexec/...`,
+`../mport/mport`) and set `LD_LIBRARY_PATH` to `../libmport`, so they run
+against a freshly built tree. Cases that need a local registry call
+`atf_skip` when `/var/db/mport/master.db` is absent.
+
+### Running the tests
+
+```sh
+make                       # build the tree first
+cd tests
+kyua test                  # run the whole suite
+kyua test mport_cli_test   # run one program
+kyua report                # show results of the last run
+# or invoke a program directly without kyua:
+atf-sh ./mport_cli_test usage_without_command
+```
+
+### AddressSanitizer (leak / invalid-free lane)
+
+`libmport` and `mport` honor a `WITH_ASAN` knob (see `mk/sanitize.mk`).
+Build instrumented and run the CLI / tests under it to catch invalid or
+double frees, use-after-free, and buffer overflows — e.g. freeing an
+advanced (interior) vector pointer:
+
+```sh
+( cd libmport && make clean && make WITH_ASAN=1 )   # clean: stale .o won't reinstrument
+( cd mport && make clean && make WITH_ASAN=1 )
+ASAN_OPTIONS=detect_leaks=0 LD_LIBRARY_PATH=libmport ./mport/mport audit
+```
+
+A clean rebuild is required — `make WITH_ASAN=1` over up-to-date objects
+will not re-instrument them. The instrumented `libmport.so` can only be
+loaded by an equally instrumented `mport`; build/run the libexec tools in a
+normal tree. **LeakSanitizer (`detect_leaks=1`) is unsupported on
+MidnightBSD**, so this lane catches memory errors and bad frees, not plain
+"allocated but never freed" leaks — verify those by code tracing.
 
 ## Architecture
 
@@ -239,3 +289,5 @@ SQLite database lives at `/var/db/mport/`. Schema versioning is managed in `libm
 4. Deploys assets via `mport.install` / `install_primative.c`
 5. Runs Lua pre/post-install hooks via `libmport/lua.c`
 6. Updates master SQLite registry
+
+Load @AGENTS.md for skills

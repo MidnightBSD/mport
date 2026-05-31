@@ -4,3 +4,4 @@ test_suite("mport")
 
 atf_test_program{name="mport_create_test", }
 atf_test_program{name="mport_libexec_test", }
+atf_test_program{name="mport_cli_test", }
