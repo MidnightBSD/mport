@@ -1105,12 +1105,20 @@ search(/*@notnull@*/ mportInstance *mport, /*@null@*/ char **query)
 	}
 
 	while (query != NULL && *query != NULL) {
-		mport_index_search_term(mport, &indexEntry, *query);
-		if (indexEntry != NULL) {
+		/*
+		 * On failure mport_index_search_term() may leave a partially
+		 * built vector (a non-NULL entry with NULL fields), so only
+		 * print when it succeeds -- but still free whatever it
+		 * allocated.
+		 */
+		if (mport_index_search_term(mport, &indexEntry, *query) == MPORT_OK &&
+		    indexEntry != NULL) {
 			for (mportIndexEntry **e = indexEntry; *e != NULL; e++) {
 				fprintf(stdout, "%s\t%s\t%s\n", (*e)->pkgname,
 				    (*e)->version, (*e)->comment);
 			}
+		}
+		if (indexEntry != NULL) {
 			mport_index_entry_free_vec(indexEntry);
 			indexEntry = NULL;
 		}
