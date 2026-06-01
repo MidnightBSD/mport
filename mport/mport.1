@@ -464,6 +464,9 @@ URL of the proxy to use for FTP requests.
 If no scheme is specified,
 .Dq ftp
 is assumed.
+.It Ev MPORT_FORCE_HTTP
+If set to a non-empty value, fetch package indexes and package bundles over
+HTTP by rewriting HTTPS download URLs to HTTP.
 .It Ev HANDLE_RC_SCRIPTS
 If set to a non-empty value, start or stop rc.d scripts included with the
 package.
