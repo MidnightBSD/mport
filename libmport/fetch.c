@@ -48,6 +48,7 @@ static int fetch(mportInstance *, const char *, const char *);
 static int fetch_bundle_to_dir(mportInstance *, const char *, const char *, const char *);
 static int fetch_to_file(mportInstance *, const char *, FILE *, bool);
 static int apply_force_http_url(/*@null@*/ char **);
+static /*@only@*/ char *force_http_url(/*@null@*/ const char *);
 
 static bool is_valid_bundle_filename(const char *);
 static bool force_http_fetch_enabled(void);
@@ -79,8 +80,9 @@ mport_fetch_index(mportInstance *mport)
 	char **mirrorsPtr = NULL;
 	char *url = NULL;
 	char *hashUrl = NULL;
-	char *osrel;
+	char *osrel = NULL;
 	int mirrorCount = 0;
+	int result = MPORT_ERR_FATAL;
 
 	MPORT_CHECK_FOR_INDEX(mport, "mport_fetch_index()");
 
@@ -108,75 +110,71 @@ mport_fetch_index(mportInstance *mport)
 			MPORT_INDEX_FILE_SOURCE) == -1 ||
 		    asprintf(&hashUrl, "%s/%s/%s/%s", *mirrorsPtr, MPORT_ARCH, osrel,
 			MPORT_INDEX_FILE_SOURCE ".sha256") == -1) {
-			free(url);
-			free(hashUrl);
-			free(osrel);
-			for (int mi = 0; mi < mirrorCount; mi++)
-				free(mirrors[mi]);
-			free(mirrors);
-			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+			result = SET_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+			goto cleanup;
 		}
 		if (apply_force_http_url(&url) != MPORT_OK ||
 		    apply_force_http_url(&hashUrl) != MPORT_OK) {
-			free(url);
-			free(hashUrl);
-			free(osrel);
-			for (int mi = 0; mi < mirrorCount; mi++)
-				free(mirrors[mi]);
-			free(mirrors);
-			RETURN_CURRENT_ERROR;
+			result = mport_err_code();
+			goto cleanup;
 		}
 
 		if (fetch(mport, url, MPORT_INDEX_FILE_COMPRESSED) == MPORT_OK) {
 			if (fetch(mport, hashUrl, MPORT_INDEX_FILE_HASH) == MPORT_OK) {
 				char *hash = mport_extract_hash_from_file(MPORT_INDEX_FILE_HASH);
 				free(hashUrl);
+				hashUrl = NULL;
 
 				if (hash == NULL ||
 				    mport_verify_hash(MPORT_INDEX_FILE_COMPRESSED, hash) == 0) {
-					mport_call_msg_cb(
-					    mport, "Index hash failed verification: %s\n", hash);
+					mport_call_msg_cb(mport,
+					    "Index hash failed verification: %s\n",
+					    hash != NULL ? hash : "(null)");
 					free(hash);
 					free(url);
+					url = NULL;
 					continue;
 				} else {
 					if (mport_decompress_zstd(MPORT_INDEX_FILE_COMPRESSED,
 						mport_index_file_path()) != MPORT_OK) {
-						free(url);
 						free(hash);
-						free(osrel);
-						for (int mi = 0; mi < mirrorCount; mi++)
-							free(mirrors[mi]);
-						free(mirrors);
-						return MPORT_ERR_FATAL;
+						result = MPORT_ERR_FATAL;
+						goto cleanup;
 					}
-					free(url);
 					free(hash);
-					free(osrel);
-					for (int mi = 0; mi < mirrorCount; mi++)
-						free(mirrors[mi]);
-					free(mirrors);
-					return MPORT_OK;
+					result = MPORT_OK;
+					goto cleanup;
 				}
 			} else {
 				free(hashUrl);
+				hashUrl = NULL;
 			}
 		}
 		free(url);
+		url = NULL;
 		mirrorsPtr++;
 	}
 
 	free(osrel);
+	osrel = NULL;
 
 	/* fallback to mport bootstrap site in a pinch */
-	if (mport_fetch_bootstrap_index(mport) == MPORT_OK)
-		return MPORT_OK;
+	if (mport_fetch_bootstrap_index(mport) == MPORT_OK) {
+		result = MPORT_OK;
+		goto cleanup;
+	}
 
+	result = SET_ERRORX(MPORT_ERR_FATAL, "Unable to fetch index file: %s", mport_err_string());
+
+cleanup:
+	free(url);
+	free(hashUrl);
+	free(osrel);
 	for (int mi = 0; mi < mirrorCount; mi++)
 		free(mirrors[mi]);
 
 	free(mirrors);
-	RETURN_ERRORX(MPORT_ERR_FATAL, "Unable to fetch index file: %s", mport_err_string());
+	return result;
 }
 
 /* mport_fetch_bootstrap_index(mportInstance *mport)
@@ -247,12 +245,13 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 int
 mport_fetch_bundle(mportInstance *mport, const char *directory, const char *filename)
 {
-	char **mirrors;
-	char **mirrorsPtr;
-	char *url;
+	char **mirrors = NULL;
+	char **mirrorsPtr = NULL;
+	char *url = NULL;
 	const char *fetch_dir;
-	char *osrel;
+	char *osrel = NULL;
 	int mirrorCount = 0;
+	int result = MPORT_ERR_FATAL;
 
 	MPORT_CHECK_FOR_INDEX(mport, "mport_fetch_bundle()");
 
@@ -278,27 +277,17 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 			continue;
 		}
 		if (asprintf(&url, "%s/%s/%s/%s", *mirrorsPtr, MPORT_ARCH, osrel, filename) == -1) {
-			free(osrel);
-			for (int mi = 0; mi < mirrorCount; mi++)
-				free(mirrors[mi]);
-			free(mirrors);
-			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+			result = SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+			goto cleanup;
 		}
 		if (apply_force_http_url(&url) != MPORT_OK) {
-			free(url);
-			free(osrel);
-			for (int mi = 0; mi < mirrorCount; mi++)
-				free(mirrors[mi]);
-			free(mirrors);
-			RETURN_CURRENT_ERROR;
+			result = mport_err_code();
+			goto cleanup;
 		}
 
 		if (fetch_bundle_to_dir(mport, url, fetch_dir, filename) == MPORT_OK) {
-			free(url);
-			url = NULL;
-			for (int mi = 0; mi < mirrorCount; mi++)
-				free(mirrors[mi]);
-			return MPORT_OK;
+			result = MPORT_OK;
+			goto cleanup;
 		}
 
 		free(url);
@@ -306,11 +295,16 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 		mirrorsPtr++;
 	}
 
+	result = mport_err_code();
+
+cleanup:
+	free(url);
 	free(osrel);
 	for (int mi = 0; mi < mirrorCount; mi++)
 		free(mirrors[mi]);
 
-	RETURN_CURRENT_ERROR;
+	free(mirrors);
+	return result;
 }
 
 static bool
@@ -329,7 +323,7 @@ apply_force_http_url(/*@null@*/ char **url_p)
 	if (url_p == NULL || *url_p == NULL)
 		return MPORT_OK;
 
-	url = mport_fetch_force_http_url(*url_p);
+	url = force_http_url(*url_p);
 	if (url == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
@@ -339,8 +333,8 @@ apply_force_http_url(/*@null@*/ char **url_p)
 	return MPORT_OK;
 }
 
-char *
-mport_fetch_force_http_url(const char *url)
+static /*@only@*/ char *
+force_http_url(/*@null@*/ const char *url)
 {
 	char *rewritten;
 
