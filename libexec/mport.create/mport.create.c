@@ -91,8 +91,8 @@ main(int argc, char *argv[])
 	    -1) {
 		switch (ch) {
 		case 'o':
-			checked_strlcpy(
-			    extra->pkg_filename, optarg, sizeof(extra->pkg_filename), "package filename");
+			checked_strlcpy(extra->pkg_filename, optarg, sizeof(extra->pkg_filename),
+			    "package filename");
 			break;
 		case 'n':
 			if (optarg != NULL) {
@@ -137,7 +137,8 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 's':
-			checked_strlcpy(extra->sourcedir, optarg, sizeof(extra->sourcedir), "source dir");
+			checked_strlcpy(
+			    extra->sourcedir, optarg, sizeof(extra->sourcedir), "source dir");
 			break;
 		case 'd':
 			if (optarg != NULL) {

@@ -112,9 +112,9 @@ static int annotate_delete(/*@notnull@*/ mportInstance *mport,
 static int annotate_add(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageName,
     /*@notnull@*/ const char *tagName, /*@notnull@*/ const char *tagValue);
 
-
 static mportPackageMeta **
-sort_dependencies_topological(mportInstance *mport, mportPackageMeta **flat_packs, int package_count, bool reverse_edges)
+sort_dependencies_topological(
+    mportInstance *mport, mportPackageMeta **flat_packs, int package_count, bool reverse_edges)
 {
 	mportPackageMeta **sorted_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
 	int *in_degree = calloc((size_t)package_count, sizeof(int));
@@ -135,10 +135,11 @@ sort_dependencies_topological(mportInstance *mport, mportPackageMeta **flat_pack
 	for (int i = 0; i < package_count; i++) {
 		mportPackageMeta **downdeps = NULL;
 		if (mport_pkgmeta_get_downdepends(mport, flat_packs[i], &downdeps) != MPORT_OK) {
-			warnx("Error getting dependencies for %s: %s", flat_packs[i]->name, mport_err_string());
+			warnx("Error getting dependencies for %s: %s", flat_packs[i]->name,
+			    mport_err_string());
 			goto error;
 		}
-		
+
 		if (downdeps != NULL) {
 			for (mportPackageMeta **d = downdeps; *d != NULL; d++) {
 				for (int j = 0; j < package_count; j++) {
@@ -159,7 +160,8 @@ sort_dependencies_topological(mportInstance *mport, mportPackageMeta **flat_pack
 						}
 
 						if (!duplicate) {
-							struct edge *new_edge = malloc(sizeof(struct edge));
+							struct edge *new_edge =
+							    malloc(sizeof(struct edge));
 							if (new_edge == NULL) {
 								warnx("Out of memory");
 								mport_pkgmeta_vec_free(downdeps);
@@ -188,7 +190,8 @@ sort_dependencies_topological(mportInstance *mport, mportPackageMeta **flat_pack
 		}
 
 		if (i == package_count) {
-			warnx("Dependency cycle detected among packages. Ordering may be sub-optimal.");
+			warnx(
+			    "Dependency cycle detected among packages. Ordering may be sub-optimal.");
 			for (i = 0; i < package_count; i++) {
 				if (!queued[i])
 					break;
@@ -251,7 +254,8 @@ updateMany(mportInstance *mport, int argc, char **argv)
 
 	if (argc > 1 && strchr(argv[1], '*') != NULL) {
 		char *pkg = mport_string_replace(argv[1], "*", "%");
-		if (mport_pkgmeta_search_master(mport, &results[0], "pkg like %Q", pkg) != MPORT_OK) {
+		if (mport_pkgmeta_search_master(mport, &results[0], "pkg like %Q", pkg) !=
+		    MPORT_OK) {
 			warnx("%s", mport_err_string());
 			free(pkg);
 			free(results);
@@ -317,7 +321,8 @@ updateMany(mportInstance *mport, int argc, char **argv)
 		package_count = flat_idx;
 	}
 
-	mportPackageMeta **sorted_packs = sort_dependencies_topological(mport, flat_packs, package_count, true);
+	mportPackageMeta **sorted_packs =
+	    sort_dependencies_topological(mport, flat_packs, package_count, true);
 	if (sorted_packs == NULL) {
 		resultCode = MPORT_ERR_FATAL;
 		free(flat_packs);
@@ -328,8 +333,8 @@ updateMany(mportInstance *mport, int argc, char **argv)
 		int tempResultCode = mport_update(mport, sorted_packs[i]->name);
 		if (tempResultCode != MPORT_OK) {
 			resultCode = tempResultCode;
-			mport_call_msg_cb(mport, "Error updating package %s: %s", sorted_packs[i]->name,
-			    mport_err_string());
+			mport_call_msg_cb(mport, "Error updating package %s: %s",
+			    sorted_packs[i]->name, mport_err_string());
 		}
 	}
 
@@ -588,8 +593,8 @@ main(int argc, char *argv[])
 			resultCode = mport_download(mport, NULL, true, false, &path);
 		} else {
 			for (i = 0; i < local_argc; i++) {
-				tempResultCode = mport_download(
-				    mport, local_argv[i], false, dflag == 1, &path);
+				tempResultCode =
+				    mport_download(mport, local_argv[i], false, dflag == 1, &path);
 				if (tempResultCode != 0) {
 					resultCode = tempResultCode;
 				} else if (path != NULL) {
@@ -855,8 +860,8 @@ main(int argc, char *argv[])
 			} else if (nmissing == 0) {
 				printf("All dependencies are satisfied.\n");
 			} else {
-				printf("%d missing dependenc%s found.\n",
-				    nmissing, nmissing == 1 ? "y" : "ies");
+				printf("%d missing dependenc%s found.\n", nmissing,
+				    nmissing == 1 ? "y" : "ies");
 				resultCode = MPORT_ERR_WARN;
 			}
 		}
@@ -1112,8 +1117,8 @@ search(/*@notnull@*/ mportInstance *mport, /*@null@*/ char **query)
 		if (mport_index_search_term(mport, &indexEntry, *query) == MPORT_OK &&
 		    indexEntry != NULL) {
 			for (mportIndexEntry **e = indexEntry; *e != NULL; e++) {
-				fprintf(stdout, "%s\t%s\t%s\n", (*e)->pkgname,
-				    (*e)->version, (*e)->comment);
+				fprintf(stdout, "%s\t%s\t%s\n", (*e)->pkgname, (*e)->version,
+				    (*e)->comment);
 			}
 		}
 		if (indexEntry != NULL) {
@@ -1268,7 +1273,8 @@ install(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageNam
 			}
 			const char *v = &d[loc + 1];
 			d[loc] = '\0'; /* hack off the version number */
-			mport_index_entry_free_vec(indexEntry); /* free the empty result from the full-name lookup */
+			mport_index_entry_free_vec(
+			    indexEntry); /* free the empty result from the full-name lookup */
 			indexEntry = lookupIndex(mport, d);
 			if (indexEntry == NULL || (*indexEntry) == NULL ||
 			    strcmp(v, (*indexEntry)->version) != 0) {
@@ -1549,7 +1555,8 @@ deleteMany(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *arg
 		package_count = flat_idx;
 	}
 
-	mportPackageMeta **sorted_packs = sort_dependencies_topological(mport, flat_packs, package_count, false);
+	mportPackageMeta **sorted_packs =
+	    sort_dependencies_topological(mport, flat_packs, package_count, false);
 	if (sorted_packs == NULL) {
 		resultCode = MPORT_ERR_FATAL;
 		free(flat_packs);
@@ -1906,8 +1913,7 @@ deleteAll(/*@notnull@*/ mportInstance *mport)
 			if (mport_pkgmeta_get_updepends(mport, *p, &depends) == MPORT_OK) {
 				if (depends == NULL) {
 					if (delete (mport, (*p)->name) != MPORT_OK) {
-						fprintf(
-						    stderr, "Error deleting %s\n", (*p)->name);
+						fprintf(stderr, "Error deleting %s\n", (*p)->name);
 						errors++;
 					}
 					total++;

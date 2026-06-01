@@ -43,7 +43,8 @@
 #define CTIME_R_BUFLEN 26
 
 MPORT_PUBLIC_API char *
-mport_info(mportInstance *mport, const char *packageName) {
+mport_info(mportInstance *mport, const char *packageName)
+{
 	mportIndexEntry **indexEntries = NULL;
 	mportIndexEntry *indexEntry = NULL;
 	mportPackageMeta **packs = NULL;
@@ -72,8 +73,8 @@ mport_info(mportInstance *mport, const char *packageName) {
 		return (NULL);
 	}
 
-	if (mport_index_select_pkgname(mport, packageName, "Multiple packages match your query.", &indexEntries, &indexEntry) !=
-	    MPORT_OK) {
+	if (mport_index_select_pkgname(mport, packageName, "Multiple packages match your query.",
+		&indexEntries, &indexEntry) != MPORT_OK) {
 		return (NULL);
 	}
 
@@ -94,7 +95,8 @@ mport_info(mportInstance *mport, const char *packageName) {
 		return (NULL);
 	}
 
-	if (packs != NULL && mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK) {
+	if (packs != NULL &&
+	    mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK) {
 		SET_ERROR(MPORT_ERR_FATAL, "The moved lookup failed.");
 		return (NULL);
 	}
@@ -110,9 +112,16 @@ mport_info(mportInstance *mport, const char *packageName) {
 		options = strdup("");
 		desc = strdup("");
 
-		if (!status || !origin || !os_release || !cpe || !flavor || !deprecated || !options || !desc) {
-			free(status); free(origin); free(os_release); free(cpe);
-			free(flavor); free(deprecated); free(options); free(desc);
+		if (!status || !origin || !os_release || !cpe || !flavor || !deprecated ||
+		    !options || !desc) {
+			free(status);
+			free(origin);
+			free(os_release);
+			free(cpe);
+			free(flavor);
+			free(deprecated);
+			free(options);
+			free(desc);
 			mport_index_entry_free_vec(indexEntries);
 			free(movedEntries);
 			SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
@@ -141,7 +150,8 @@ mport_info(mportInstance *mport, const char *packageName) {
 		}
 		deprecated = (*packs)->deprecated;
 		if (deprecated == NULL || deprecated[0] == '\0') {
-			if (movedEntries != NULL && *movedEntries!= NULL && (*movedEntries)->date[0] != '\0') {
+			if (movedEntries != NULL && *movedEntries != NULL &&
+			    (*movedEntries)->date[0] != '\0') {
 				deprecated = strdup("yes");
 			} else {
 				deprecated = strdup("no");
@@ -153,7 +163,8 @@ mport_info(mportInstance *mport, const char *packageName) {
 		}
 
 		expirationDate = (*packs)->expiration_date;
-		if (expirationDate == 0 && movedEntries != NULL && *movedEntries!= NULL && (*movedEntries)->date[0] != '\0') {
+		if (expirationDate == 0 && movedEntries != NULL && *movedEntries != NULL &&
+		    (*movedEntries)->date[0] != '\0') {
 			struct tm expDate;
 			strptime((*movedEntries)->date, "%Y-%m-%d", &expDate);
 			expirationDate = mktime(&expDate);
@@ -184,7 +195,8 @@ mport_info(mportInstance *mport, const char *packageName) {
 
 		if (indexEntry == NULL)
 			purl[0] = '\0';
-		else if (packs != NULL && indexEntry->pkgname != NULL && (*packs)->version != NULL) {
+		else if (packs != NULL && indexEntry->pkgname != NULL &&
+		    (*packs)->version != NULL) {
 			char *tmppurl = mport_purl_uri(*packs);
 			if (tmppurl != NULL) {
 				snprintf(purl, sizeof(purl), "%s", tmppurl);
@@ -193,27 +205,35 @@ mport_info(mportInstance *mport, const char *packageName) {
 				purl[0] = '\0';
 			}
 		} else
-			purl[0] = '\0';	
+			purl[0] = '\0';
 	}
 
 	char flatsize_str[8];
-	humanize_number(flatsize_str, sizeof(flatsize_str), flatsize, "B", HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
+	humanize_number(flatsize_str, sizeof(flatsize_str), flatsize, "B", HN_AUTOSCALE,
+	    HN_DECIMAL | HN_IEC_PREFIXES);
 
 	char *annotations_str = NULL;
 	if (packs != NULL) {
 		char **tags = NULL;
 		int tag_count = 0;
-		if (mport_annotation_list(mport, (*packs)->name, &tags, &tag_count) == MPORT_OK && tag_count > 0) {
+		if (mport_annotation_list(mport, (*packs)->name, &tags, &tag_count) == MPORT_OK &&
+		    tag_count > 0) {
 			size_t len = 0;
 			FILE *fp = open_memstream(&annotations_str, &len);
 			if (fp != NULL) {
 				for (int i = 0; i < tag_count; i++) {
 					char *val = NULL;
-					if (mport_annotation_get(mport, (*packs)->name, tags[i], &val) == MPORT_OK && val != NULL) {
+					if (mport_annotation_get(
+						mport, (*packs)->name, tags[i], &val) == MPORT_OK &&
+					    val != NULL) {
 						if (i == 0)
-							fprintf(fp, "Annotations     :\n                       %s:        %s\n", tags[i], val);
+							fprintf(fp,
+							    "Annotations     :\n                       %s:        %s\n",
+							    tags[i], val);
 						else
-							fprintf(fp, "                       %s:        %s\n", tags[i], val);
+							fprintf(fp,
+							    "                       %s:        %s\n",
+							    tags[i], val);
 						free(val);
 					}
 					free(tags[i]);
@@ -241,64 +261,48 @@ mport_info(mportInstance *mport, const char *packageName) {
 	if (insdate_str == NULL)
 		insdate_str = "\n";
 
-	if (packs !=NULL && indexEntry == NULL) {
+	if (packs != NULL && indexEntry == NULL) {
 		asprintf(&info_text,
-	         "%s-%s\n"
-	         "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
-	         "Flavor          : %s\nOS              : %s\n"
-	         "CPE             : %s\nPURL            : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date    : %s"
-	         "Comment         : %s\n%sOptions         : %s\nType            : %s\nFlat Size       : %s\nDescription     :\n%s\n",
-	         (*packs)->name, (*packs)->version,
-	         (*packs)->name, status, "", "", origin,
-	         flavor, os_release,
-		 cpe, purl, locked ? "yes" : "no", automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no", deprecated,
-	         expdate_str,
-	         insdate_str,
-	         "",
-	         annotations_str,
-	         options,
-		 type == MPORT_TYPE_APP ? "Application" : "System", 
-		 flatsize_str,
-		 desc);
+		    "%s-%s\n"
+		    "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
+		    "Flavor          : %s\nOS              : %s\n"
+		    "CPE             : %s\nPURL            : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date    : %s"
+		    "Comment         : %s\n%sOptions         : %s\nType            : %s\nFlat Size       : %s\nDescription     :\n%s\n",
+		    (*packs)->name, (*packs)->version, (*packs)->name, status, "", "", origin,
+		    flavor, os_release, cpe, purl, locked ? "yes" : "no",
+		    automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no",
+		    deprecated, expdate_str, insdate_str, "", annotations_str, options,
+		    type == MPORT_TYPE_APP ? "Application" : "System", flatsize_str, desc);
 	} else if (packs != NULL) {
 		asprintf(&info_text,
-	         "%s-%s\n"
-	         "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
-	         "Flavor          : %s\nOS              : %s\n"
-	         "CPE             : %s\nPURL            : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date    : %s"
-	         "Comment         : %s\n%sOptions         : %s\nType            : %s\nFlat Size       : %s\nDescription     :\n%s\n",
-	         (*packs)->name, (*packs)->version,
-	         (*packs)->name, status, indexEntry == NULL ? "" : indexEntry->version, indexEntry == NULL ? "" : indexEntry->license, origin,
-	         flavor, os_release,
-		 cpe, purl, locked ? "yes" : "no", automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no", deprecated,
-	         expdate_str,
-	         insdate_str,
-	         indexEntry == NULL ? "" : indexEntry->comment,
-	         annotations_str,
-	         options,
-		 type == MPORT_TYPE_APP ? "Application" : "System",
-		 flatsize_str,
-		 desc);
+		    "%s-%s\n"
+		    "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
+		    "Flavor          : %s\nOS              : %s\n"
+		    "CPE             : %s\nPURL            : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date    : %s"
+		    "Comment         : %s\n%sOptions         : %s\nType            : %s\nFlat Size       : %s\nDescription     :\n%s\n",
+		    (*packs)->name, (*packs)->version, (*packs)->name, status,
+		    indexEntry == NULL ? "" : indexEntry->version,
+		    indexEntry == NULL ? "" : indexEntry->license, origin, flavor, os_release, cpe,
+		    purl, locked ? "yes" : "no", automatic == MPORT_EXPLICIT ? "yes" : "no",
+		    no_shlib_provided ? "yes" : "no", deprecated, expdate_str, insdate_str,
+		    indexEntry == NULL ? "" : indexEntry->comment, annotations_str, options,
+		    type == MPORT_TYPE_APP ? "Application" : "System", flatsize_str, desc);
 	} else {
 		/* Not installed locally; report index information only. */
 		asprintf(&info_text,
-	         "%s-%s\n"
-	         "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
-	         "Flavor          : %s\nOS              : %s\n"
-	         "CPE             : %s\nPURL            : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date    : %s"
-	         "Comment         : %s\n%sOptions         : %s\nType            : %s\nFlat Size       : %s\nDescription     :\n%s\n",
-	         indexEntry->pkgname, indexEntry->version,
-	         indexEntry->pkgname, status, indexEntry->version, indexEntry->license == NULL ? "" : indexEntry->license, origin,
-	         flavor, os_release,
-		 cpe, purl, locked ? "yes" : "no", automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no", deprecated,
-	         "",  /* expiration date: not installed, always empty */
-	         "\n", /* install date: not installed, always empty */
-	         indexEntry->comment == NULL ? "" : indexEntry->comment,
-	         annotations_str,
-	         options,
-		 type == MPORT_TYPE_APP ? "Application" : "System",
-		 flatsize_str,
-		 desc);
+		    "%s-%s\n"
+		    "Name            : %s\nVersion         : %s\nLatest          : %s\nLicenses        : %s\nOrigin          : %s\n"
+		    "Flavor          : %s\nOS              : %s\n"
+		    "CPE             : %s\nPURL            : %s\nLocked          : %s\nPrime           : %s\nShared library  : %s\nDeprecated      : %s\nExpiration Date : %s\nInstall Date    : %s"
+		    "Comment         : %s\n%sOptions         : %s\nType            : %s\nFlat Size       : %s\nDescription     :\n%s\n",
+		    indexEntry->pkgname, indexEntry->version, indexEntry->pkgname, status,
+		    indexEntry->version, indexEntry->license == NULL ? "" : indexEntry->license,
+		    origin, flavor, os_release, cpe, purl, locked ? "yes" : "no",
+		    automatic == MPORT_EXPLICIT ? "yes" : "no", no_shlib_provided ? "yes" : "no",
+		    deprecated, "", /* expiration date: not installed, always empty */
+		    "\n", /* install date: not installed, always empty */
+		    indexEntry->comment == NULL ? "" : indexEntry->comment, annotations_str,
+		    options, type == MPORT_TYPE_APP ? "Application" : "System", flatsize_str, desc);
 	}
 
 	if (info_text == NULL) {

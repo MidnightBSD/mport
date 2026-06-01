@@ -44,9 +44,9 @@ main(int argc, char *argv[])
 
 	while ((ch = getopt(argc, argv, "c:")) != -1) {
 		switch (ch) {
-			case 'c':
-				chroot_path = optarg;
-				break;
+		case 'c':
+			chroot_path = optarg;
+			break;
 		}
 	}
 
@@ -63,14 +63,14 @@ main(int argc, char *argv[])
 	}
 
 	mport = mport_instance_new();
-  
+
 	if (mport_instance_init(mport, NULL, NULL, false, false) != MPORT_OK) {
 		warnx("%s", mport_err_string());
 		mport_instance_free(mport);
 		exit(EXIT_FAILURE);
 	}
-  
-	mport_instance_free(mport); 
-  
+
+	mport_instance_free(mport);
+
 	return 0;
 }
