@@ -47,7 +47,7 @@
 static int fetch(mportInstance *, const char *, const char *);
 static int fetch_bundle_to_dir(mportInstance *, const char *, const char *, const char *);
 static int fetch_to_file(mportInstance *, const char *, FILE *, bool);
-static int force_http_url(/*@null@*/ char **);
+static int apply_force_http_url(/*@null@*/ char **);
 
 static bool is_valid_bundle_filename(const char *);
 static bool force_http_fetch_enabled(void);
@@ -114,7 +114,8 @@ mport_fetch_index(mportInstance *mport)
 				free(mirrors[mi]);
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 		}
-		if (force_http_url(&url) != MPORT_OK || force_http_url(&hashUrl) != MPORT_OK) {
+		if (apply_force_http_url(&url) != MPORT_OK ||
+		    apply_force_http_url(&hashUrl) != MPORT_OK) {
 			free(url);
 			free(hashUrl);
 			free(osrel);
@@ -204,7 +205,7 @@ mport_fetch_bootstrap_index(mportInstance *mport)
 		free(osrel);
 		return MPORT_ERR_FATAL;
 	}
-	if (force_http_url(&url) != MPORT_OK || force_http_url(&hashUrl) != MPORT_OK) {
+	if (apply_force_http_url(&url) != MPORT_OK || apply_force_http_url(&hashUrl) != MPORT_OK) {
 		free(url);
 		free(hashUrl);
 		free(osrel);
@@ -278,7 +279,7 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 			free(osrel);
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
 		}
-		if (force_http_url(&url) != MPORT_OK) {
+		if (apply_force_http_url(&url) != MPORT_OK) {
 			free(url);
 			free(osrel);
 			for (int mi = 0; mi < mirrorCount; mi++)
@@ -316,22 +317,37 @@ force_http_fetch_enabled(void)
 }
 
 static int
-force_http_url(/*@null@*/ char **url_p)
+apply_force_http_url(/*@null@*/ char **url_p)
 {
 	char *url;
 
-	if (!force_http_fetch_enabled())
-		return MPORT_OK;
-	if (url_p == NULL || *url_p == NULL || !url_is_https(*url_p))
+	if (url_p == NULL || *url_p == NULL)
 		return MPORT_OK;
 
-	if (asprintf(&url, "http://%s", *url_p + 8) == -1)
+	url = mport_fetch_force_http_url(*url_p);
+	if (url == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
 	free(*url_p);
 	*url_p = url;
 
 	return MPORT_OK;
+}
+
+char *
+mport_fetch_force_http_url(const char *url)
+{
+	char *rewritten;
+
+	if (url == NULL)
+		return NULL;
+	if (!force_http_fetch_enabled() || !url_is_https(url))
+		return strdup(url);
+
+	if (asprintf(&rewritten, "http://%s", url + 8) == -1)
+		return NULL;
+
+	return rewritten;
 }
 
 static bool

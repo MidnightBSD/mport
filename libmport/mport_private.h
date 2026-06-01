@@ -265,6 +265,7 @@ int mport_set_errx(int , const char *, ...);
 
 int mport_fetch_index(mportInstance *);
 int mport_fetch_bootstrap_index(mportInstance *);
+char * mport_fetch_force_http_url(const char *);
 char * mport_fetch_cves(mportInstance *mport, char *cpe);
 
 /* a few index things */
