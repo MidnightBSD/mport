@@ -49,11 +49,10 @@ mport_setting_get(mportInstance *mport, const char *name)
 	}
 
 	switch (sqlite3_step(stmt)) {
-	case SQLITE_ROW:
-		{
-			const unsigned char *row_val = sqlite3_column_text(stmt, 0);
-			val = (row_val == NULL) ? NULL : strdup((const char *)row_val);
-		}
+	case SQLITE_ROW: {
+		const unsigned char *row_val = sqlite3_column_text(stmt, 0);
+		val = (row_val == NULL) ? NULL : strdup((const char *)row_val);
+	}
 		sqlite3_finalize(stmt);
 		if (val == NULL) {
 			SET_ERROR(MPORT_ERR_FATAL, "Malformed setting row.");
@@ -101,7 +100,7 @@ mport_setting_list(mportInstance *mport)
 
 	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM settings") != MPORT_OK) {
 		return NULL;
-	}	
+	}
 
 	list = calloc(count + 1, sizeof(char *));
 	if (list == NULL)

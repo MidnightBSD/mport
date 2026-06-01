@@ -51,13 +51,14 @@ static int attach_index_db(sqlite3 *db);
 
 static void populate_row(sqlite3_stmt *stmt, mportIndexEntry *e);
 
-
 char *
-mport_index_file_path(void) {
+mport_index_file_path(void)
+{
 	char *envIndexFile = getenv("PKG_DB");
 
 	if (envIndexFile == NULL || strlen(envIndexFile) == 0) {
-		if (!mport_file_exists(MPORT_INDEX_FILE) && mport_file_exists(MPORT_INSTALL_MEDIA_INDEX_FILE)) {
+		if (!mport_file_exists(MPORT_INDEX_FILE) &&
+		    mport_file_exists(MPORT_INSTALL_MEDIA_INDEX_FILE)) {
 			/* copy install media index to local as a starting point. */
 			mport_copy_file(MPORT_INSTALL_MEDIA_INDEX_FILE, MPORT_INDEX_FILE);
 		}
@@ -71,7 +72,8 @@ mport_index_file_path(void) {
 	 */
 	char *dotDot = strstr(envIndexFile, "..");
 	if (dotDot != NULL) {
-		SET_ERROR(MPORT_ERR_WARN, "Relative path is not allowed in PKG_DB environment variable");
+		SET_ERROR(
+		    MPORT_ERR_WARN, "Relative path is not allowed in PKG_DB environment variable");
 		return MPORT_INDEX_FILE;
 	}
 
@@ -80,11 +82,11 @@ mport_index_file_path(void) {
 
 /*
  * Loads the index database.  The index contains a list of bundles that are
- * available for download, a list of aliases (apache is aliased to apache22 for 
+ * available for download, a list of aliases (apache is aliased to apache22 for
  * example), and a list of mirrors.
  *
  * This function will use the current local index if it is present and younger
- * than the max index age.  Otherwise, it will download the index.  If any 
+ * than the max index age.  Otherwise, it will download the index.  If any
  * index is present, the mirror list will be used; otherwise the bootstrap
  * url will be used.
  */
@@ -98,13 +100,14 @@ mport_index_load(mportInstance *mport)
 	if (autoupdate == NULL) {
 		autoupdate = mport_setting_get(mport, MPORT_SETTING_REPO_AUTOUPDATE_LEGACY);
 	}
-	if (autoupdate != NULL && (strcmp("FALSE", autoupdate) == 0 || strcmp("false", autoupdate) == 0 ||
-			strcmp("NO", autoupdate) == 0 || strcmp("no", autoupdate) == 0)) {
+	if (autoupdate != NULL &&
+	    (strcmp("FALSE", autoupdate) == 0 || strcmp("false", autoupdate) == 0 ||
+		strcmp("NO", autoupdate) == 0 || strcmp("no", autoupdate) == 0)) {
 		noIndex = true;
 	}
 	if (autoupdate != NULL)
 		free(autoupdate);
-	
+
 	if (mport_file_exists(indexFile)) {
 		if (attach_index_db(mport->db) != MPORT_OK) {
 			RETURN_CURRENT_ERROR;
@@ -152,7 +155,6 @@ attach_index_db(sqlite3 *db)
 	return (MPORT_OK);
 }
 
-
 /**
  * mport_index_load is typically preferred.  This function is only used to force
  * a download of the index manually by the user.
@@ -171,7 +173,8 @@ mport_index_get(mportInstance *mport)
 		}
 	} else {
 		if (mport_fetch_index(mport) != MPORT_OK) {
-			SET_ERROR(MPORT_ERR_WARN, "Could not fetch updated index; previous index used.");
+			SET_ERROR(
+			    MPORT_ERR_WARN, "Could not fetch updated index; previous index used.");
 			RETURN_CURRENT_ERROR;
 		}
 	}
@@ -210,21 +213,22 @@ mport_index_get(mportInstance *mport)
  *             with the system, 2 if matched on origin, 0 otherwise.
  */
 MPORT_PUBLIC_API int
-mport_index_check(mportInstance *mport, mportPackageMeta *pack) {
+mport_index_check(mportInstance *mport, mportPackageMeta *pack)
+{
 	mportIndexEntry **indexEntries = NULL, **indexEntries_orig = NULL;
 	int ret = 0;
 	bool used_origin = false;
 
-    if (mport == NULL) {
-        RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
-    }
+	if (mport == NULL) {
+		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
+	}
 
-    if (pack == NULL)
-        RETURN_ERROR(MPORT_ERR_FATAL, "pack not defined");
+	if (pack == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "pack not defined");
 
-    if (mport_index_lookup_pkgname(mport, pack->name, &indexEntries_orig) != MPORT_OK) {
-        SET_ERRORX(MPORT_ERR_WARN, "Error Looking up package name %s", pack->name);
-    }
+	if (mport_index_lookup_pkgname(mport, pack->name, &indexEntries_orig) != MPORT_OK) {
+		SET_ERRORX(MPORT_ERR_WARN, "Error Looking up package name %s", pack->name);
+	}
 
 	if (indexEntries_orig == NULL || *indexEntries_orig == NULL) {
 		// not found in the index.  Could be a version upgrade like py38->py39
@@ -232,34 +236,40 @@ mport_index_check(mportInstance *mport, mportPackageMeta *pack) {
 			mport_index_entry_free_vec(indexEntries_orig);
 			indexEntries_orig = NULL;
 		}
-		if (mport_index_lookup_pkgname(mport, pack->origin, &indexEntries_orig) != MPORT_OK) {
-			SET_ERRORX(MPORT_ERR_WARN, "Error Looking up package origin %s", pack->origin);
+		if (mport_index_lookup_pkgname(mport, pack->origin, &indexEntries_orig) !=
+		    MPORT_OK) {
+			SET_ERRORX(
+			    MPORT_ERR_WARN, "Error Looking up package origin %s", pack->origin);
 			return (0);
 		}
 		used_origin = true;
 	}
 
-    if (indexEntries_orig != NULL) {
-        indexEntries = indexEntries_orig;
-        while (*indexEntries != NULL) {
-            int osflag = mport_check_preconditions(mport, pack, MPORT_PRECHECK_OS);
-			// if the package was built for an older os, update it.  if the package version is less than the index version, update it.
-			// if the origin had to be matched, and the package name does not match the index, update it. (py38->py39)
-            if ((*indexEntries)->version != NULL && pack->version != NULL && (mport_version_cmp(pack->version, (*indexEntries)->version) < 0 ||
-                                                     (mport_version_cmp(pack->version, (*indexEntries)->version) == 0 && osflag == MPORT_OK) ||
-													 (used_origin && strcmp(pack->name, (*indexEntries)->pkgname) != 0))) {
-                ret = used_origin ? 2 : 1;
-                break;
-            }
-            indexEntries++;
-        }
-        mport_index_entry_free_vec(indexEntries_orig);
-        indexEntries_orig = NULL;
-    }
+	if (indexEntries_orig != NULL) {
+		indexEntries = indexEntries_orig;
+		while (*indexEntries != NULL) {
+			int osflag = mport_check_preconditions(mport, pack, MPORT_PRECHECK_OS);
+			// if the package was built for an older os, update it.  if the package
+			// version is less than the index version, update it. if the origin had to
+			// be matched, and the package name does not match the index, update it.
+			// (py38->py39)
+			if ((*indexEntries)->version != NULL && pack->version != NULL &&
+			    (mport_version_cmp(pack->version, (*indexEntries)->version) < 0 ||
+				(mport_version_cmp(pack->version, (*indexEntries)->version) == 0 &&
+				    osflag == MPORT_OK) ||
+				(used_origin &&
+				    strcmp(pack->name, (*indexEntries)->pkgname) != 0))) {
+				ret = used_origin ? 2 : 1;
+				break;
+			}
+			indexEntries++;
+		}
+		mport_index_entry_free_vec(indexEntries_orig);
+		indexEntries_orig = NULL;
+	}
 
-    return (ret);
+	return (ret);
 }
-
 
 /* return 1 if the index is younger than the max age, 0 otherwise */
 static int
@@ -302,7 +312,7 @@ index_update_last_checked(mportInstance *mport)
 	char *utime;
 	int ret;
 
-	if (asprintf(&utime, "%jd", (intmax_t) mport_get_time()) == -1)
+	if (asprintf(&utime, "%jd", (intmax_t)mport_get_time()) == -1)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
 	ret = mport_setting_set(mport, MPORT_SETTING_INDEX_LAST_CHECKED, utime);
 	free(utime);
@@ -312,7 +322,7 @@ index_update_last_checked(mportInstance *mport)
 
 /*
  * Fills the string vector with the list of the mirrors for the current
- * country.  
+ * country.
  */
 int
 mport_index_get_mirror_list(mportInstance *mport, char ***list_p, int *list_size)
@@ -329,17 +339,18 @@ mport_index_get_mirror_list(mportInstance *mport, char ***list_p, int *list_size
 	}
 
 	/* XXX the country is hard coded until a configuration system is created */
-	if (mport_db_count(mport->db, &len, "SELECT COUNT(*) FROM idx.mirrors WHERE country=%Q", mirror_region) != MPORT_OK) {
+	if (mport_db_count(mport->db, &len, "SELECT COUNT(*) FROM idx.mirrors WHERE country=%Q",
+		mirror_region) != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
 
 	*list_size = len;
-	list = calloc((size_t) len + 1, sizeof(char *));
+	list = calloc((size_t)len + 1, sizeof(char *));
 	*list_p = list;
 	i = 0;
 
-	if (mport_db_prepare(mport->db, &stmt, "SELECT mirror FROM idx.mirrors WHERE country=%Q", mirror_region) !=
-	    MPORT_OK) {
+	if (mport_db_prepare(mport->db, &stmt, "SELECT mirror FROM idx.mirrors WHERE country=%Q",
+		mirror_region) != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
 	}
@@ -348,7 +359,7 @@ mport_index_get_mirror_list(mportInstance *mport, char ***list_p, int *list_size
 		ret = sqlite3_step(stmt);
 
 		if (ret == SQLITE_ROW) {
-			list[i] = strdup((const char *) sqlite3_column_text(stmt, 0));
+			list[i] = strdup((const char *)sqlite3_column_text(stmt, 0));
 
 			if (list[i] == NULL) {
 				sqlite3_finalize(stmt);
@@ -373,11 +384,12 @@ mport_index_get_mirror_list(mportInstance *mport, char ***list_p, int *list_size
 MPORT_PUBLIC_API int
 mport_index_print_mirror_list(mportInstance *mport)
 {
-	
+
 	int ret;
 	sqlite3_stmt *stmt;
 
-	if (mport_db_prepare(mport->db, &stmt, "SELECT country, mirror FROM idx.mirrors ORDER BY country") != MPORT_OK) {
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT country, mirror FROM idx.mirrors ORDER BY country") != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
 	}
@@ -387,7 +399,8 @@ mport_index_print_mirror_list(mportInstance *mport)
 		ret = sqlite3_step(stmt);
 
 		if (ret == SQLITE_ROW) {
-			mport_call_msg_cb(mport, "%s\t%s\n", sqlite3_column_text(stmt, 0), sqlite3_column_text(stmt, 1));
+			mport_call_msg_cb(mport, "%s\t%s\n", sqlite3_column_text(stmt, 0),
+			    sqlite3_column_text(stmt, 1));
 		} else if (ret == SQLITE_DONE) {
 			break;
 		} else {
@@ -403,7 +416,7 @@ mport_index_print_mirror_list(mportInstance *mport)
 MPORT_PUBLIC_API int
 mport_index_mirror_list(mportInstance *mport, mportMirrorEntry ***entry_vec)
 {
-	
+
 	sqlite3_stmt *stmt;
 	int count;
 	mportMirrorEntry **e = NULL;
@@ -416,22 +429,22 @@ mport_index_mirror_list(mportInstance *mport, mportMirrorEntry ***entry_vec)
 
 	MPORT_CHECK_FOR_INDEX(mport, "mport_index_mirror_list()")
 
-
 	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM idx.mirrors") != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
 
-	e = (mportMirrorEntry **) calloc((size_t) count + 1, sizeof(mportMirrorEntry *));
+	e = (mportMirrorEntry **)calloc((size_t)count + 1, sizeof(mportMirrorEntry *));
 	if (e == NULL) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "Could not allocate memory for mirror entries");
 	}
 	*entry_vec = e;
 
-	if (count == 0) {	
+	if (count == 0) {
 		return ret;
 	}
 
-	if (mport_db_prepare(mport->db, &stmt, "SELECT country, mirror FROM idx.mirrors ORDER BY country") != MPORT_OK) {
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT country, mirror FROM idx.mirrors ORDER BY country") != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
 	}
@@ -440,13 +453,14 @@ mport_index_mirror_list(mportInstance *mport, mportMirrorEntry ***entry_vec)
 		ret = sqlite3_step(stmt);
 
 		if (ret == SQLITE_ROW) {
-			if ((e[i] = (mportMirrorEntry *) calloc(1, sizeof(mportMirrorEntry))) == NULL) {
+			if ((e[i] = (mportMirrorEntry *)calloc(1, sizeof(mportMirrorEntry))) ==
+			    NULL) {
 				ret = MPORT_ERR_FATAL;
 				goto DONE;
 			}
 
-			strlcpy(e[i]->country, (const char *) sqlite3_column_text(stmt, 0), 5);
-			strlcpy(e[i]->url, (const char *) sqlite3_column_text(stmt, 1), 256);
+			strlcpy(e[i]->country, (const char *)sqlite3_column_text(stmt, 0), 5);
+			strlcpy(e[i]->url, (const char *)sqlite3_column_text(stmt, 1), 256);
 			i++;
 		} else if (ret == SQLITE_DONE) {
 			break;
@@ -460,7 +474,6 @@ DONE:
 	sqlite3_finalize(stmt);
 	return ret;
 }
-
 
 /*
  * Looks up a pkgname from the index and fills a vector of index entries
@@ -490,13 +503,14 @@ mport_index_lookup_pkgname(mportInstance *mport, const char *pkgname, mportIndex
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM idx.packages  WHERE pkg GLOB %Q", lookup) != MPORT_OK) {
+	if (mport_db_count(mport->db, &count,
+		"SELECT count(*) FROM idx.packages  WHERE pkg GLOB %Q", lookup) != MPORT_OK) {
 		free(lookup);
 		lookup = NULL;
 		RETURN_CURRENT_ERROR;
 	}
 
-	e = (mportIndexEntry **) calloc((size_t) count + 1, sizeof(mportIndexEntry *));
+	e = (mportIndexEntry **)calloc((size_t)count + 1, sizeof(mportIndexEntry *));
 	if (e == NULL) {
 		free(lookup);
 		lookup = NULL;
@@ -511,8 +525,8 @@ mport_index_lookup_pkgname(mportInstance *mport, const char *pkgname, mportIndex
 	}
 
 	if (mport_db_prepare(mport->db, &stmt,
-	                     "SELECT pkg, version, comment, bundlefile, license, hash FROM idx.packages WHERE pkg GLOB %Q",
-	                     lookup) != MPORT_OK) {
+		"SELECT pkg, version, comment, bundlefile, license, hash FROM idx.packages WHERE pkg GLOB %Q",
+		lookup) != MPORT_OK) {
 		ret = mport_err_code();
 		goto DONE;
 	}
@@ -521,14 +535,16 @@ mport_index_lookup_pkgname(mportInstance *mport, const char *pkgname, mportIndex
 		step = sqlite3_step(stmt);
 
 		if (step == SQLITE_ROW) {
-			if ((e[i] = (mportIndexEntry *) calloc(1, sizeof(mportIndexEntry))) == NULL) {
+			if ((e[i] = (mportIndexEntry *)calloc(1, sizeof(mportIndexEntry))) ==
+			    NULL) {
 				ret = MPORT_ERR_FATAL;
 				goto DONE;
 			}
 
 			populate_row(stmt, e[i]);
 
-			if (e[i]->pkgname == NULL || e[i]->version == NULL || e[i]->comment == NULL || e[i]->license == NULL ||
+			if (e[i]->pkgname == NULL || e[i]->version == NULL ||
+			    e[i]->comment == NULL || e[i]->license == NULL ||
 			    e[i]->bundlefile == NULL) {
 				ret = MPORT_ERR_FATAL;
 				goto DONE;
@@ -553,8 +569,8 @@ DONE:
 }
 
 int
-mport_index_select_pkgname(mportInstance *mport, const char *pkgname, const char *msg, mportIndexEntry ***entry_vec,
-    mportIndexEntry **selected)
+mport_index_select_pkgname(mportInstance *mport, const char *pkgname, const char *msg,
+    mportIndexEntry ***entry_vec, mportIndexEntry **selected)
 {
 	mportIndexEntry **entries = NULL;
 	int choice = 0;
@@ -578,7 +594,8 @@ mport_index_select_pkgname(mportInstance *mport, const char *pkgname, const char
 		count++;
 
 	if (count > 1) {
-		choice = mport_call_select_cb(mport, msg == NULL ? "Multiple packages match your query." : msg, entries, 0);
+		choice = mport_call_select_cb(
+		    mport, msg == NULL ? "Multiple packages match your query." : msg, entries, 0);
 		if (choice < 0) {
 			mport_index_entry_free_vec(entries);
 			*entry_vec = NULL;
@@ -588,7 +605,8 @@ mport_index_select_pkgname(mportInstance *mport, const char *pkgname, const char
 		if (choice >= count) {
 			mport_index_entry_free_vec(entries);
 			*entry_vec = NULL;
-			SET_ERROR(MPORT_ERR_FATAL, "Package selection callback returned an invalid choice");
+			SET_ERROR(MPORT_ERR_FATAL,
+			    "Package selection callback returned an invalid choice");
 			RETURN_CURRENT_ERROR;
 		}
 	}
@@ -598,15 +616,15 @@ mport_index_select_pkgname(mportInstance *mport, const char *pkgname, const char
 	return MPORT_OK;
 }
 
-
 /*
  * Look up index entries containing the term. Supports unix style globs.
  * e.g. mport_index_search_term(mport, &indexEntry, 'gmake');
- * 
+ *
  * Simplified version of mport_index_search();
  */
 MPORT_PUBLIC_API int
-mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char *search_term) {
+mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char *search_term)
+{
 
 	sqlite3_stmt *stmt = NULL;
 	int ret = MPORT_OK;
@@ -614,7 +632,6 @@ mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char
 	int i = 0, step;
 	mportIndexEntry **e = NULL;
 	char *term = NULL;
-
 
 	if (mport == NULL) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
@@ -625,16 +642,17 @@ mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char
 
 	if (strstr(search_term, "*") != NULL)
 		term = strdup(search_term);
-	else 
-		if (asprintf(&term, "*%s*", search_term) == -1)
+	else if (asprintf(&term, "*%s*", search_term) == -1)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Could not allocate memory");
 
-	if (mport_db_count(mport->db, &len, "SELECT count(*) FROM idx.packages WHERE pkg glob %Q or comment glob %Q", term, term) != MPORT_OK) {
+	if (mport_db_count(mport->db, &len,
+		"SELECT count(*) FROM idx.packages WHERE pkg glob %Q or comment glob %Q", term,
+		term) != MPORT_OK) {
 		free(term);
 		RETURN_CURRENT_ERROR;
 	}
 
-	e = (mportIndexEntry **) calloc((size_t) len + 1, sizeof(mportIndexEntry *));
+	e = (mportIndexEntry **)calloc((size_t)len + 1, sizeof(mportIndexEntry *));
 	if (e == NULL) {
 		free(term);
 		RETURN_ERROR(MPORT_ERR_FATAL, "Could not allocate memory");
@@ -648,8 +666,8 @@ mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char
 	}
 
 	if (mport_db_prepare(mport->db, &stmt,
-	                     "SELECT pkg, version, comment, bundlefile, license, hash, type FROM idx.packages WHERE pkg glob %Q or comment glob %Q", term, term) !=
-	    MPORT_OK) {
+		"SELECT pkg, version, comment, bundlefile, license, hash, type FROM idx.packages WHERE pkg glob %Q or comment glob %Q",
+		term, term) != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		free(term);
 		term = NULL;
@@ -660,14 +678,16 @@ mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char
 		step = sqlite3_step(stmt);
 
 		if (step == SQLITE_ROW) {
-			if ((e[i] = (mportIndexEntry *) calloc(1, sizeof(mportIndexEntry))) == NULL) {
+			if ((e[i] = (mportIndexEntry *)calloc(1, sizeof(mportIndexEntry))) ==
+			    NULL) {
 				ret = MPORT_ERR_FATAL;
 				break;
 			}
 
 			populate_row(stmt, e[i]);
 
-			if (e[i]->pkgname == NULL || e[i]->version == NULL || e[i]->comment == NULL || e[i]->license == NULL ||
+			if (e[i]->pkgname == NULL || e[i]->version == NULL ||
+			    e[i]->comment == NULL || e[i]->license == NULL ||
 			    e[i]->bundlefile == NULL) {
 				ret = MPORT_ERR_FATAL;
 				break;
@@ -699,7 +719,8 @@ mport_index_search_term(mportInstance *mport, mportIndexEntry ***entry_vec, char
  *
  * mport_index_search(mport, &indexEntries, "pkg=%Q", name);
  *
- * indexEntries is set to an empty allocated list and MPORT_OK is returned if no packages where found.
+ * indexEntries is set to an empty allocated list and MPORT_OK is returned if no packages where
+ * found.
  */
 MPORT_PUBLIC_API int
 mport_index_search(mportInstance *mport, mportIndexEntry ***entry_vec, const char *fmt, ...)
@@ -726,11 +747,12 @@ mport_index_search(mportInstance *mport, mportIndexEntry ***entry_vec, const cha
 		RETURN_ERROR(MPORT_ERR_FATAL, "Could not build where clause");
 	}
 
-	if (mport_db_count(mport->db, &len, "SELECT count(*) FROM idx.packages  WHERE %s", where) != MPORT_OK) {
+	if (mport_db_count(mport->db, &len, "SELECT count(*) FROM idx.packages  WHERE %s", where) !=
+	    MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
 
-	e = (mportIndexEntry **) calloc((size_t) len + 1, sizeof(mportIndexEntry *));
+	e = (mportIndexEntry **)calloc((size_t)len + 1, sizeof(mportIndexEntry *));
 	if (e == NULL) {
 		sqlite3_free(where);
 		RETURN_ERROR(MPORT_ERR_FATAL, "Could not allocate memory");
@@ -743,8 +765,8 @@ mport_index_search(mportInstance *mport, mportIndexEntry ***entry_vec, const cha
 	}
 
 	if (mport_db_prepare(db, &stmt,
-	                     "SELECT pkg, version, comment, bundlefile, license, hash, type FROM idx.packages WHERE %s", where) !=
-	    MPORT_OK) {
+		"SELECT pkg, version, comment, bundlefile, license, hash, type FROM idx.packages WHERE %s",
+		where) != MPORT_OK) {
 		sqlite3_free(where);
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
@@ -754,14 +776,16 @@ mport_index_search(mportInstance *mport, mportIndexEntry ***entry_vec, const cha
 		step = sqlite3_step(stmt);
 
 		if (step == SQLITE_ROW) {
-			if ((e[i] = (mportIndexEntry *) calloc(1, sizeof(mportIndexEntry))) == NULL) {
+			if ((e[i] = (mportIndexEntry *)calloc(1, sizeof(mportIndexEntry))) ==
+			    NULL) {
 				ret = MPORT_ERR_FATAL;
 				break;
 			}
 
 			populate_row(stmt, e[i]);
 
-			if (e[i]->pkgname == NULL || e[i]->version == NULL || e[i]->comment == NULL || e[i]->license == NULL ||
+			if (e[i]->pkgname == NULL || e[i]->version == NULL ||
+			    e[i]->comment == NULL || e[i]->license == NULL ||
 			    e[i]->bundlefile == NULL) {
 				ret = MPORT_ERR_FATAL;
 				break;
@@ -783,7 +807,6 @@ mport_index_search(mportInstance *mport, mportIndexEntry ***entry_vec, const cha
 	return ret;
 }
 
-
 MPORT_PUBLIC_API int
 mport_index_list(mportInstance *mport, mportIndexEntry ***entry_vec)
 {
@@ -797,14 +820,15 @@ mport_index_list(mportInstance *mport, mportIndexEntry ***entry_vec)
 	if (mport_db_count(mport->db, &len, "SELECT count(*) FROM idx.packages") != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	e = (mportIndexEntry **) calloc((size_t) len + 1, sizeof(mportIndexEntry *));
+	e = (mportIndexEntry **)calloc((size_t)len + 1, sizeof(mportIndexEntry *));
 	*entry_vec = e;
 
 	if (len == 0) {
 		return MPORT_OK;
 	}
 
-	if (mport_db_prepare(db, &stmt, "SELECT pkg, version, comment, bundlefile, license, hash FROM idx.packages") !=
+	if (mport_db_prepare(db, &stmt,
+		"SELECT pkg, version, comment, bundlefile, license, hash FROM idx.packages") !=
 	    MPORT_OK) {
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
@@ -814,14 +838,16 @@ mport_index_list(mportInstance *mport, mportIndexEntry ***entry_vec)
 		step = sqlite3_step(stmt);
 
 		if (step == SQLITE_ROW) {
-			if ((e[i] = (mportIndexEntry *) calloc(1, sizeof(mportIndexEntry))) == NULL) {
+			if ((e[i] = (mportIndexEntry *)calloc(1, sizeof(mportIndexEntry))) ==
+			    NULL) {
 				ret = MPORT_ERR_FATAL;
 				break;
 			}
 
 			populate_row(stmt, e[i]);
 
-			if (e[i]->pkgname == NULL || e[i]->version == NULL || e[i]->comment == NULL || e[i]->license == NULL ||
+			if (e[i]->pkgname == NULL || e[i]->version == NULL ||
+			    e[i]->comment == NULL || e[i]->license == NULL ||
 			    e[i]->bundlefile == NULL) {
 				ret = MPORT_ERR_FATAL;
 				break;
@@ -857,11 +883,12 @@ mport_moved_lookup(mportInstance *mport, const char *origin, mportIndexMovedEntr
 
 	MPORT_CHECK_FOR_INDEX(mport, "mport_moved_lookup()")
 
-	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM idx.moved  WHERE port = %Q", origin) != MPORT_OK) {
+	if (mport_db_count(mport->db, &count, "SELECT count(*) FROM idx.moved  WHERE port = %Q",
+		origin) != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
 
-	e = (mportIndexMovedEntry **) calloc((size_t) count + 1, sizeof(mportIndexMovedEntry *));
+	e = (mportIndexMovedEntry **)calloc((size_t)count + 1, sizeof(mportIndexMovedEntry *));
 	if (e == NULL) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "Could not allocate memory for moved entries");
 	}
@@ -872,8 +899,8 @@ mport_moved_lookup(mportInstance *mport, const char *origin, mportIndexMovedEntr
 	}
 
 	if (mport_db_prepare(mport->db, &stmt,
-	                     "SELECT port, moved_to, why, date FROM idx.moved WHERE port = %Q",
-	                     origin) != MPORT_OK) {
+		"SELECT port, moved_to, why, date FROM idx.moved WHERE port = %Q",
+		origin) != MPORT_OK) {
 		ret = mport_err_code();
 		goto MOVED_DONE;
 	}
@@ -882,7 +909,8 @@ mport_moved_lookup(mportInstance *mport, const char *origin, mportIndexMovedEntr
 		step = sqlite3_step(stmt);
 
 		if (step == SQLITE_ROW) {
-			if ((e[i] = (mportIndexMovedEntry *) calloc(1, sizeof(mportIndexMovedEntry))) == NULL) {
+			if ((e[i] = (mportIndexMovedEntry *)calloc(
+				 1, sizeof(mportIndexMovedEntry))) == NULL) {
 				ret = MPORT_ERR_FATAL;
 				goto MOVED_DONE;
 			}
@@ -894,13 +922,15 @@ mport_moved_lookup(mportInstance *mport, const char *origin, mportIndexMovedEntr
 
 			// TODO: fix
 			char *orig_pkg = NULL;
-			if (lookup_alias_inverse(mport, origin, &orig_pkg) == MPORT_OK && orig_pkg != NULL) {
+			if (lookup_alias_inverse(mport, origin, &orig_pkg) == MPORT_OK &&
+			    orig_pkg != NULL) {
 				strlcpy(e[i]->pkgname, orig_pkg, 128); // original package name
 				free(orig_pkg);
 			}
 
 			char *moved_pkg = NULL;
-			if (e[i]->moved_to[0] != '\0' && lookup_alias_inverse(mport, e[i]->moved_to, &moved_pkg) != MPORT_OK) {
+			if (e[i]->moved_to[0] != '\0' &&
+			    lookup_alias_inverse(mport, e[i]->moved_to, &moved_pkg) != MPORT_OK) {
 				ret = mport_err_code();
 				goto MOVED_DONE;
 			} else if (moved_pkg != NULL) {
@@ -918,7 +948,7 @@ mport_moved_lookup(mportInstance *mport, const char *origin, mportIndexMovedEntr
 		}
 	}
 
-	MOVED_DONE:
+MOVED_DONE:
 	sqlite3_finalize(stmt);
 	return ret;
 }
@@ -948,7 +978,7 @@ populate_row(sqlite3_stmt *stmt, mportIndexEntry *e)
 	e->hash = (hash == NULL) ? NULL : strdup((const char *)hash);
 
 	if (sqlite3_column_type(stmt, 6) == SQLITE_INTEGER) {
-        e->type = sqlite3_column_int(stmt, 6);
+		e->type = sqlite3_column_int(stmt, 6);
 	}
 }
 
@@ -963,23 +993,24 @@ lookup_alias_inverse(mportInstance *mport, const char *query, char **result)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid parameters to lookup_alias_inverse");
 	}
 
-	if (mport_db_prepare(mport->db, &stmt, "SELECT pkg FROM idx.aliases WHERE pkg=%Q", query) != MPORT_OK)
+	if (mport_db_prepare(mport->db, &stmt, "SELECT pkg FROM idx.aliases WHERE pkg=%Q", query) !=
+	    MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	switch (sqlite3_step(stmt)) {
-		case SQLITE_ROW:
-			str = (const char *) sqlite3_column_text(stmt, 0);
-			if (str != NULL)
-				*result = strdup(str);
-			else
-				*result = NULL;
-			break;
-		case SQLITE_DONE:
-			*result = strdup(query);
-			break;
-		default:
-			ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
-			break;
+	case SQLITE_ROW:
+		str = (const char *)sqlite3_column_text(stmt, 0);
+		if (str != NULL)
+			*result = strdup(str);
+		else
+			*result = NULL;
+		break;
+	case SQLITE_DONE:
+		*result = strdup(query);
+		break;
+	default:
+		ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		break;
 	}
 
 	sqlite3_finalize(stmt);
@@ -989,7 +1020,6 @@ lookup_alias_inverse(mportInstance *mport, const char *query, char **result)
 
 	return ret;
 }
-
 
 static int
 lookup_alias(mportInstance *mport, const char *query, char **result)
@@ -1002,24 +1032,26 @@ lookup_alias(mportInstance *mport, const char *query, char **result)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid parameters to lookup_alias");
 	}
 
-	// assumes that query is an alias|pkg maps to origin|pkgname e.g. www/py-qt5-webkit|py27-qt5-webkit
-	if (mport_db_prepare(mport->db, &stmt, "SELECT pkg FROM idx.aliases WHERE alias=%Q ORDER BY pkg desc", query) != MPORT_OK)
+	// assumes that query is an alias|pkg maps to origin|pkgname e.g.
+	// www/py-qt5-webkit|py27-qt5-webkit
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT pkg FROM idx.aliases WHERE alias=%Q ORDER BY pkg desc", query) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	switch (sqlite3_step(stmt)) {
-		case SQLITE_ROW:
-			str = (const char *) sqlite3_column_text(stmt, 0);
-			if (str != NULL)
-				*result = strdup(str);
-			else
-				*result = NULL;
-			break;
-		case SQLITE_DONE:
-			*result = strdup(query);
-			break;
-		default:
-			ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
-			break;
+	case SQLITE_ROW:
+		str = (const char *)sqlite3_column_text(stmt, 0);
+		if (str != NULL)
+			*result = strdup(str);
+		else
+			*result = NULL;
+		break;
+	case SQLITE_DONE:
+		*result = strdup(query);
+		break;
+	default:
+		ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		break;
 	}
 
 	sqlite3_finalize(stmt);
@@ -1029,7 +1061,6 @@ lookup_alias(mportInstance *mport, const char *query, char **result)
 
 	return ret;
 }
-
 
 /* free a vector of mportIndexEntry structs */
 MPORT_PUBLIC_API void
@@ -1049,7 +1080,6 @@ mport_index_entry_free_vec(mportIndexEntry **e)
 	free(e_orig);
 	e_orig = NULL;
 }
-
 
 /* free a mportIndexEntry struct */
 MPORT_PUBLIC_API void

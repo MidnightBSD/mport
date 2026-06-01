@@ -79,7 +79,7 @@ getCurrentTime(void)
 
 /**
  * @brief Ping a host to determine the round trip time
- * 
+ *
  * @param hostname IP address or hostname to ping
  * @return long milliseconds
  */
@@ -121,7 +121,8 @@ ping(char *hostname)
 		return -1;
 	}
 
-	for (int i = 0; i < MAX_RETRIES; i++) rtts[i] = -1;
+	for (int i = 0; i < MAX_RETRIES; i++)
+		rtts[i] = -1;
 
 	for (; try < MAX_RETRIES; try++) {
 		memset(&icmphdr, 0, sizeof(icmphdr));
@@ -147,8 +148,8 @@ ping(char *hostname)
 		for (;;) {
 			addr_len = sizeof(from_addr);
 			n = recvfrom(sockfd, recv_packet, sizeof(recv_packet), 0,
-				(struct sockaddr *)&from_addr, &addr_len);
-			
+			    (struct sockaddr *)&from_addr, &addr_len);
+
 			if (n < 0) {
 				if (errno == EINTR)
 					continue;
@@ -159,14 +160,13 @@ ping(char *hostname)
 
 			struct ip *ip_hdr = (struct ip *)recv_packet;
 			int ip_hdr_len = ip_hdr->ip_hl << 2;
-			
+
 			if (n < ip_hdr_len + (ssize_t)sizeof(struct icmp))
 				continue;
 
 			struct icmp *icmp_reply = (struct icmp *)(recv_packet + ip_hdr_len);
 
-			if (icmp_reply->icmp_type == ICMP_ECHOREPLY && 
-			    icmp_reply->icmp_id == pid && 
+			if (icmp_reply->icmp_type == ICMP_ECHOREPLY && icmp_reply->icmp_id == pid &&
 			    icmp_reply->icmp_seq == try) {
 				long end_time = getCurrentTime();
 				rtt = end_time - start_time;
@@ -174,7 +174,7 @@ ping(char *hostname)
 				break;
 			}
 		}
-		
+
 		if (try < MAX_RETRIES - 1)
 			usleep(100000); // 100ms between retries
 	}

@@ -35,15 +35,15 @@
 #include <sys/statvfs.h>
 #include <libutil.h>
 
-static char ** get_dependencies(mportInstance *mport, mportPackageMeta *pack);
+static char **get_dependencies(mportInstance *mport, mportPackageMeta *pack);
 static char *find_file_with_prefix(const char *dir, const char *prefix);
 
-#define GOTO_CLEANUP_ON_MPORT_ERR(expr) \
-	do { \
-		if ((expr) != MPORT_OK) { \
+#define GOTO_CLEANUP_ON_MPORT_ERR(expr)         \
+	do {                                    \
+		if ((expr) != MPORT_OK) {       \
 			ret = mport_err_code(); \
-			goto cleanup; \
-		} \
+			goto cleanup;           \
+		}                               \
 	} while (0)
 
 static char **
@@ -86,7 +86,7 @@ get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
 		return NULL;
 	}
 
-    int i = 0;
+	int i = 0;
 	while (1) {
 		const char *depend_pkg, *depend_version;
 
@@ -101,7 +101,8 @@ get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
 					return NULL;
 				}
 			} else {
-				if (asprintf(&dependencies[i], "%s-%s", depend_pkg, depend_version) == -1) {
+				if (asprintf(&dependencies[i], "%s-%s", depend_pkg,
+					depend_version) == -1) {
 					sqlite3_finalize(stmt);
 					return NULL;
 				}
@@ -118,40 +119,42 @@ get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
 		}
 
 		if (i == count)
-			break;	
+			break;
 	}
 
 	return dependencies;
 }
 
 char *
-find_file_with_prefix(const char *dir, const char *prefix) 
+find_file_with_prefix(const char *dir, const char *prefix)
 {
-    DIR *d;
-    struct dirent *dir_entry;
-    char *found_file = NULL;
-    size_t prefix_len = strlen(prefix);
+	DIR *d;
+	struct dirent *dir_entry;
+	char *found_file = NULL;
+	size_t prefix_len = strlen(prefix);
 
-    d = opendir(dir);
-    if (d) {
-        while ((dir_entry = readdir(d)) != NULL) {
-            if (strncmp(dir_entry->d_name, prefix, prefix_len) == 0) {
-                // Found a file with the correct prefix
-                found_file = malloc(strlen(dir) + strlen(dir_entry->d_name) + 2); // +2 for '/' and null terminator
-                if (found_file) {
-                    sprintf(found_file, "%s/%s", dir, dir_entry->d_name);
-                }
-                break;
-            }
-        }
-        closedir(d);
-    }
+	d = opendir(dir);
+	if (d) {
+		while ((dir_entry = readdir(d)) != NULL) {
+			if (strncmp(dir_entry->d_name, prefix, prefix_len) == 0) {
+				// Found a file with the correct prefix
+				found_file = malloc(strlen(dir) + strlen(dir_entry->d_name) +
+				    2); // +2 for '/' and null terminator
+				if (found_file) {
+					sprintf(found_file, "%s/%s", dir, dir_entry->d_name);
+				}
+				break;
+			}
+		}
+		closedir(d);
+	}
 
-    return found_file;
+	return found_file;
 }
 
 MPORT_PUBLIC_API int
-mport_install_primative(mportInstance *mport, const char *filename, const char *prefix, mportAutomatic automatic)
+mport_install_primative(
+    mportInstance *mport, const char *filename, const char *prefix, mportAutomatic automatic)
 {
 	mportBundleRead *bundle = NULL;
 	mportPackageMeta **already_installed = NULL;
@@ -166,11 +169,11 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 	if (mport == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
 
-		/* There are two scenarios here.  
-		   1. We are installing online with an index and have already fetched dependencies. 
-		   2. We are installing from a local package file. Check if the dependencies are availaible in the
-		   same directory that are missing.
-		*/
+	/* There are two scenarios here.
+	   1. We are installing online with an index and have already fetched dependencies.
+	   2. We are installing from a local package file. Check if the dependencies are availaible
+	   in the same directory that are missing.
+	*/
 	if (mport->offline) {
 		// temporarily open pkg file to get metadata.
 		if ((bundle = mport_bundle_read_new()) == NULL)
@@ -181,27 +184,32 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 		GOTO_CLEANUP_ON_MPORT_ERR(mport_pkgmeta_read_stub(mport, &pkgs));
 
 		if (!mport_is_age_verified(mport, pkgs[0])) {
-			mport_call_msg_cb(mport, "Unable to install %s-%s: package is age restricted and user does not meet the requirements.", pkgs[0]->name, pkgs[0]->version);
+			mport_call_msg_cb(mport,
+			    "Unable to install %s-%s: package is age restricted and user does not meet the requirements.",
+			    pkgs[0]->name, pkgs[0]->version);
 			ret = MPORT_ERR_FATAL;
 			goto cleanup;
 		}
 
-		/* if we previously installed it and want to force, allow it.  
-		   In this case, automatic flag from previous install not honored 
+		/* if we previously installed it and want to force, allow it.
+		   In this case, automatic flag from previous install not honored
 		*/
-		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_INSTALLED) != MPORT_OK) {
+		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_INSTALLED) !=
+		    MPORT_OK) {
 			if (mport->force) {
 				mport_delete_primative(mport, pkgs[0], 1);
 			} else {
-				mport_call_msg_cb(mport, "%s-%s: already installed.", pkgs[0]->name, pkgs[0]->version);
+				mport_call_msg_cb(mport, "%s-%s: already installed.", pkgs[0]->name,
+				    pkgs[0]->version);
 				ret = MPORT_OK;
 				goto cleanup;
 			}
 		}
 
-		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_CONFLICTS) != MPORT_OK) {
-			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkgs[0]->name, pkgs[0]->version,
-			                  mport_err_string());
+		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_CONFLICTS) !=
+		    MPORT_OK) {
+			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkgs[0]->name,
+			    pkgs[0]->version, mport_err_string());
 			ret = MPORT_ERR_FATAL;
 			goto cleanup;
 		}
@@ -221,8 +229,8 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 
 		deps = dependencies;
 		dir = mport_directory(filename);
-		while (deps!= NULL && *deps != NULL) {
-			char *dep_filename = NULL; 
+		while (deps != NULL && *deps != NULL) {
+			char *dep_filename = NULL;
 			if (asprintf(&dep_filename, "%s/%s.mport", dir, *deps) == -1) {
 				deps++;
 				continue;
@@ -232,14 +240,17 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 				free(dep_filename);
 				dep_filename = find_file_with_prefix(dir, *deps);
 				if (dep_filename == NULL) {
-	    			mport_call_msg_cb(mport, "Dependency %s not found in %s", *deps, dir);
-	    			deps++;
-		   			continue;
+					mport_call_msg_cb(
+					    mport, "Dependency %s not found in %s", *deps, dir);
+					deps++;
+					continue;
 				}
 			}
 
-			if (mport_install_primative(mport, dep_filename, prefix, MPORT_AUTOMATIC)!= MPORT_OK) {
-				mport_call_msg_cb(mport, "Unable to install %s: %s", *deps, mport_err_string());
+			if (mport_install_primative(mport, dep_filename, prefix, MPORT_AUTOMATIC) !=
+			    MPORT_OK) {
+				mport_call_msg_cb(
+				    mport, "Unable to install %s: %s", *deps, mport_err_string());
 				if (!mport->ignoreMissing) {
 					free(dep_filename);
 					ret = MPORT_ERR_FATAL;
@@ -252,7 +263,8 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 	}
 
 	if ((bundle = mport_bundle_read_new()) == NULL) {
-		ret = mport_set_errx(MPORT_ERR_FATAL, "Error at %s:(%d): %s", __FILE__, __LINE__, "Out of memory.");
+		ret = mport_set_errx(
+		    MPORT_ERR_FATAL, "Error at %s:(%d): %s", __FILE__, __LINE__, "Out of memory.");
 		goto cleanup;
 	}
 
@@ -262,20 +274,24 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 
 	for (i = 0; *(pkgs + i) != NULL; i++) {
 		pkg = pkgs[i];
-        pkg->automatic = automatic;
+		pkg->automatic = automatic;
 		pkg->install_date = mport_get_time();
 		pkg->action = MPORT_ACTION_INSTALL;
 
 		if (!mport_is_age_verified(mport, pkg)) {
-			mport_call_msg_cb(mport, "Unable to install %s-%s: package is age restricted and user does not meet the requirements.", pkg->name, pkg->version);
+			mport_call_msg_cb(mport,
+			    "Unable to install %s-%s: package is age restricted and user does not meet the requirements.",
+			    pkg->name, pkg->version);
 			ret = MPORT_ERR_FATAL;
 			break; /* do not keep going if we have an age verification failure! */
 		}
 
-		if (mport_pkgmeta_search_master(mport, &already_installed, "pkg=%Q", pkg->name) == MPORT_OK) {
+		if (mport_pkgmeta_search_master(mport, &already_installed, "pkg=%Q", pkg->name) ==
+		    MPORT_OK) {
 			if (already_installed != NULL && already_installed[0] != NULL) {
 				if (mport->force) {
-					pkg->automatic = already_installed[0]->automatic; // honor old flag
+					pkg->automatic =
+					    already_installed[0]->automatic; // honor old flag
 				}
 				mport_pkgmeta_vec_free(already_installed);
 				already_installed = NULL;
@@ -286,42 +302,49 @@ mport_install_primative(mportInstance *mport, const char *filename, const char *
 			/* override the default prefix with the given prefix */
 			free(pkg->prefix);
 			if ((pkg->prefix = strdup(prefix)) == NULL) { /* all hope is lost! bail */
-				ret = mport_set_errx(MPORT_ERR_FATAL, "Error at %s:(%d): %s", __FILE__, __LINE__, "Out of memory.");
+				ret = mport_set_errx(MPORT_ERR_FATAL, "Error at %s:(%d): %s",
+				    __FILE__, __LINE__, "Out of memory.");
 				goto cleanup;
 			}
 		}
 
 		if (pkg->flatsize > 0) {
 			struct statvfs sfs;
-			const char *check_path = (mport->root != NULL && mport->root[0] != '\0') ? mport->root : pkg->prefix;
+			const char *check_path = (mport->root != NULL && mport->root[0] != '\0') ?
+			    mport->root :
+			    pkg->prefix;
 			if (statvfs(check_path, &sfs) == 0) {
 				int64_t avail_bytes;
 				if (sfs.f_frsize != 0 &&
-				    (uintmax_t)sfs.f_bavail > (uintmax_t)INT64_MAX / (uintmax_t)sfs.f_frsize) {
+				    (uintmax_t)sfs.f_bavail >
+					(uintmax_t)INT64_MAX / (uintmax_t)sfs.f_frsize) {
 					avail_bytes = INT64_MAX;
 				} else {
-					avail_bytes = (int64_t)((uintmax_t)sfs.f_bavail * (uintmax_t)sfs.f_frsize);
+					avail_bytes = (int64_t)((uintmax_t)sfs.f_bavail *
+					    (uintmax_t)sfs.f_frsize);
 				}
 				if (pkg->flatsize > avail_bytes) {
 					char avail_str[32], need_str[32];
-					humanize_number(avail_str, sizeof(avail_str), avail_bytes, "B",
-					    HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
-					humanize_number(need_str, sizeof(need_str), pkg->flatsize, "B",
-					    HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
+					humanize_number(avail_str, sizeof(avail_str), avail_bytes,
+					    "B", HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
+					humanize_number(need_str, sizeof(need_str), pkg->flatsize,
+					    "B", HN_AUTOSCALE, HN_DECIMAL | HN_IEC_PREFIXES);
 					mport_call_msg_cb(mport,
 					    "Warning: %s-%s requires %s but only %s is available on %s.",
-					    pkg->name, pkg->version, need_str, avail_str, check_path);
+					    pkg->name, pkg->version, need_str, avail_str,
+					    check_path);
 				}
 			}
 		}
 
-		long precheck_flags = MPORT_PRECHECK_INSTALLED | MPORT_PRECHECK_DEPENDS | MPORT_PRECHECK_CONFLICTS;
+		long precheck_flags =
+		    MPORT_PRECHECK_INSTALLED | MPORT_PRECHECK_DEPENDS | MPORT_PRECHECK_CONFLICTS;
 		if (!mport->force)
 			precheck_flags |= MPORT_PRECHECK_FILE_CONFLICTS;
-		if ((mport_check_preconditions(mport, pkg, precheck_flags) != MPORT_OK)
-                   || (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)) {
-			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name, pkg->version,
-			                  mport_err_string());
+		if ((mport_check_preconditions(mport, pkg, precheck_flags) != MPORT_OK) ||
+		    (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)) {
+			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name,
+			    pkg->version, mport_err_string());
 			ret = MPORT_ERR_FATAL;
 			break; /* do not keep going if we have a package failure! */
 		}

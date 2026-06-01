@@ -39,7 +39,9 @@
 
 static void usage(void);
 
-int main(int argc, char *argv[]) {
+int
+main(int argc, char *argv[])
+{
 	int i, ch;
 	mportInstance *mport;
 	const char *chroot_path = NULL;
@@ -48,13 +50,13 @@ int main(int argc, char *argv[]) {
 
 	while ((ch = getopt(argc, argv, "c:")) != -1) {
 		switch (ch) {
-			case 'c':
-				chroot_path = optarg;
-				break;
-			case '?':
-			default:
-				usage();
-				break;
+		case 'c':
+			chroot_path = optarg;
+			break;
+		case '?':
+		default:
+			usage();
+			break;
 		}
 	}
 
@@ -98,7 +100,8 @@ int main(int argc, char *argv[]) {
 }
 
 static void
-usage(void) {
+usage(void)
+{
 
 	fprintf(stderr, "Usage: mport.update [-c <chroot directory>] pkgfile1 pkgfile2 ...\n");
 	exit(2);

@@ -38,8 +38,8 @@
 #include <errno.h>
 #include <stddef.h>
 
-MPORT_PUBLIC_API int 
-mport_import(mportInstance *mport,  char  *path)
+MPORT_PUBLIC_API int
+mport_import(mportInstance *mport, char *path)
 {
 	FILE *file = NULL;
 	FILE *input;
@@ -48,7 +48,7 @@ mport_import(mportInstance *mport,  char  *path)
 
 	if (path == NULL)
 		console = true;
-	
+
 	if (!console && !mport_file_exists(path)) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "File exists at export path");
 	}
@@ -56,7 +56,8 @@ mport_import(mportInstance *mport,  char  *path)
 	if (!console) {
 		file = fopen(path, "r");
 		if (file == NULL)
-			RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open import file %s", path, strerror(errno));
+			RETURN_ERRORX(
+			    MPORT_ERR_FATAL, "Couldn't open import file %s", path, strerror(errno));
 	}
 
 	input = console ? stdin : file;
@@ -67,7 +68,7 @@ mport_import(mportInstance *mport,  char  *path)
 			continue;
 
 		mport_call_msg_cb(mport, "Installing %s", name);
-		mport_install(mport, name,  NULL, NULL, MPORT_EXPLICIT);
+		mport_install(mport, name, NULL, NULL, MPORT_EXPLICIT);
 	}
 
 	if (ferror(input)) {
@@ -79,22 +80,22 @@ mport_import(mportInstance *mport,  char  *path)
 	if (!console) {
 		fclose(file);
 	}
-	
+
 	return (MPORT_OK);
 }
 
-MPORT_PUBLIC_API int 
+MPORT_PUBLIC_API int
 mport_export(mportInstance *mport, char *path)
 {
 	mportPackageMeta **packs;
 	mportPackageMeta **packs_orig;
-	
+
 	FILE *file = NULL;
 	bool console = false;
 
 	if (path == NULL)
 		console = true;
-	
+
 	if (!console && mport_file_exists(path)) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "File exists at export path");
 	}
@@ -110,7 +111,8 @@ mport_export(mportInstance *mport, char *path)
 	if (!console) {
 		file = fopen(path, "w");
 		if (file == NULL)
-			RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open export file %s", path, strerror(errno));
+			RETURN_ERRORX(
+			    MPORT_ERR_FATAL, "Couldn't open export file %s", path, strerror(errno));
 	}
 
 	packs_orig = packs;
@@ -125,8 +127,8 @@ mport_export(mportInstance *mport, char *path)
 	if (!console) {
 		fclose(file);
 	}
-		
+
 	mport_pkgmeta_vec_free(packs_orig);
-		
+
 	return (MPORT_OK);
 }

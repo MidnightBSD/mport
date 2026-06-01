@@ -280,7 +280,8 @@ mport_pkgmeta_count(mportInstance *mport, enum count_type type, char *where)
 	else if (type == WHERE)
 		sql = "SELECT count(*) FROM packages WHERE %s";
 
-	if (mport == NULL) return len;
+	if (mport == NULL)
+		return len;
 
 	if (type == WHERE && where != NULL) {
 		if (mport_db_prepare(mport->db, &stmt, sql, where) != MPORT_OK) {
@@ -505,7 +506,8 @@ mport_pkgmeta_logevent(mportInstance *mport, mportPackageMeta *pkg, const char *
  *
  */
 static int
-enrich_vec(mportPackageMeta ***vec, int len, sqlite3 *db) {
+enrich_vec(mportPackageMeta ***vec, int len, sqlite3 *db)
+{
 	sqlite3_stmt *stmt;
 
 	for (int i = 0; i < len; i++) {
@@ -513,9 +515,11 @@ enrich_vec(mportPackageMeta ***vec, int len, sqlite3 *db) {
 		if (pkg == NULL)
 			continue;
 
-		if (mport_db_prepare(db, &stmt, "SELECT conflict_pkg FROM conflicts WHERE pkg=%Q", pkg->name) == MPORT_OK) {
+		if (mport_db_prepare(db, &stmt, "SELECT conflict_pkg FROM conflicts WHERE pkg=%Q",
+			pkg->name) == MPORT_OK) {
 			if (sqlite3_step(stmt) == SQLITE_ROW) {
-				tll_push_back(pkg->conflicts, strdup((const char *)sqlite3_column_text(stmt, 0)));
+				tll_push_back(pkg->conflicts,
+				    strdup((const char *)sqlite3_column_text(stmt, 0)));
 			}
 			sqlite3_finalize(stmt);
 		}

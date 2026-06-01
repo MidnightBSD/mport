@@ -43,14 +43,13 @@ extern char **environ;
 
 static int run_service_cmd(mportInstance *mport, const char *rc_script, char *command);
 
-int 
-mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_action_t action) 
+int
+mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_action_t action)
 {
 	sqlite3_stmt *stmt;
 	char *service;
 	const unsigned char *rc_script;
 	char *handle_rc_script;
-
 
 	// don't turn off services if MPORT_GUI is set.  This can drop someone out of an X session.
 	// TODO: we should handle this with triggers eventually.
@@ -59,11 +58,12 @@ mport_start_stop_service(mportInstance *mport, mportPackageMeta *pack, service_a
 
 	// if handle rc scripts is disabled, we don't need to do anything
 	handle_rc_script = mport_setting_get(mport, MPORT_SETTING_HANDLE_RC_SCRIPTS);
-	bool skip = (getenv("HANDLE_RC_SCRIPTS") == NULL && !mport_check_answer_bool(handle_rc_script));
+	bool skip =
+	    (getenv("HANDLE_RC_SCRIPTS") == NULL && !mport_check_answer_bool(handle_rc_script));
 	free(handle_rc_script);
 	if (skip)
-	    return (MPORT_OK);
-	
+		return (MPORT_OK);
+
 	/* stop any services that might exist; this replaces @stopdaemon */
 	if (mport_db_prepare(mport->db, &stmt,
 		"select data from assets where data like '/usr/local/etc/rc.d/%%' and type=%i and pkg=%Q",
@@ -113,7 +113,8 @@ run_service_cmd(mportInstance *mport, const char *rc_script, char *command)
 	argv[2] = command;
 	argv[3] = NULL;
 
-	if ((error = posix_spawn(&pid, "/usr/sbin/service", NULL, NULL, (char **)argv, environ)) != 0) {
+	if ((error = posix_spawn(&pid, "/usr/sbin/service", NULL, NULL, (char **)argv, environ)) !=
+	    0) {
 		errno = error;
 		mport_call_msg_cb(mport, "Unable to %s service %s\n", command, rc_script);
 		return (-1);
