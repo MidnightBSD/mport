@@ -110,8 +110,10 @@ mport_fetch_index(mportInstance *mport)
 			MPORT_INDEX_FILE_SOURCE ".sha256") == -1) {
 			free(url);
 			free(hashUrl);
+			free(osrel);
 			for (int mi = 0; mi < mirrorCount; mi++)
 				free(mirrors[mi]);
+			free(mirrors);
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 		}
 		if (apply_force_http_url(&url) != MPORT_OK ||
@@ -277,6 +279,9 @@ mport_fetch_bundle(mportInstance *mport, const char *directory, const char *file
 		}
 		if (asprintf(&url, "%s/%s/%s/%s", *mirrorsPtr, MPORT_ARCH, osrel, filename) == -1) {
 			free(osrel);
+			for (int mi = 0; mi < mirrorCount; mi++)
+				free(mirrors[mi]);
+			free(mirrors);
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
 		}
 		if (apply_force_http_url(&url) != MPORT_OK) {
@@ -363,24 +368,30 @@ char *
 mport_fetch_cves(mportInstance *mport, char *cpe)
 {
 	int result;
+	char *path;
 	char *url;
 	FILE *local;
 
 	char tmpfile2[] = _PATH_TMP "mport.cve.XXXXXXXX";
-	int fd;
+	int fd = -1;
 
 	if ((fd = mkstemp(tmpfile2)) == -1) {
 		SET_ERRORX(MPORT_ERR_FATAL, "Couldn't make tmp file: %s", strerror(errno));
+		return NULL;
 	}
 
 	if (asprintf(&url,
 		"%s/api/cpe/partial-match?includeVersion=true&cpe=%s&startDate=2006-02-28",
-		MPORT_SECURITY_URL, cpe) == -1)
+		MPORT_SECURITY_URL, cpe) == -1) {
+		close(fd);
+		unlink(tmpfile2);
 		return NULL;
+	}
 
 	local = fdopen(fd, "w");
 	if (local == NULL) {
 		close(fd);
+		unlink(tmpfile2);
 		free(url);
 		SET_ERRORX(MPORT_ERR_FATAL, "Unable to open %s: %s", tmpfile2, strerror(errno));
 		return NULL;
@@ -393,9 +404,17 @@ mport_fetch_cves(mportInstance *mport, char *cpe)
 	free(url);
 
 	if (result != MPORT_OK) {
+		unlink(tmpfile2);
 		return NULL;
 	}
-	return strdup(tmpfile2); // return the file path
+
+	path = strdup(tmpfile2);
+	if (path == NULL) {
+		unlink(tmpfile2);
+		SET_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+		return NULL;
+	}
+	return path;
 }
 
 static int
