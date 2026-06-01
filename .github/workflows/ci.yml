@@ -28,6 +28,6 @@ jobs:
 
       - name: Build on MidnightBSD
         run: |
-            ASSUME_ALWAYS_YES=yes mport install atf
+            sudo env ASSUME_ALWAYS_YES=yes mport install atf || true
             make
             kyua test -k tests/Kyuafile
