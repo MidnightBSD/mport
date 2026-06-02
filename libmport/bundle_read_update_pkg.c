@@ -38,6 +38,8 @@
 
 static int make_backup_bundle(mportInstance *, mportPackageMeta *, char *);
 static int install_backup_bundle(mportInstance *, char *);
+static int detach_update_stub_for_backup(
+    /*@notnull@*/ mportInstance *, /*@notnull@*/ mportBundleRead *);
 static int build_create_extras(mportInstance *, mportPackageMeta *, char *, mportCreateExtras **);
 static int build_create_extras_copy_metafiles(const mportPackageMeta *, mportCreateExtras *);
 static int build_create_extras_depends(mportInstance *, mportPackageMeta *, mportCreateExtras *);
@@ -63,8 +65,22 @@ mport_bundle_read_update_pkg(mportInstance *mport, mportBundleRead *bundle, mpor
 	}
 
 	pkg->action = MPORT_ACTION_UPDATE;
-	if ((mport_delete_primative(mport, pkg, 1) != MPORT_OK) ||
-	    (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)) {
+	if (mport_delete_primative(mport, pkg, 1) != MPORT_OK) {
+		int err = mport_err_code();
+
+		(void)mport_rmtree(tmpfile2);
+		return (err);
+	}
+
+	if (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK) {
+		if (detach_update_stub_for_backup(mport, bundle) != MPORT_OK) {
+			int err = mport_err_code();
+
+			mport_call_msg_cb(
+			    mport, "Error preparing to restore backup package %s", pkg->name);
+			(void)mport_rmtree(tmpfile2);
+			return (err);
+		}
 		if (install_backup_bundle(mport, tmpfile2) == MPORT_OK) {
 			(void)mport_rmtree(tmpfile2);
 		} else {
@@ -75,6 +91,21 @@ mport_bundle_read_update_pkg(mportInstance *mport, mportBundleRead *bundle, mpor
 
 	/* if we can't delete the tmpfile, just move on. */
 	(void)mport_rmtree(tmpfile2);
+
+	return (MPORT_OK);
+}
+
+static int
+detach_update_stub_for_backup(/*@notnull@*/ mportInstance *mport,
+    /*@notnull@*/ mportBundleRead *bundle)
+{
+	if (!bundle->stub_attached)
+		return (MPORT_OK);
+
+	if (mport_detach_stub_db(mport->db) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	bundle->stub_attached = 0;
 
 	return (MPORT_OK);
 }
