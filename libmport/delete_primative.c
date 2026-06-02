@@ -70,6 +70,7 @@ static int run_special_unexec(mportInstance *, mportPackageMeta *);
 static int run_pkg_deinstall(mportInstance *, mportPackageMeta *, const char *);
 static int delete_pkg_infra(mportInstance *, mportPackageMeta *);
 static int check_for_upwards_depends(mportInstance *, mportPackageMeta *);
+static void warn_ignored_rmdir_error(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
 static bool is_safe_to_delete_dir(mportInstance *, mportPackageMeta *, const char *);
 static bool is_system_dir(const char *path);
 
@@ -369,9 +370,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 			if (is_safe_to_delete_dir(mport, pack, file)) {
 				mport_removeflags(mport->root, file);
 				if (mport_rmdir(file, type == ASSET_DIRRMTRY ? 1 : 0) != MPORT_OK) {
-					mport_call_msg_cb(mport,
-					    "Could not remove directory '%s': %s", file,
-					    mport_err_string());
+					warn_ignored_rmdir_error(mport, file);
 				}
 			} else if (type != ASSET_DIRRMTRY) {
 				mport_call_msg_cb(
@@ -438,6 +437,16 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	syslog(LOG_NOTICE, "%s-%s deinstalled", pack->name, pack->version);
 
 	return (MPORT_OK);
+}
+
+static void
+warn_ignored_rmdir_error(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *dir)
+{
+	const char *err_msg = mport_err_string();
+
+	mport_call_msg_cb(mport, "Could not remove directory '%s': %s", dir,
+	    err_msg != NULL ? err_msg : "unknown error");
+	mport_set_err(MPORT_OK, NULL);
 }
 
 static bool
@@ -640,8 +649,7 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg)
 			 * module, if it's not /boot/modules */
 			if (strcmp("/boot/modules", data) != 0 &&
 			    mport_rmdir(data, 1) != MPORT_OK) {
-				mport_call_msg_cb(mport, "Could not remove directory '%s': %s",
-				    data, mport_err_string());
+				warn_ignored_rmdir_error(mport, data);
 			}
 			break;
 		case ASSET_DESKTOP_FILE_UTILS:
