@@ -38,6 +38,11 @@ ATF_TC_BODY(mport_check_answer_bool_true, tc)
 	ATF_REQUIRE_EQ(true, mport_check_answer_bool("t"));
 	ATF_REQUIRE_EQ(true, mport_check_answer_bool("1"));
 	ATF_REQUIRE_EQ(true, mport_check_answer_bool("Yes")); /* Only checks first char */
+
+	/* Leading/trailing whitespace around answers */
+	ATF_REQUIRE_EQ(true, mport_check_answer_bool(" Y"));
+	ATF_REQUIRE_EQ(true, mport_check_answer_bool("Y "));
+	ATF_REQUIRE_EQ(true, mport_check_answer_bool("  Y  "));
 }
 
 ATF_TC(mport_check_answer_bool_false);
