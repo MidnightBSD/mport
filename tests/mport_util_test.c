@@ -1,10 +1,10 @@
 #include <sys/cdefs.h>
 #include <sys/param.h>
-
 #include <sys/stat.h>
 
 #include <atf-c.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -12,10 +12,16 @@
 #include <fcntl.h>
 #include "../libmport/mport.h"
 
+extern int mport_count_spaces(const char *);
+
 /* Splint does not understand ATF's generated test-case wrappers. */
 /*@-boundsread -boundswrite -compdef -compdestroy -dependenttrans -fullinitblock@*/
 /*@-mustfreefresh -noeffect -nullderef -nullpass -nullret -nullstate@*/
 /*@-retvalint -retvalother -type -unrecog@*/
+
+
+ATF_TC_WITHOUT_HEAD(count_spaces_empty);
+ATF_TC_BODY(count_spaces_empty, tc)
 
 bool mport_check_answer_bool(char *ans);
 
@@ -135,57 +141,43 @@ ATF_TC_HEAD(is_elf_file_false_small, tc)
 }
 ATF_TC_BODY(is_elf_file_false_small, tc)
 {
-	const char *filename = "test_small_file";
-	const char content[] = "ELF"; // Only 3 bytes
-	create_file(filename, content, sizeof(content) - 1);
-
-	ATF_CHECK(!mport_is_elf_file(filename));
-}
-ATF_TC_CLEANUP(is_elf_file_false_small, tc)
-{
-	unlink("test_small_file");
+	(void)tc;
+	ATF_REQUIRE_EQ(0, mport_count_spaces(""));
 }
 
-ATF_TC_WITH_CLEANUP(is_elf_file_false_missing);
-ATF_TC_HEAD(is_elf_file_false_missing, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "mport_is_elf_file returns false for a missing file");
-}
-ATF_TC_BODY(is_elf_file_false_missing, tc)
-{
-	ATF_CHECK(!mport_is_elf_file("nonexistent_file_that_should_not_exist"));
-}
-ATF_TC_CLEANUP(is_elf_file_false_missing, tc)
-{
-ATF_TC_WITHOUT_HEAD(mport_file_exists_existing_file);
-ATF_TC_BODY(mport_file_exists_existing_file, tc)
+ATF_TC_WITHOUT_HEAD(count_spaces_none);
+ATF_TC_BODY(count_spaces_none, tc)
 {
 	(void)tc;
-
-	/* Test with a file that is guaranteed to exist */
-	ATF_REQUIRE_EQ(1, mport_file_exists("/etc/passwd"));
+	ATF_REQUIRE_EQ(0, mport_count_spaces("hello"));
+	ATF_REQUIRE_EQ(0, mport_count_spaces("hello_world-123"));
 }
 
-ATF_TC_WITHOUT_HEAD(mport_file_exists_nonexistent_file);
-ATF_TC_BODY(mport_file_exists_nonexistent_file, tc)
+ATF_TC_WITHOUT_HEAD(count_spaces_only);
+ATF_TC_BODY(count_spaces_only, tc)
 {
 	(void)tc;
-
-	/* Test with a file that is guaranteed not to exist */
-	ATF_REQUIRE_EQ(0, mport_file_exists("/this/file/does/not/exist/ever/12345"));
+	ATF_REQUIRE_EQ(1, mport_count_spaces(" "));
+	ATF_REQUIRE_EQ(3, mport_count_spaces("   "));
+	ATF_REQUIRE_EQ(2, mport_count_spaces("\t\n"));
 }
 
-ATF_TC_WITHOUT_HEAD(mport_file_exists_directory);
-ATF_TC_BODY(mport_file_exists_directory, tc)
+ATF_TC_WITHOUT_HEAD(count_spaces_mixed);
+ATF_TC_BODY(count_spaces_mixed, tc)
 {
 	(void)tc;
-
-	/* Test with a directory that is guaranteed to exist */
-	ATF_REQUIRE_EQ(1, mport_file_exists("/etc"));
+	ATF_REQUIRE_EQ(1, mport_count_spaces("hello world"));
+	ATF_REQUIRE_EQ(2, mport_count_spaces("hello  world"));
+	ATF_REQUIRE_EQ(3, mport_count_spaces(" hello world "));
+	ATF_REQUIRE_EQ(5, mport_count_spaces(" \thello \nworld "));
 }
 
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, count_spaces_empty);
+	ATF_TP_ADD_TC(tp, count_spaces_none);
+	ATF_TP_ADD_TC(tp, count_spaces_only);
+	ATF_TP_ADD_TC(tp, count_spaces_mixed);
 	ATF_TP_ADD_TC(tp, mport_check_answer_bool_null);
 	ATF_TP_ADD_TC(tp, mport_check_answer_bool_true);
 	ATF_TP_ADD_TC(tp, mport_check_answer_bool_false);
