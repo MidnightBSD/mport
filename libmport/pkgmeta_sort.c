@@ -34,6 +34,38 @@
 #include "mport.h"
 #include "mport_private.h"
 
+struct pkgmeta_dependency_edge {
+	int to;
+	struct pkgmeta_dependency_edge *next;
+};
+
+static void free_edges(struct pkgmeta_dependency_edge **, int);
+
+/* Splint does not model ownership transfer for the sparse edge-list cleanup. */
+/*@ignore@*/
+static void
+free_edges(struct pkgmeta_dependency_edge **adj, int package_count)
+{
+	struct pkgmeta_dependency_edge *edge;
+	struct pkgmeta_dependency_edge *next;
+	int i;
+
+	if (adj == NULL)
+		return;
+
+	for (i = 0; i < package_count; i++) {
+		edge = adj[i];
+		while (edge != NULL) {
+			next = edge->next;
+			free(edge);
+			edge = next;
+		}
+	}
+
+	free(adj);
+}
+/*@end@*/
+
 /* Splint hits an internal constraint bug on this cleanup path. */
 /*@ignore@*/
 mportPackageMeta **
@@ -43,24 +75,27 @@ mport_pkgmeta_sort_dependencies(
 	mportPackageMeta **sorted_packs;
 	mportPackageMeta **downdeps;
 	mportPackageMeta **d;
+	struct pkgmeta_dependency_edge **adj;
+	const struct pkgmeta_dependency_edge *curr;
+	struct pkgmeta_dependency_edge *new_edge;
 	int *in_degree;
 	bool *queued;
-	bool *edges;
+	bool duplicate;
 	int i;
 	int j;
 	int from;
 	int to;
 	int sorted_count;
-	int edge_count;
-	int edge_index;
 
-	sorted_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
+	if (flat_packs == NULL || package_count <= 0)
+		return calloc(1, sizeof(mportPackageMeta *));
+
+	sorted_packs = calloc((size_t)package_count + 1, sizeof(mportPackageMeta *));
 	in_degree = calloc((size_t)package_count, sizeof(int));
 	queued = calloc((size_t)package_count, sizeof(bool));
-	edge_count = package_count * package_count;
-	edges = calloc((size_t)edge_count, sizeof(bool));
+	adj = calloc((size_t)package_count, sizeof(struct pkgmeta_dependency_edge *));
 
-	if (sorted_packs == NULL || in_degree == NULL || edges == NULL || queued == NULL) {
+	if (sorted_packs == NULL || in_degree == NULL || adj == NULL || queued == NULL) {
 		warnx("Out of memory");
 		goto error;
 	}
@@ -85,10 +120,27 @@ mport_pkgmeta_sort_dependencies(
 
 				from = reverse_edges ? j : i;
 				to = reverse_edges ? i : j;
-				edge_index = (from * package_count) + to;
 
-				if (!edges[edge_index]) {
-					edges[edge_index] = true;
+				duplicate = false;
+				curr = adj[from];
+				while (curr != NULL) {
+					if (curr->to == to) {
+						duplicate = true;
+						break;
+					}
+					curr = curr->next;
+				}
+
+				if (!duplicate) {
+					new_edge = malloc(sizeof(struct pkgmeta_dependency_edge));
+					if (new_edge == NULL) {
+						warnx("Out of memory");
+						mport_pkgmeta_vec_free(downdeps);
+						goto error;
+					}
+					new_edge->to = to;
+					new_edge->next = adj[from];
+					adj[from] = new_edge;
 					in_degree[to]++;
 				}
 				break;
@@ -116,20 +168,20 @@ mport_pkgmeta_sort_dependencies(
 		queued[i] = true;
 		sorted_packs[sorted_count++] = flat_packs[i];
 
-		for (j = 0; j < package_count; j++) {
-			edge_index = (i * package_count) + j;
-			if (edges[edge_index])
-				in_degree[j]--;
+		curr = adj[i];
+		while (curr != NULL) {
+			in_degree[curr->to]--;
+			curr = curr->next;
 		}
 	}
 
-	free(edges);
+	free_edges(adj, package_count);
 	free(in_degree);
 	free(queued);
 	return sorted_packs;
 
 error:
-	free(edges);
+	free_edges(adj, package_count);
 	free(sorted_packs);
 	free(in_degree);
 	free(queued);
