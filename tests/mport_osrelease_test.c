@@ -23,7 +23,7 @@ ATF_TC_BODY(osrelease_from_settings, tc)
 
 	mport = mport_instance_new();
 	ATF_REQUIRE(mport != NULL);
-	ATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, false));
+\tATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, MPORT_VQUIET));
 
 	ATF_REQUIRE_EQ(MPORT_OK, mport_setting_set(mport, MPORT_SETTING_TARGET_OS, "9.9-TEST"));
 
