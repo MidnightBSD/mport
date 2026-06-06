@@ -55,6 +55,15 @@ printf 'Running splint on %d staged .c file(s)...\n' "${#staged_c_files[@]}"
 
 for f in "${staged_c_files[@]}"; do
   [[ -f "$f" ]] || continue
+  if grep -Eq '^[[:space:]]*/\* *SPLINT_SKIP_FILE:' "$f"; then
+    reason="$(
+      sed -n 's:^[[:space:]]*/\* *SPLINT_SKIP_FILE: *::p' "$f" |
+        sed 's:[[:space:]]*\*/[[:space:]]*$::' |
+        head -n 1
+    )"
+    echo "Skipping $f: $reason" >&2
+    continue
+  fi
   echo "== $f ==" >>"$tmp_out"
   splint "${SPLINT_FLAGS[@]}" "${INCLUDE_DIRS[@]}" "$f" >>"$tmp_out" 2>&1 || true
 done
