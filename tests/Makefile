@@ -8,6 +8,11 @@ LDFLAGS.mport_fetch_test+=	-L${.CURDIR}/../libmport \
 				-Wl,-rpath,${.CURDIR}/../libmport \
 				-Wl,-rpath,${LOCALBASE}/lib
 LDADD.mport_fetch_test+=	-lmport -latf-c
+LDFLAGS.mport_util_test+=	-L${.CURDIR}/../libmport \
+				-L${LOCALBASE}/lib \
+				-Wl,-rpath,${.CURDIR}/../libmport \
+				-Wl,-rpath,${LOCALBASE}/lib
+LDADD.mport_util_test+=		-lmport -latf-c
 
 LDFLAGS.mport_util_test+=	-L${.CURDIR}/../libmport \
 				-L${LOCALBASE}/lib \
