@@ -15,6 +15,7 @@
 /*@-retvalint -retvalother -type -unrecog@*/
 
 #define TEST_ROOT "test-pkgmeta-root"
+#define SORT_TEST_PACKAGE_COUNT 4
 
 static void
 cleanup_test_root(void)
@@ -71,10 +72,10 @@ sorted_index(mportPackageMeta **sorted, int package_count, const char *name)
 }
 
 static void
-require_before(mportPackageMeta **sorted, const char *first, const char *second)
+require_before(mportPackageMeta **sorted, int package_count, const char *first, const char *second)
 {
-	int first_index = sorted_index(sorted, 4, first);
-	int second_index = sorted_index(sorted, 4, second);
+	int first_index = sorted_index(sorted, package_count, first);
+	int second_index = sorted_index(sorted, package_count, second);
 
 	ATF_REQUIRE_MSG(first_index >= 0, "missing package %s from sorted result", first);
 	ATF_REQUIRE_MSG(second_index >= 0, "missing package %s from sorted result", second);
@@ -118,12 +119,12 @@ ATF_TC_BODY(sort_dependencies_dependency_first, tc)
 	mport = create_test_instance();
 	populate_dependency_graph(mport);
 
-	sorted = mport_pkgmeta_sort_dependencies(mport, flat, 4, true);
+	sorted = mport_pkgmeta_sort_dependencies(mport, flat, SORT_TEST_PACKAGE_COUNT, true);
 	ATF_REQUIRE(sorted != NULL);
 
-	require_before(sorted, "d", "b");
-	require_before(sorted, "b", "a");
-	require_before(sorted, "c", "a");
+	require_before(sorted, SORT_TEST_PACKAGE_COUNT, "d", "b");
+	require_before(sorted, SORT_TEST_PACKAGE_COUNT, "b", "a");
+	require_before(sorted, SORT_TEST_PACKAGE_COUNT, "c", "a");
 
 	free(sorted);
 	mport_instance_free(mport);
@@ -156,12 +157,12 @@ ATF_TC_BODY(sort_dependencies_dependent_first, tc)
 	mport = create_test_instance();
 	populate_dependency_graph(mport);
 
-	sorted = mport_pkgmeta_sort_dependencies(mport, flat, 4, false);
+	sorted = mport_pkgmeta_sort_dependencies(mport, flat, SORT_TEST_PACKAGE_COUNT, false);
 	ATF_REQUIRE(sorted != NULL);
 
-	require_before(sorted, "a", "b");
-	require_before(sorted, "a", "c");
-	require_before(sorted, "b", "d");
+	require_before(sorted, SORT_TEST_PACKAGE_COUNT, "a", "b");
+	require_before(sorted, SORT_TEST_PACKAGE_COUNT, "a", "c");
+	require_before(sorted, SORT_TEST_PACKAGE_COUNT, "b", "d");
 
 	free(sorted);
 	mport_instance_free(mport);

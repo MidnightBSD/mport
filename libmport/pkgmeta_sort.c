@@ -73,6 +73,7 @@ mport_pkgmeta_sort_dependencies(
     mportInstance *mport, mportPackageMeta **flat_packs, int package_count, bool reverse_edges)
 {
 	mportPackageMeta **sorted_packs;
+	mportPackageMeta **result;
 	mportPackageMeta **downdeps;
 	mportPackageMeta **d;
 	struct pkgmeta_dependency_edge **adj;
@@ -87,10 +88,11 @@ mport_pkgmeta_sort_dependencies(
 	int to;
 	int sorted_count;
 
+	result = NULL;
 	if (flat_packs == NULL || package_count <= 0)
 		return calloc(1, sizeof(mportPackageMeta *));
 
-	sorted_packs = calloc((size_t)package_count + 1, sizeof(mportPackageMeta *));
+	sorted_packs = calloc((size_t)(package_count + 1), sizeof(mportPackageMeta *));
 	in_degree = calloc((size_t)package_count, sizeof(int));
 	queued = calloc((size_t)package_count, sizeof(bool));
 	adj = calloc((size_t)package_count, sizeof(struct pkgmeta_dependency_edge *));
@@ -175,16 +177,14 @@ mport_pkgmeta_sort_dependencies(
 		}
 	}
 
-	free_edges(adj, package_count);
-	free(in_degree);
-	free(queued);
-	return sorted_packs;
+	result = sorted_packs;
+	sorted_packs = NULL;
 
 error:
 	free_edges(adj, package_count);
 	free(sorted_packs);
 	free(in_degree);
 	free(queued);
-	return NULL;
+	return result;
 }
 /*@end@*/

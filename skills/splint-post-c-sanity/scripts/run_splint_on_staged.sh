@@ -55,8 +55,13 @@ printf 'Running splint on %d staged .c file(s)...\n' "${#staged_c_files[@]}"
 
 for f in "${staged_c_files[@]}"; do
   [[ -f "$f" ]] || continue
-  if grep -q 'SPLINT_SKIP_FILE:' "$f"; then
-    echo "Skipping $f: $(sed -n 's/.*SPLINT_SKIP_FILE: *//p' "$f" | head -n 1)" >>"$tmp_out"
+  if grep -Eq '^[[:space:]]*/\* *SPLINT_SKIP_FILE:' "$f"; then
+    reason="$(
+      sed -n 's:^[[:space:]]*/\* *SPLINT_SKIP_FILE: *::p' "$f" |
+        sed 's:[[:space:]]*\*/[[:space:]]*$::' |
+        head -n 1
+    )"
+    echo "Skipping $f: $reason" >&2
     continue
   fi
   echo "== $f ==" >>"$tmp_out"
@@ -69,8 +74,6 @@ findings="$(
   awk '
     NF == 0 { next }
     /^== / { next }
-    /^Skipping .*SPLINT_SKIP_FILE/ { next }
-    /^Skipping / { next }
     /^Splint [0-9]/ { next }
     /^Command Line: Setting .* redundant with current value$/ { next }
     /^Finished checking --- no warnings$/ { next }
