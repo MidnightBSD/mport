@@ -76,7 +76,7 @@ ATF_TC_BODY(osrelease_settings_null, tc)
 
 	mport = mport_instance_new();
 	ATF_REQUIRE(mport != NULL);
-	ATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, false));
+\tATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, MPORT_VQUIET));
 
 	// make sure the setting does not exist or we clear it
 	mport_db_do(mport->db, "DELETE FROM settings WHERE name=%Q", MPORT_SETTING_TARGET_OS);
