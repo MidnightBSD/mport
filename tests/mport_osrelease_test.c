@@ -9,7 +9,6 @@
 #include <unistd.h>
 
 #include "../libmport/mport.h"
-#include "../libmport/mport_private.h"
 
 ATF_TC_WITH_CLEANUP(osrelease_from_settings);
 ATF_TC_HEAD(osrelease_from_settings, tc)
@@ -23,9 +22,9 @@ ATF_TC_BODY(osrelease_from_settings, tc)
 
 	mport = mport_instance_new();
 	ATF_REQUIRE(mport != NULL);
-\tATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, MPORT_VQUIET));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, false));
 
-	ATF_REQUIRE_EQ(MPORT_OK, mport_setting_set(mport, MPORT_SETTING_TARGET_OS, "9.9-TEST"));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_setting_set(mport, "target_os", "9.9-TEST"));
 
 	version = mport_get_osrelease(mport);
 	ATF_REQUIRE(version != NULL);
@@ -76,10 +75,10 @@ ATF_TC_BODY(osrelease_settings_null, tc)
 
 	mport = mport_instance_new();
 	ATF_REQUIRE(mport != NULL);
-\tATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, MPORT_VQUIET));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, false));
 
 	// make sure the setting does not exist or we clear it
-\tATF_REQUIRE_EQ(MPORT_OK, mport_db_do(mport->db, "DELETE FROM settings WHERE name=%Q", MPORT_SETTING_TARGET_OS));
+	mport_setting_set(mport, "target_os", "");
 
 	version = mport_get_osrelease(mport);
 	// this shouldn't crash, and will try system methods
