@@ -3,7 +3,6 @@ TESTSDIR=	${TESTSBASE}/mport
 KYUAFILE=	no
 
 ATF_TESTS_C+=	mport_fetch_test mport_util_test
-
 LDFLAGS.mport_fetch_test+=	-L${.CURDIR}/../libmport \
 				-L${LOCALBASE}/lib \
 				-Wl,-rpath,${.CURDIR}/../libmport \
