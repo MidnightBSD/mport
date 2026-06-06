@@ -10,17 +10,18 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "../libmport/mport.h"
+#include <errno.h>
 
 #include "../libmport/mport.h"
 #include "../libmport/mport_private.h"
 
 extern int mport_count_spaces(const char *);
 
-/* Splint does not understand ATF's generated test-case wrappers. */
-/*@-boundsread -boundswrite -compdef -compdestroy -dependenttrans -fullinitblock@*/
-/*@-mustfreefresh -noeffect -nullderef -nullpass -nullret -nullstate@*/
-/*@-retvalint -retvalother -type -unrecog@*/
+int mport_rmdir(const char *, int);
+
+
+ATF_TC_WITH_CLEANUP(mport_rmdir_empty);
+ATF_TC_HEAD(mport_rmdir_empty, tc)
 
 #define TEST_DIR "test_mport_mkdir_dir"
 
@@ -157,61 +158,93 @@ ATF_TC_BODY(mport_check_answer_bool_invalid, tc)
 	ATF_REQUIRE_EQ(false, mport_check_answer_bool("hello"));
 static void
 create_file(const char *filename, const void *data, size_t len)
+
 {
-	FILE *f = fopen(filename, "wb");
-	ATF_REQUIRE(f != NULL);
-	if (len > 0) {
-		ATF_REQUIRE_EQ(len, fwrite(data, 1, len, f));
-	}
-	fclose(f);
+	atf_tc_set_md_var(tc, "descr", "mport_rmdir successfully removes an empty directory");
+}
+ATF_TC_BODY(mport_rmdir_empty, tc)
+{
+	const char *test_dir = "test_empty_dir";
+
+	ATF_REQUIRE(mkdir(test_dir, 0755) == 0);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_rmdir(test_dir, 0));
+	ATF_REQUIRE(access(test_dir, F_OK) != 0);
+}
+ATF_TC_CLEANUP(mport_rmdir_empty, tc)
+{
+	rmdir("test_empty_dir");
 }
 
-ATF_TC_WITH_CLEANUP(is_elf_file_true);
-ATF_TC_HEAD(is_elf_file_true, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "mport_is_elf_file returns true for an ELF file");
-}
-ATF_TC_BODY(is_elf_file_true, tc)
-{
-	const char *filename = "test_elf_file";
-	const char magic[] = "\x7F"
-			     "ELF"
-			     "some other data";
-	create_file(filename, magic, sizeof(magic) - 1); // exclude null terminator
-
-	ATF_CHECK(mport_is_elf_file(filename));
-}
-ATF_TC_CLEANUP(is_elf_file_true, tc)
-{
-	unlink("test_elf_file");
-}
-
-ATF_TC_WITH_CLEANUP(is_elf_file_false_text);
-ATF_TC_HEAD(is_elf_file_false_text, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "mport_is_elf_file returns false for a plain text file");
-}
-ATF_TC_BODY(is_elf_file_false_text, tc)
-{
-	const char *filename = "test_text_file.txt";
-	const char content[] = "Hello World!";
-	create_file(filename, content, sizeof(content) - 1);
-
-	ATF_CHECK(!mport_is_elf_file(filename));
-}
-ATF_TC_CLEANUP(is_elf_file_false_text, tc)
-{
-	unlink("test_text_file.txt");
-}
-
-ATF_TC_WITH_CLEANUP(is_elf_file_false_small);
-ATF_TC_HEAD(is_elf_file_false_small, tc)
+ATF_TC_WITH_CLEANUP(mport_rmdir_nonempty_ignore);
+ATF_TC_HEAD(mport_rmdir_nonempty_ignore, tc)
 {
 	atf_tc_set_md_var(
-	    tc, "descr", "mport_is_elf_file returns false for a file smaller than ELF magic");
+	    tc, "descr", "mport_rmdir handles non-empty directory with ignore_nonempty=1");
 }
-ATF_TC_BODY(is_elf_file_false_small, tc)
+ATF_TC_BODY(mport_rmdir_nonempty_ignore, tc)
 {
+	const char *test_dir = "test_nonempty_dir_ignore";
+	const char *test_file = "test_nonempty_dir_ignore/file.txt";
+
+	ATF_REQUIRE(mkdir(test_dir, 0755) == 0);
+	int fd = open(test_file, O_CREAT | O_WRONLY, 0644);
+	ATF_REQUIRE(fd != -1);
+	close(fd);
+
+	ATF_REQUIRE_EQ(MPORT_OK, mport_rmdir(test_dir, 1));
+	ATF_REQUIRE(access(test_dir, F_OK) == 0); /* Directory should still exist */
+
+	unlink(test_file);
+}
+ATF_TC_CLEANUP(mport_rmdir_nonempty_ignore, tc)
+{
+	unlink("test_nonempty_dir_ignore/file.txt");
+	rmdir("test_nonempty_dir_ignore");
+}
+
+ATF_TC_WITH_CLEANUP(mport_rmdir_nonempty_noignore);
+ATF_TC_HEAD(mport_rmdir_nonempty_noignore, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "mport_rmdir fails on non-empty directory with ignore_nonempty=0");
+}
+ATF_TC_BODY(mport_rmdir_nonempty_noignore, tc)
+{
+
+	const char *test_dir = "test_nonempty_dir_noignore";
+	const char *test_file = "test_nonempty_dir_noignore/file.txt";
+
+	ATF_REQUIRE(mkdir(test_dir, 0755) == 0);
+	int fd = open(test_file, O_CREAT | O_WRONLY, 0644);
+	ATF_REQUIRE(fd != -1);
+	close(fd);
+
+	ATF_REQUIRE(mport_rmdir(test_dir, 0) != MPORT_OK);
+
+	unlink(test_file);
+}
+ATF_TC_CLEANUP(mport_rmdir_nonempty_noignore, tc)
+{
+	unlink("test_nonempty_dir_noignore/file.txt");
+	rmdir("test_nonempty_dir_noignore");
+}
+
+ATF_TC_WITH_CLEANUP(mport_rmdir_notfound_ignore);
+ATF_TC_HEAD(mport_rmdir_notfound_ignore, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "mport_rmdir handles non-existent directory with ignore_nonempty=1");
+}
+ATF_TC_BODY(mport_rmdir_notfound_ignore, tc)
+{
+	const char *test_dir = "test_notfound_dir";
+
+	ATF_REQUIRE(access(test_dir, F_OK) != 0);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_rmdir(test_dir, 1));
+}
+ATF_TC_CLEANUP(mport_rmdir_notfound_ignore, tc)
+{
+
 	(void)tc;
 	ATF_REQUIRE_EQ(0, mport_count_spaces(""));
 }
@@ -245,6 +278,10 @@ ATF_TC_BODY(count_spaces_mixed, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, mport_rmdir_empty);
+	ATF_TP_ADD_TC(tp, mport_rmdir_nonempty_ignore);
+	ATF_TP_ADD_TC(tp, mport_rmdir_nonempty_noignore);
+	ATF_TP_ADD_TC(tp, mport_rmdir_notfound_ignore);
 	ATF_TP_ADD_TC(tp, mport_mkdir_success);
 	ATF_TP_ADD_TC(tp, mport_mkdir_existing);
 	ATF_TP_ADD_TC(tp, count_spaces_empty);

@@ -18,6 +18,7 @@ LDFLAGS.mport_osrelease_test+=	-L${.CURDIR}/../libmport \
 				-Wl,-rpath,${LOCALBASE}/lib
 LDADD.mport_osrelease_test+=	-lmport -latf-c
 
+ATF_TESTS_C+=	mport_util_test
 LDFLAGS.mport_util_test+=	-L${.CURDIR}/../libmport \
 				-L${LOCALBASE}/lib \
 				-Wl,-rpath,${.CURDIR}/../libmport \
