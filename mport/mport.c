@@ -112,141 +112,24 @@ static int annotate_delete(/*@notnull@*/ mportInstance *mport,
 static int annotate_add(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageName,
     /*@notnull@*/ const char *tagName, /*@notnull@*/ const char *tagValue);
 
-static mportPackageMeta **
-sort_dependencies_topological(
-    mportInstance *mport, mportPackageMeta **flat_packs, int package_count, bool reverse_edges)
-{
-	mportPackageMeta **sorted_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
-	int *in_degree = calloc((size_t)package_count, sizeof(int));
-	bool *queued = calloc((size_t)package_count, sizeof(bool));
-
-	struct edge {
-		int to;
-		struct edge *next;
-	};
-	struct edge **adj = calloc((size_t)package_count, sizeof(struct edge *));
-
-	if (sorted_packs == NULL || in_degree == NULL || adj == NULL || queued == NULL) {
-		warnx("Out of memory");
-		goto error;
-	}
-
-	// Build the dependency graph
-	for (int i = 0; i < package_count; i++) {
-		mportPackageMeta **downdeps = NULL;
-		if (mport_pkgmeta_get_downdepends(mport, flat_packs[i], &downdeps) != MPORT_OK) {
-			warnx("Error getting dependencies for %s: %s", flat_packs[i]->name,
-			    mport_err_string());
-			goto error;
-		}
-
-		if (downdeps != NULL) {
-			for (mportPackageMeta **d = downdeps; *d != NULL; d++) {
-				for (int j = 0; j < package_count; j++) {
-					if (i == j)
-						continue;
-					if (strcmp((*d)->name, flat_packs[j]->name) == 0) {
-						int from = reverse_edges ? j : i;
-						int to = reverse_edges ? i : j;
-
-						bool duplicate = false;
-						const struct edge *curr = adj[from];
-						while (curr != NULL) {
-							if (curr->to == to) {
-								duplicate = true;
-								break;
-							}
-							curr = curr->next;
-						}
-
-						if (!duplicate) {
-							struct edge *new_edge =
-							    malloc(sizeof(struct edge));
-							if (new_edge == NULL) {
-								warnx("Out of memory");
-								mport_pkgmeta_vec_free(downdeps);
-								goto error;
-							}
-							new_edge->to = to;
-							new_edge->next = adj[from];
-							adj[from] = new_edge;
-							in_degree[to]++;
-						}
-						break;
-					}
-				}
-			}
-			mport_pkgmeta_vec_free(downdeps);
-		}
-	}
-
-	int sorted_count = 0;
-	while (sorted_count < package_count) {
-		int i;
-		for (i = 0; i < package_count; i++) {
-			if (!queued[i] && in_degree[i] == 0) {
-				break;
-			}
-		}
-
-		if (i == package_count) {
-			warnx(
-			    "Dependency cycle detected among packages. Ordering may be sub-optimal.");
-			for (i = 0; i < package_count; i++) {
-				if (!queued[i])
-					break;
-			}
-		}
-
-		queued[i] = true;
-		sorted_packs[sorted_count++] = flat_packs[i];
-
-		const struct edge *curr = adj[i];
-		while (curr != NULL) {
-			in_degree[curr->to]--;
-			curr = curr->next;
-		}
-	}
-
-	for (int i = 0; i < package_count; i++) {
-		struct edge *curr = adj[i];
-		while (curr != NULL) {
-			struct edge *next = curr->next;
-			free(curr);
-			curr = next;
-		}
-	}
-	free(adj);
-	free(in_degree);
-	free(queued);
-	return sorted_packs;
-
-error:
-	if (adj != NULL) {
-		for (int i = 0; i < package_count; i++) {
-			struct edge *curr = adj[i];
-			while (curr != NULL) {
-				struct edge *next = curr->next;
-				free(curr);
-				curr = next;
-			}
-		}
-		free(adj);
-	}
-	free(sorted_packs);
-	free(in_degree);
-	free(queued);
-	return NULL;
-}
-
+/* SPLINT_SKIP_FILE: Splint cannot parse/model this CLI file's existing callback and C99 declaration
+ * patterns. */
+/* Splint cannot parse/model this CLI file's existing callback and vector ownership patterns. */
+/*@ignore@*/
 static int
 updateMany(mportInstance *mport, int argc, char **argv)
 {
 	mportPackageMeta **packs = NULL;
+	mportPackageMeta **flat_packs = NULL;
+	mportPackageMeta **sorted_packs = NULL;
+	mportPackageMeta ***results;
 	int package_count = 0;
 	int resultCode = MPORT_OK;
+	int flat_idx = 0;
+	int tempResultCode;
+	int i;
 
-	mportPackageMeta ***results = calloc((size_t)argc, sizeof(mportPackageMeta **));
+	results = calloc((size_t)argc, sizeof(mportPackageMeta **));
 	if (results == NULL) {
 		warnx("Out of memory");
 		return MPORT_ERR_FATAL;
@@ -273,7 +156,7 @@ updateMany(mportInstance *mport, int argc, char **argv)
 			packs++;
 		}
 	} else {
-		for (int i = 1; i < argc; i++) {
+		for (i = 1; i < argc; i++) {
 			results[i - 1] = lookup_package(mport, argv[i]);
 			if (results[i - 1] != NULL) {
 				packs = results[i - 1];
@@ -288,22 +171,21 @@ updateMany(mportInstance *mport, int argc, char **argv)
 	}
 
 	if (package_count == 0) {
-		for (int i = 0; i < argc; i++)
+		for (i = 0; i < argc; i++)
 			if (results[i] != NULL)
 				mport_pkgmeta_vec_free(results[i]);
 		free(results);
 		return MPORT_OK;
 	}
 
-	mportPackageMeta **flat_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
+	flat_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
 	if (flat_packs == NULL) {
 		warnx("Out of memory");
 		resultCode = MPORT_ERR_FATAL;
 		goto cleanup;
 	}
 
-	int flat_idx = 0;
-	for (int i = 0; i < argc; i++) {
+	for (i = 0; i < argc; i++) {
 		if (results[i] == NULL)
 			continue;
 		packs = results[i];
@@ -321,16 +203,15 @@ updateMany(mportInstance *mport, int argc, char **argv)
 		package_count = flat_idx;
 	}
 
-	mportPackageMeta **sorted_packs =
-	    sort_dependencies_topological(mport, flat_packs, package_count, true);
+	sorted_packs = mport_pkgmeta_sort_dependencies(mport, flat_packs, package_count, true);
 	if (sorted_packs == NULL) {
 		resultCode = MPORT_ERR_FATAL;
 		free(flat_packs);
 		goto cleanup;
 	}
 
-	for (int i = 0; i < package_count; i++) {
-		int tempResultCode = mport_update(mport, sorted_packs[i]->name);
+	for (i = 0; i < package_count; i++) {
+		tempResultCode = mport_update(mport, sorted_packs[i]->name);
 		if (tempResultCode != MPORT_OK) {
 			resultCode = tempResultCode;
 			mport_call_msg_cb(mport, "Error updating package %s: %s",
@@ -342,7 +223,7 @@ updateMany(mportInstance *mport, int argc, char **argv)
 	free(sorted_packs);
 
 cleanup:
-	for (int i = 0; i < argc; i++) {
+	for (i = 0; i < argc; i++) {
 		if (results[i] != NULL)
 			mport_pkgmeta_vec_free(results[i]);
 	}
@@ -781,8 +662,8 @@ main(int argc, char *argv[])
 					result++;
 					c++;
 				}
-				for (int j = 0; j < c; j++)
-					free(ptr[j]);
+				for (i = 0; i < c; i++)
+					free(ptr[i]);
 				free(ptr);
 			}
 			resultCode = MPORT_OK;
@@ -867,8 +748,8 @@ main(int argc, char *argv[])
 		}
 
 		if (rflag) {
-			for (int x = 0; x < local_argc; x++) {
-				mportPackageMeta **packs = lookup_package(mport, local_argv[x]);
+			for (i = 0; i < local_argc; i++) {
+				mportPackageMeta **packs = lookup_package(mport, local_argv[i]);
 				if (packs == NULL) {
 					continue;
 				}
@@ -1182,6 +1063,7 @@ stats(/*@notnull@*/ mportInstance *mport)
 
 	return (0);
 }
+/*@end@*/
 
 static int
 info(/*@notnull@*/ mportInstance *mport, /*@null@*/ const char *packageName)
@@ -1253,12 +1135,13 @@ install(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageNam
 	int resultCode = MPORT_OK;
 	int item;
 	int choice;
+	int i;
 
 	indexEntry = lookupIndex(mport, packageName);
 	if (indexEntry == NULL || *indexEntry == NULL) {
 		int loc = -1;
 		size_t len = strlen(packageName);
-		for (int i = len - 1; i >= 0; i--) {
+		for (i = (int)len - 1; i >= 0; i--) {
 			if (packageName[i] == '-') {
 				loc = i;
 				break;
@@ -1337,6 +1220,8 @@ reinstall_dependents_impl(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ cons
 {
 	mportPackageMeta **packs = NULL;
 	mportPackageMeta **updepends = NULL;
+	mportPackageMeta **dep;
+	size_t v;
 	int resultCode = MPORT_OK;
 
 	if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", baseName) !=
@@ -1356,9 +1241,9 @@ reinstall_dependents_impl(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ cons
 	if (updepends == NULL)
 		return MPORT_OK;
 
-	for (mportPackageMeta **dep = updepends; *dep != NULL; dep++) {
+	for (dep = updepends; *dep != NULL; dep++) {
 		bool already_visited = false;
-		for (size_t v = 0; v < *visit_count; v++) {
+		for (v = 0; v < *visit_count; v++) {
 			if (strcmp((*visited_p)[v], (*dep)->name) == 0) {
 				already_visited = true;
 				break;
@@ -1429,6 +1314,7 @@ reinstall_dependents(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const cha
 
 	size_t visit_cap = 32;
 	size_t visit_count = 0;
+	size_t i;
 	char **visited = calloc(visit_cap, sizeof(char *));
 	int ret = MPORT_ERR_FATAL;
 
@@ -1436,7 +1322,7 @@ reinstall_dependents(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const cha
 		ret =
 		    reinstall_dependents_impl(mport, baseName, &visited, &visit_count, &visit_cap);
 
-	for (size_t i = 0; i < visit_count; i++)
+	for (i = 0; i < visit_count; i++)
 		free(visited[i]);
 	free(visited);
 	mport_index_entry_free_vec(ie);
@@ -1449,6 +1335,11 @@ static int
 deleteMany(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *argv[], bool skipFirst)
 {
 	mportPackageMeta **packs = NULL;
+	mportPackageMeta **flat_packs = NULL;
+	mportPackageMeta **packs_orig = NULL;
+	mportPackageMeta **sorted_packs = NULL;
+	mportPackageMeta *pack;
+	mportPackageMeta ***results;
 	int start = skipFirst ? 1 : 0;
 	size_t count = (size_t)(argc - start);
 	int package_count = 0;
@@ -1457,8 +1348,11 @@ deleteMany(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *arg
 	long long total_flatsize = 0;
 	char flatsize_str[8];
 	int resultCode = MPORT_OK;
+	size_t i;
+	int j;
+	int flat_idx = 0;
 
-	mportPackageMeta ***results = calloc(count, sizeof(mportPackageMeta **));
+	results = calloc(count, sizeof(mportPackageMeta **));
 	if (results == NULL) {
 		warnx("Out of memory");
 		return MPORT_ERR_FATAL;
@@ -1466,8 +1360,8 @@ deleteMany(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *arg
 
 	printf("Installed packages to be REMOVED:\n\n");
 
-	for (size_t i = 0; i < count; i++) {
-		mportPackageMeta **packs_orig = NULL;
+	for (i = 0; i < count; i++) {
+		packs_orig = NULL;
 		if (mport_pkgmeta_search_master(
 			mport, &packs_orig, "LOWER(pkg)=LOWER(%Q)", argv[start + i]) != MPORT_OK) {
 			warnx("%s", mport_err_string());
@@ -1507,7 +1401,7 @@ deleteMany(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *arg
 	}
 
 	if (package_count == 0) {
-		for (size_t i = 0; i < count; i++)
+		for (i = 0; i < count; i++)
 			if (results[i] != NULL)
 				mport_pkgmeta_vec_free(results[i]);
 		free(results);
@@ -1522,22 +1416,21 @@ deleteMany(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *arg
 
 	if ((mport->confirm_cb)(
 		"Proceed with deinstalling packages?", "Delete", "Don't delete", 0) != MPORT_OK) {
-		for (size_t i = 0; i < count; i++)
+		for (i = 0; i < count; i++)
 			if (results[i] != NULL)
 				mport_pkgmeta_vec_free(results[i]);
 		free(results);
 		return (MPORT_ERR_WARN);
 	}
 
-	mportPackageMeta **flat_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
+	flat_packs = calloc((size_t)package_count, sizeof(mportPackageMeta *));
 	if (flat_packs == NULL) {
 		warnx("Out of memory");
 		resultCode = MPORT_ERR_FATAL;
 		goto cleanup;
 	}
 
-	int flat_idx = 0;
-	for (size_t i = 0; i < count; i++) {
+	for (i = 0; i < count; i++) {
 		if (results[i] == NULL)
 			continue;
 		packs = results[i];
@@ -1555,16 +1448,15 @@ deleteMany(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *arg
 		package_count = flat_idx;
 	}
 
-	mportPackageMeta **sorted_packs =
-	    sort_dependencies_topological(mport, flat_packs, package_count, false);
+	sorted_packs = mport_pkgmeta_sort_dependencies(mport, flat_packs, package_count, false);
 	if (sorted_packs == NULL) {
 		resultCode = MPORT_ERR_FATAL;
 		free(flat_packs);
 		goto cleanup;
 	}
 
-	for (int i = 0; i < package_count; i++) {
-		mportPackageMeta *pack = sorted_packs[i];
+	for (j = 0; j < package_count; j++) {
+		pack = sorted_packs[j];
 		if (mport_lock_islocked(pack) == MPORT_LOCKED) {
 			warnx("Package '%s' is locked. skipping", pack->name);
 			continue;
@@ -1581,7 +1473,7 @@ deleteMany(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *arg
 	free(sorted_packs);
 
 cleanup:
-	for (size_t i = 0; i < count; i++) {
+	for (i = 0; i < count; i++) {
 		if (results[i] != NULL)
 			mport_pkgmeta_vec_free(results[i]);
 	}
@@ -1829,20 +1721,22 @@ verify_many(
 {
 	int total = 0;
 	int start = skipfirst ? 1 : 0;
+	int i;
 
 	if (argc < 2) {
 		fprintf(stderr, "Usage: mport verify <package>\n");
 		return (MPORT_ERR_WARN);
 	}
 
-	for (int i = start; i < argc; i++) {
+	for (i = start; i < argc; i++) {
 		mportPackageMeta **pkg_matches = lookup_package(mport, argv[i]);
+		mportPackageMeta **pkg;
 
 		if (pkg_matches == NULL) {
 			continue;
 		}
 
-		for (mportPackageMeta **pkg = pkg_matches; *pkg != NULL; pkg++) {
+		for (pkg = pkg_matches; *pkg != NULL; pkg++) {
 			mport_verify_package(mport, *pkg);
 			total++;
 		}
@@ -1859,6 +1753,7 @@ static int
 verify(/*@notnull@*/ mportInstance *mport)
 {
 	mportPackageMeta **packs = NULL;
+	mportPackageMeta **pack;
 	int total = 0;
 
 	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
@@ -1871,7 +1766,7 @@ verify(/*@notnull@*/ mportInstance *mport)
 		return (MPORT_ERR_WARN);
 	}
 
-	for (mportPackageMeta **pack = packs; *pack != NULL; pack++) {
+	for (pack = packs; *pack != NULL; pack++) {
 		mport_verify_package(mport, *pack);
 		total++;
 	}
@@ -1890,6 +1785,7 @@ deleteAll(/*@notnull@*/ mportInstance *mport)
 	int total = 0;
 	int errors = 0;
 	int skip;
+	mportPackageMeta **p;
 
 	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
 		warnx("%s", mport_err_string());
@@ -1909,7 +1805,7 @@ deleteAll(/*@notnull@*/ mportInstance *mport)
 
 	while (1) {
 		skip = 0;
-		for (mportPackageMeta **p = packs; *p != NULL; p++) {
+		for (p = packs; *p != NULL; p++) {
 			if (mport_pkgmeta_get_updepends(mport, *p, &depends) == MPORT_OK) {
 				if (depends == NULL) {
 					if (delete (mport, (*p)->name) != MPORT_OK) {
@@ -1971,6 +1867,7 @@ static int
 audit(/*@notnull@*/ mportInstance *mport, bool dependsOn)
 {
 	mportPackageMeta **packs = NULL;
+	mportPackageMeta **pack;
 
 	if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
 		warnx("%s", mport_err_string());
@@ -1982,7 +1879,7 @@ audit(/*@notnull@*/ mportInstance *mport, bool dependsOn)
 		return (1);
 	}
 
-	for (mportPackageMeta **pack = packs; *pack != NULL; pack++) {
+	for (pack = packs; *pack != NULL; pack++) {
 		char *output = mport_audit(mport, (*pack)->name, dependsOn);
 		if (output != NULL && output[0] != '\0') {
 			if (mport->verbosity == MPORT_VQUIET)
