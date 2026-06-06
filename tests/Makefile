@@ -13,7 +13,7 @@ LDFLAGS.mport_util_test+=	-L${.CURDIR}/../libmport \
 				-L${LOCALBASE}/lib \
 				-Wl,-rpath,${.CURDIR}/../libmport \
 				-Wl,-rpath,${LOCALBASE}/lib
-LDADD.mport_util_test+=		-lmport -latf-c
+LDADD.mport_util_test+=	-lmport -latf-c
 
 mportFILES=	Kyuafile \
 		mport_create_test \

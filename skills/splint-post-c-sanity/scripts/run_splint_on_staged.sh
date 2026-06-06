@@ -32,9 +32,6 @@ SPLINT_FLAGS=(
   "-D__aligned(x)="
   "-D_Alignof(x)=sizeof(x)"
   "-D__va_list=void *"
-  "-D__amd64__"
-  "-D__FreeBSD__=10"
-  "-D__MidnightBSD_version=300000"
   +boundsread +boundswrite +likelybounds
   +nullpass +nullret
   +bufferoverflowhigh
@@ -66,7 +63,6 @@ findings="$(
     /^== / { next }
     /^Splint [0-9]/ { next }
     /^Command Line: Setting .* redundant with current value$/ { next }
-    /^Finished checking --- no warnings$/ { next }
     { printf "%d:%s\n", NR, $0 }
   ' "$tmp_out"
 )"
