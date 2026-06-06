@@ -30,12 +30,12 @@ pick_clang_format() {
     return 0
   fi
 
-  # Try version-suffixed binaries (clang-formatNN) and pick the highest NN.
+  # Try version-suffixed binaries (clang-format-NN) and pick the highest NN.
   local best=""
   local best_ver=-1
   while IFS= read -r cmd; do
     local base="${cmd##*/}"
-    if [[ "$base" =~ ^clang-format([0-9]+)$ ]]; then
+    if [[ "$base" =~ ^clang-format-([0-9]+)$ ]]; then
       local ver="${BASH_REMATCH[1]}"
       if (( ver > best_ver )); then
         best_ver=$ver
@@ -69,7 +69,7 @@ pick_clang_tidy() {
   local best_ver=-1
   while IFS= read -r cmd; do
     local base="${cmd##*/}"
-    if [[ "$base" =~ ^clang-tidy([0-9]+)$ ]]; then
+    if [[ "$base" =~ ^clang-tidy-([0-9]+)$ ]]; then
       local ver="${BASH_REMATCH[1]}"
       if (( ver > best_ver )); then
         best_ver=$ver
