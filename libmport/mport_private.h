@@ -33,9 +33,9 @@
 
 #ifdef DEBUG
 #include <err.h>
-#define DIAG(fmt, ...) warnx(fmt, ## __VA_ARGS__);
+#define DIAG(fmt, args...) warnx(fmt, ## args);
 #else
-#define DIAG(...) 
+#define DIAG(args...) 
 #endif
 
 #if defined(__MidnightBSD__)
@@ -202,8 +202,8 @@ mportPackageMessage* mport_pkg_message_from_ucl(mportInstance *, const ucl_objec
 #define RETURN_CURRENT_ERROR return mport_err_code()
 #define RETURN_ERROR(code, msg) return mport_set_errx((code), "Error at %s:(%d): %s", __FILE__, __LINE__, (msg))
 #define SET_ERROR(code, msg) mport_set_errx((code), "Error at %s:(%d): %s", __FILE__, __LINE__, (msg))
-#define RETURN_ERRORX(code, fmt, ...) return mport_set_errx((code), "Error at %s:(%d): " fmt, __FILE__, __LINE__, __VA_ARGS__)
-#define SET_ERRORX(code, fmt, ...) mport_set_errx((code), "Error at %s:(%d): " fmt, __FILE__, __LINE__, __VA_ARGS__)
+#define RETURN_ERRORX(code, fmt, args...) return mport_set_errx((code), "Error at %s:(%d): " fmt, __FILE__, __LINE__, ## args)
+#define SET_ERRORX(code, fmt, args...) mport_set_errx((code), "Error at %s:(%d): " fmt, __FILE__, __LINE__, ## args)
 int mport_set_err(int, const char *);
 int mport_set_errx(int , const char *, ...);
 

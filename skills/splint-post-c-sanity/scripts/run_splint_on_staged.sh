@@ -31,6 +31,7 @@ SPLINT_FLAGS=(
   +posixlib -warnposixheaders
   "-D__aligned(x)="
   "-D_Alignof(x)=sizeof(x)"
+  "-D_RuneLocale=void"
   "-D__va_list=void *"
   "-D__amd64__"
   "-D__FreeBSD__=10"
