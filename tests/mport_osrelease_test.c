@@ -9,7 +9,47 @@
 #include <unistd.h>
 
 #include "../libmport/mport.h"
-#include "../libmport/mport_private.h"
+
+#define TEST_ROOT "test-osrelease-root"
+#define MPORT_SETTING_TARGET_OS "target_os"
+
+int mport_db_do(sqlite3 *, const char *, ...);
+
+/* Splint does not understand ATF's generated test-case wrappers. */
+/*@-boundsread -boundswrite -compdef -compdestroy -dependenttrans -fullinitblock@*/
+/*@-mustfreefresh -noeffect -nullpass -nullret -nullstate -paramuse@*/
+/*@-retvalint -retvalother -type -unrecog@*/
+
+static void
+cleanup_test_root(void)
+{
+	(void)unlink(TEST_ROOT "/var/db/mport/master.db-wal");
+	(void)unlink(TEST_ROOT "/var/db/mport/master.db-shm");
+	(void)unlink(TEST_ROOT "/var/db/mport/master.db");
+	(void)rmdir(TEST_ROOT "/var/db/mport/infrastructure");
+	(void)rmdir(TEST_ROOT "/var/db/mport");
+	(void)rmdir(TEST_ROOT "/var/db");
+	(void)rmdir(TEST_ROOT "/var");
+	(void)rmdir(TEST_ROOT);
+}
+
+static mportInstance *
+create_test_instance(void)
+{
+	mportInstance *mport;
+
+	cleanup_test_root();
+	ATF_REQUIRE_EQ(0, mkdir(TEST_ROOT, 0755));
+	ATF_REQUIRE_EQ(0, mkdir(TEST_ROOT "/var", 0755));
+	ATF_REQUIRE_EQ(0, mkdir(TEST_ROOT "/var/db", 0755));
+
+	mport = mport_instance_new();
+	ATF_REQUIRE(mport != NULL);
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_instance_init(mport, TEST_ROOT, "root", false, MPORT_VQUIET));
+
+	return mport;
+}
 
 ATF_TC_WITH_CLEANUP(osrelease_from_settings);
 ATF_TC_HEAD(osrelease_from_settings, tc)
@@ -21,9 +61,7 @@ ATF_TC_BODY(osrelease_from_settings, tc)
 	mportInstance *mport;
 	char *version;
 
-	mport = mport_instance_new();
-	ATF_REQUIRE(mport != NULL);
-\tATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, MPORT_VQUIET));
+	mport = create_test_instance();
 
 	ATF_REQUIRE_EQ(MPORT_OK, mport_setting_set(mport, MPORT_SETTING_TARGET_OS, "9.9-TEST"));
 
@@ -37,6 +75,8 @@ ATF_TC_BODY(osrelease_from_settings, tc)
 ATF_TC_CLEANUP(osrelease_from_settings, tc)
 {
 	(void)tc;
+
+	cleanup_test_root();
 }
 
 ATF_TC_WITH_CLEANUP(osrelease_null_instance);
@@ -74,15 +114,12 @@ ATF_TC_BODY(osrelease_settings_null, tc)
 	mportInstance *mport;
 	char *version;
 
-	mport = mport_instance_new();
-	ATF_REQUIRE(mport != NULL);
-\tATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, MPORT_VQUIET));
+	mport = create_test_instance();
 
-	// make sure the setting does not exist or we clear it
-\tATF_REQUIRE_EQ(MPORT_OK, mport_db_do(mport->db, "DELETE FROM settings WHERE name=%Q", MPORT_SETTING_TARGET_OS));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "DELETE FROM settings WHERE name=%Q", MPORT_SETTING_TARGET_OS));
 
 	version = mport_get_osrelease(mport);
-	// this shouldn't crash, and will try system methods
 	if (version != NULL) {
 		free(version);
 	}
@@ -92,6 +129,8 @@ ATF_TC_BODY(osrelease_settings_null, tc)
 ATF_TC_CLEANUP(osrelease_settings_null, tc)
 {
 	(void)tc;
+
+	cleanup_test_root();
 }
 
 ATF_TP_ADD_TCS(tp)

@@ -2,9 +2,17 @@ PACKAGE=	mport
 TESTSDIR=	${TESTSBASE}/mport
 KYUAFILE=	no
 
+CFLAGS+=	-I${.CURDIR}/../libmport \
+		-I${.CURDIR}/../external/tllist \
+		-I${.CURDIR}/../external/lua/src \
+		-I/usr/include/private/ucl \
+		-I/usr/include/ucl \
+		-I/usr/include/private/zstd \
+		-I${LOCALBASE}/include
+
 ATF_TESTS_C+=	mport_fetch_test \
 		mport_osrelease_test \
-    mport_util_test
+		mport_util_test
 
 LDFLAGS.mport_fetch_test+=	-L${.CURDIR}/../libmport \
 				-L${LOCALBASE}/lib \
@@ -18,7 +26,6 @@ LDFLAGS.mport_osrelease_test+=	-L${.CURDIR}/../libmport \
 				-Wl,-rpath,${LOCALBASE}/lib
 LDADD.mport_osrelease_test+=	-lmport -latf-c
 
-ATF_TESTS_C+=	mport_util_test
 LDFLAGS.mport_util_test+=	-L${.CURDIR}/../libmport \
 				-L${LOCALBASE}/lib \
 				-Wl,-rpath,${.CURDIR}/../libmport \
