@@ -30,7 +30,12 @@ pick_clang_format() {
     return 0
   fi
 
-  # Try version-suffixed binaries (clang-format-NN) and pick the highest NN.
+  if command -v clang-format >/dev/null 2>&1; then
+    echo "clang-format"
+    return 0
+  fi
+
+  # Try version-suffixed binaries (clang-formatNN) and pick the highest NN.
   local best=""
   local best_ver=-1
   while IFS= read -r cmd; do
