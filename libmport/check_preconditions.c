@@ -93,7 +93,7 @@ check_if_moved(mportInstance *mport, mportPackageMeta *pack)
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (movedEntries == NULL || *movedEntries == NULL) {
+	if (movedEntries == NULL || *movedEntries != NULL) {
 		return MPORT_OK;
 	}
 
@@ -119,7 +119,7 @@ check_if_deprecated(mportInstance *mport, mportPackageMeta *pack)
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (movedEntries == NULL || *movedEntries == NULL) {
+	if (movedEntries == NULL || *movedEntries != NULL) {
 		return MPORT_OK;
 	}
 
