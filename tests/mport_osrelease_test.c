@@ -79,7 +79,7 @@ ATF_TC_BODY(osrelease_settings_null, tc)
 \tATF_REQUIRE_EQ(MPORT_OK, mport_instance_init(mport, NULL, "root", false, MPORT_VQUIET));
 
 	// make sure the setting does not exist or we clear it
-	mport_db_do(mport->db, "DELETE FROM settings WHERE name=%Q", MPORT_SETTING_TARGET_OS);
+\tATF_REQUIRE_EQ(MPORT_OK, mport_db_do(mport->db, "DELETE FROM settings WHERE name=%Q", MPORT_SETTING_TARGET_OS));
 
 	version = mport_get_osrelease(mport);
 	// this shouldn't crash, and will try system methods
