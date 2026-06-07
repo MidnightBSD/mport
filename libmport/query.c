@@ -85,11 +85,12 @@ mport_query_installed(mportInstance *mport, const mportQueryOptions *opts, mport
 
 		if (matched) {
 			out[kept++] = *pack;
-			*pack = NULL;
+		} else {
+			mport_pkgmeta_free(*pack);
 		}
 	}
 	out[kept] = NULL;
-	mport_pkgmeta_vec_free(all_packs);
+	free(all_packs);
 
 	if (kept == 0) {
 		free(out);
@@ -109,7 +110,7 @@ mport_query_print(mportInstance *mport, mportPackageMeta **packs, const char *fo
 	if (mport == NULL || format == NULL || out == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid arguments to mport_query_print");
 
-	for (pack = packs; packs != NULL && *pack != NULL; pack++) {
+	for (pack = packs; pack != NULL && *pack != NULL; pack++) {
 		if (mport_query_format_package(mport, *pack, format, out) != MPORT_OK)
 			RETURN_CURRENT_ERROR;
 		fputc('\n', out);
@@ -292,6 +293,10 @@ eval_expression(mportInstance *mport, mportPackageMeta *pack, const char *expres
 		if (*or_term == '|')
 			or_term++;
 
+		or_term = trim(or_term);
+		if (*or_term == '\0')
+			continue;
+
 		for (and_term = strtok_r(or_term, "&", &and_save); and_term != NULL;
 		    and_term = strtok_r(NULL, "&", &and_save)) {
 			char *term = trim(and_term);
@@ -301,10 +306,14 @@ eval_expression(mportInstance *mport, mportPackageMeta *pack, const char *expres
 			if (*term == '&')
 				term++;
 			term = trim(term);
+			if (*term == '\0')
+				continue;
 			if (*term == '!') {
 				negate = true;
 				term = trim(term + 1);
 			}
+			if (*term == '\0')
+				continue;
 
 			for (i = 0; ops[i] != NULL; i++) {
 				char *op = strstr(term, ops[i]);
@@ -522,6 +531,7 @@ list_for_code(mportInstance *mport, mportPackageMeta *pack, char code, query_lis
 		    tok = strtok_r(NULL, " ,", &save)) {
 			if (query_list_add(list, tok) != MPORT_OK) {
 				free(license);
+				query_list_free(list);
 				RETURN_CURRENT_ERROR;
 			}
 		}
@@ -536,6 +546,7 @@ list_for_code(mportInstance *mport, mportPackageMeta *pack, char code, query_lis
 		    tok = strtok_r(NULL, " \n\t,", &save)) {
 			if (query_list_add(list, tok) != MPORT_OK) {
 				free(options);
+				query_list_free(list);
 				RETURN_CURRENT_ERROR;
 			}
 		}
@@ -550,6 +561,7 @@ list_for_code(mportInstance *mport, mportPackageMeta *pack, char code, query_lis
 		const unsigned char *value = sqlite3_column_text(stmt, 0);
 		if (value != NULL && query_list_add(list, (const char *)value) != MPORT_OK) {
 			sqlite3_finalize(stmt);
+			query_list_free(list);
 			RETURN_CURRENT_ERROR;
 		}
 	}
@@ -619,34 +631,47 @@ truthy(const char *value)
 static bool
 compare_values(const char *left, const char *op, const char *right)
 {
+	const char *right_cmp = right;
+	char *right_buf = NULL;
+	bool result;
+
 	if (left == NULL)
 		left = "";
-	if (right == NULL)
-		right = "";
+	if (right_cmp == NULL)
+		right_cmp = "";
 
-	if (right[0] != '\0' && (right[0] == '\'' || right[0] == '"') &&
-	    right[strlen(right) - 1] == right[0]) {
-		char *mutable = (char *)right;
-		mutable[strlen(mutable) - 1] = '\0';
-		right++;
+	if (right_cmp[0] != '\0' && (right_cmp[0] == '\'' || right_cmp[0] == '"')) {
+		size_t len = strlen(right_cmp);
+
+		if (len >= 2 && right_cmp[len - 1] == right_cmp[0]) {
+			right_buf = malloc(len - 1);
+			if (right_buf != NULL) {
+				memcpy(right_buf, right_cmp + 1, len - 2);
+				right_buf[len - 2] = '\0';
+				right_cmp = right_buf;
+			}
+		}
 	}
 
 	if (strcmp(op, "~") == 0)
-		return fnmatch(right, left, 0) == 0;
-	if (strcmp(op, "=") == 0)
-		return strcmp(left, right) == 0;
-	if (strcmp(op, "!=") == 0)
-		return strcmp(left, right) != 0;
-	if (strcmp(op, ">") == 0)
-		return mport_version_cmp(left, right) > 0;
-	if (strcmp(op, ">=") == 0)
-		return mport_version_cmp(left, right) >= 0;
-	if (strcmp(op, "<") == 0)
-		return mport_version_cmp(left, right) < 0;
-	if (strcmp(op, "<=") == 0)
-		return mport_version_cmp(left, right) <= 0;
+		result = fnmatch(right_cmp, left, 0) == 0;
+	else if (strcmp(op, "=") == 0)
+		result = strcmp(left, right_cmp) == 0;
+	else if (strcmp(op, "!=") == 0)
+		result = strcmp(left, right_cmp) != 0;
+	else if (strcmp(op, ">") == 0)
+		result = mport_version_cmp(left, right_cmp) > 0;
+	else if (strcmp(op, ">=") == 0)
+		result = mport_version_cmp(left, right_cmp) >= 0;
+	else if (strcmp(op, "<") == 0)
+		result = mport_version_cmp(left, right_cmp) < 0;
+	else if (strcmp(op, "<=") == 0)
+		result = mport_version_cmp(left, right_cmp) <= 0;
+	else
+		result = false;
 
-	return false;
+	free(right_buf);
+	return result;
 }
 
 static char *

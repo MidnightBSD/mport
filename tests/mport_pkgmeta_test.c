@@ -276,7 +276,7 @@ ATF_TC_BODY(query_filters_patterns_and_expressions, tc)
 	mportInstance *mport;
 	mportPackageMeta **packs = NULL;
 	mportQueryOptions opts;
-	char *patterns[] = { "alp*" };
+	char *patterns[] = { "*" };
 
 	(void)tc;
 
@@ -289,7 +289,7 @@ ATF_TC_BODY(query_filters_patterns_and_expressions, tc)
 	opts.match = MPORT_QUERY_MATCH_GLOB;
 	opts.patterns = patterns;
 	opts.pattern_count = 1;
-	opts.expression = "%v>=1.0";
+	opts.expression = "%n='alpha'&&%v>=1.0||%n='missing'";
 
 	ATF_REQUIRE_EQ(MPORT_OK, mport_query_installed(mport, &opts, &packs));
 	ATF_REQUIRE(packs != NULL);
