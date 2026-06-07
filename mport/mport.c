@@ -80,6 +80,7 @@ static int deleteAll(/*@notnull@*/ mportInstance *);
 static int info(/*@notnull@*/ mportInstance *, /*@null@*/ const char *);
 
 static int search(/*@notnull@*/ mportInstance *, /*@null@*/ char **);
+static int query(/*@notnull@*/ mportInstance *, int, /*@notnull@*/ char *[]);
 
 static int stats(/*@notnull@*/ mportInstance *mport);
 
@@ -634,6 +635,9 @@ main(int argc, char *argv[])
 			free(searchQuery[i - 1]);
 		}
 		free(searchQuery);
+	} else if (!strcmp(cmd, "query")) {
+		loadIndex(mport);
+		resultCode = query(mport, argc, argv);
 	} else if (!strcmp(cmd, "shell")) {
 		asprintf(&buf, "%s/%s", "/usr/bin", "sqlite3");
 		flag = strdup("/var/db/mport/master.db");
@@ -860,6 +864,7 @@ usage(void)
 	    "    deleteall                   Remove all installed packages\n\n"
 	    "  Information:\n"
 	    "    search <query>              Search for packages\n"
+	    "    query [-aCgix] [-e expr] <format> [pattern ...]\n"
 	    "    info <package>              Display package information\n"
 	    "    list [updates|prime]        List installed packages\n"
 	    "    which [-qo] <file>          Find which package provides a file\n"
@@ -1010,6 +1015,82 @@ search(/*@notnull@*/ mportInstance *mport, /*@null@*/ char **query)
 	}
 
 	return (0);
+}
+
+static int
+query(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *argv[])
+{
+	mportQueryOptions opts;
+	mportPackageMeta **packs = NULL;
+	const char *format;
+	int ch2;
+	int result;
+
+	memset(&opts, 0, sizeof(opts));
+	opts.case_sensitive = false;
+	opts.match = MPORT_QUERY_MATCH_EXACT;
+
+#if defined(__MidnightBSD__)
+	optreset = 1;
+#endif
+	optind = 1;
+	while ((ch2 = getopt(argc, argv, "aCe:F:gix")) != -1) {
+		switch (ch2) {
+		case 'a':
+			opts.all = true;
+			break;
+		case 'C':
+			opts.case_sensitive = true;
+			break;
+		case 'e':
+			opts.expression = optarg;
+			break;
+		case 'F':
+			warnx("mport query -F is not supported yet");
+			return MPORT_ERR_WARN;
+		case 'g':
+			opts.match = MPORT_QUERY_MATCH_GLOB;
+			break;
+		case 'i':
+			opts.case_sensitive = false;
+			break;
+		case 'x':
+			opts.match = MPORT_QUERY_MATCH_REGEX;
+			break;
+		default:
+			fprintf(stderr,
+			    "Usage: mport query [-aCgix] [-e expression] <format> [pattern ...]\n");
+			return MPORT_ERR_WARN;
+		}
+	}
+
+	if (optind >= argc) {
+		fprintf(
+		    stderr, "Usage: mport query [-aCgix] [-e expression] <format> [pattern ...]\n");
+		return MPORT_ERR_WARN;
+	}
+
+	format = argv[optind++];
+	opts.patterns = &argv[optind];
+	opts.pattern_count = argc - optind;
+	if (opts.pattern_count == 0)
+		opts.all = true;
+
+	result = mport_query_installed(mport, &opts, &packs);
+	if (result != MPORT_OK) {
+		warnx("%s", mport_err_string());
+		return result;
+	}
+
+	if (packs == NULL)
+		return MPORT_OK;
+
+	result = mport_query_print(mport, packs, format, stdout);
+	if (result != MPORT_OK)
+		warnx("%s", mport_err_string());
+
+	mport_pkgmeta_vec_free(packs);
+	return result;
 }
 
 static int

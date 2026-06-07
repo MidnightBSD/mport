@@ -57,8 +57,8 @@ for f in "${staged_c_files[@]}"; do
   [[ -f "$f" ]] || continue
   if grep -Eq '^[[:space:]]*/\* *SPLINT_SKIP_FILE:' "$f"; then
     reason="$(
-      sed -n 's:^[[:space:]]*/\* *SPLINT_SKIP_FILE: *::p' "$f" |
-        sed 's:[[:space:]]*\*/[[:space:]]*$::' |
+      sed -n 's|^[[:space:]]*/\* *SPLINT_SKIP_FILE: *||p' "$f" |
+        sed 's|[[:space:]]*\*/[[:space:]]*$||' |
         head -n 1
     )"
     echo "Skipping $f: $reason" >&2
