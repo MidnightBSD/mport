@@ -1396,7 +1396,7 @@ mport_string_replace(const char *str, const char *old, const char *new)
 		memcpy(r, new, newlen);
 		r += newlen;
 	}
-	strcpy(r, p);
+	strlcpy(r, p, (retlen + 1) - (r - ret));
 
 	return (ret);
 }
