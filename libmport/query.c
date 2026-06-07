@@ -300,6 +300,7 @@ eval_expression(mportInstance *mport, mportPackageMeta *pack, const char *expres
 		for (and_term = strtok_r(or_term, "&", &and_save); and_term != NULL;
 		    and_term = strtok_r(NULL, "&", &and_save)) {
 			char *term = trim(and_term);
+			bool had_operator = false;
 			bool negate = false;
 			bool term_result = false;
 
@@ -322,6 +323,7 @@ eval_expression(mportInstance *mport, mportPackageMeta *pack, const char *expres
 					char *right;
 					char *value;
 
+					had_operator = true;
 					*op = '\0';
 					left = trim(term);
 					right = trim(op + strlen(ops[i]));
@@ -336,7 +338,7 @@ eval_expression(mportInstance *mport, mportPackageMeta *pack, const char *expres
 				}
 			}
 
-			if (!term_result && strchr(term, '=') == NULL &&
+			if (!had_operator && !term_result && strchr(term, '=') == NULL &&
 			    strchr(term, '~') == NULL && strchr(term, '<') == NULL &&
 			    strchr(term, '>') == NULL) {
 				char *value;
