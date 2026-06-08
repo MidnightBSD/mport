@@ -58,6 +58,20 @@ static const char *fallback_system_dirs[] = {
 	_PATH_MAILDIR,
 };
 
+static const char *
+mtree_dir_path(void)
+{
+	const char *mtree_dir;
+
+	mtree_dir = getenv("MPORT_MTREE_DIR");
+	/*@-boundsread@*/
+	if (mtree_dir == NULL || *mtree_dir == '\0')
+		mtree_dir = "/etc/mtree";
+	/*@=boundsread@*/
+
+	return mtree_dir;
+}
+
 static /*@observer@*/ /*@null@*/ const char *
 mtree_root_for_file(const char *filename)
 {
@@ -144,8 +158,6 @@ list_add(mtree_dir_list *list, const char *path)
 	/*@-boundswrite@*/
 	list->items[list->count] = copy;
 	/*@=boundswrite@*/
-	if (list->items[list->count] == NULL)
-		return MPORT_ERR_FATAL;
 	list->count++;
 
 	return MPORT_OK;
@@ -282,11 +294,7 @@ load_mtree_dirs(mtree_dir_list *list)
 	struct dirent *de;
 	int loaded = 0;
 
-	mtree_dir = getenv("MPORT_MTREE_DIR");
-	/*@-boundsread@*/
-	if (mtree_dir == NULL || *mtree_dir == '\0')
-		mtree_dir = "/etc/mtree";
-	/*@=boundsread@*/
+	mtree_dir = mtree_dir_path();
 
 	dir = opendir(mtree_dir);
 	if (dir == NULL)
@@ -326,26 +334,37 @@ is_fallback_system_dir(const char *path)
 bool
 mport_is_system_mtree_dir(const char *path)
 {
-	mtree_dir_list list = { NULL, 0, 0 };
+	static mtree_dir_list list = { NULL, 0, 0 };
+	static bool loaded = false;
+	static bool using_fallback = false;
+	static char cached_mtree_dir[MAXPATHLEN];
 	char normalized[MAXPATHLEN];
-	bool protected;
+	const char *current_mtree_dir;
 
 	if (path == NULL)
 		return false;
 
+	current_mtree_dir = mtree_dir_path();
+	if (loaded && strcmp(cached_mtree_dir, current_mtree_dir) != 0) {
+		list_free(&list);
+		loaded = false;
+		using_fallback = false;
+	}
+
 	(void)strlcpy(normalized, path, sizeof(normalized));
 	normalize_path(normalized);
 
-	if (load_mtree_dirs(&list) != MPORT_OK) {
-		/*@-compdestroy@*/
-		list_free(&list);
-		/*@=compdestroy@*/
-		return is_fallback_system_dir(normalized);
+	if (!loaded) {
+		(void)strlcpy(cached_mtree_dir, current_mtree_dir, sizeof(cached_mtree_dir));
+		if (load_mtree_dirs(&list) != MPORT_OK) {
+			list_free(&list);
+			using_fallback = true;
+		}
+		loaded = true;
 	}
 
-	protected = list_contains(&list, normalized);
-	/*@-compdestroy@*/
-	list_free(&list);
-	/*@=compdestroy@*/
-	return protected;
+	if (using_fallback)
+		return is_fallback_system_dir(normalized);
+
+	return list_contains(&list, normalized);
 }

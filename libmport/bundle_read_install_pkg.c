@@ -87,8 +87,8 @@ static int create_sample_file(mportInstance *mport, char *cwd, const char *file)
 
 static int create_dir_asset_fd(mportInstance *, const char *, const char *, mode_t, int *);
 static int apply_dir_asset_attrs(int, mportAssetListEntry *, uid_t, gid_t);
-static int insert_autodir_assets(
-    mportInstance *, sqlite3_stmt *, mportPackageMeta *, mportAssetList *, const char *);
+static int insert_autodir_assets(mportInstance *, sqlite3_stmt *, mportPackageMeta *,
+    mportAssetList *, mportAssetList *, const char *);
 
 static char **parse_sample(char *input);
 
@@ -717,6 +717,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 	int filefd = -1;
 	char file[FILENAME_MAX], cwd[FILENAME_MAX];
 	sqlite3_stmt *insert = NULL;
+	mportAssetList *autodirs = NULL;
 
 	/* sadly, we can't just use abs pathnames, because it will break hardlinks */
 	orig_cwd = getcwd(NULL, 0);
@@ -727,6 +728,9 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 	mport_call_progress_init_cb(mport, "Installing %s-%s", pkg->name, pkg->version);
 
 	if (mport_bundle_read_get_assetlist(mport, pkg, &alist, ACTUALINSTALL) != MPORT_OK)
+		goto ERROR;
+
+	if ((autodirs = mport_assetlist_new()) == NULL)
 		goto ERROR;
 
 	if (create_package_row(mport, pkg) != MPORT_OK)
@@ -863,7 +867,8 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 				}
 			}
 
-			if (insert_autodir_assets(mport, insert, pkg, alist, file) != MPORT_OK)
+			if (insert_autodir_assets(mport, insert, pkg, alist, autodirs, file) !=
+			    MPORT_OK)
 				goto ERROR;
 
 			/*
@@ -1262,6 +1267,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 	(mport->progress_free_cb)();
 	(void)mport_chdir(NULL, orig_cwd);
 	free(orig_cwd);
+	mport_assetlist_free(autodirs);
 	mport_assetlist_free(alist);
 	return (MPORT_OK);
 
@@ -1271,6 +1277,7 @@ ERROR:
 	sqlite3_finalize(insert);
 	(mport->progress_free_cb)();
 	free(orig_cwd);
+	mport_assetlist_free(autodirs);
 	mport_assetlist_free(alist);
 
 	RETURN_CURRENT_ERROR;
@@ -1347,6 +1354,13 @@ path_under_prefix(const char *path, const char *prefix)
 		return false;
 
 	prefix_len = strlen(prefix);
+	if (prefix_len == 0)
+		return false;
+	while (prefix_len > 1 && prefix[prefix_len - 1] == '/')
+		prefix_len--;
+	if (prefix_len == 1 && prefix[0] == '/')
+		return path[0] == '/' && path[1] != '\0';
+
 	return strncmp(path, prefix, prefix_len) == 0 && path[prefix_len] == '/';
 }
 
@@ -1379,26 +1393,6 @@ asset_list_has_dir(mportAssetList *alist, const char *prefix, const char *dir)
 	return false;
 }
 
-static bool
-asset_db_has_dir(mportInstance *mport, const char *pkgname, const char *dir)
-{
-	sqlite3_stmt *stmt = NULL;
-	int count = 0;
-
-	if (mport_db_prepare(mport->db, &stmt,
-		"SELECT count(*) FROM assets WHERE pkg=%Q and type in (%d, %d, %d, %d, %d) "
-		"and data=%Q",
-		pkgname, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE,
-		ASSET_AUTODIR, dir) != MPORT_OK)
-		return true;
-
-	if (sqlite3_step(stmt) == SQLITE_ROW)
-		count = sqlite3_column_int(stmt, 0);
-	sqlite3_finalize(stmt);
-
-	return count > 0;
-}
-
 static int
 insert_autodir(mportInstance *mport, sqlite3_stmt *insert, const char *dir)
 {
@@ -1423,18 +1417,42 @@ insert_autodir(mportInstance *mport, sqlite3_stmt *insert, const char *dir)
 }
 
 static int
+autodir_seen_add(mportAssetList *autodirs, const char *dir)
+{
+	mportAssetListEntry *entry;
+
+	entry = calloc(1, sizeof(mportAssetListEntry));
+	if (entry == NULL)
+		return MPORT_ERR_FATAL;
+
+	entry->type = ASSET_AUTODIR;
+	entry->data = strdup(dir);
+	if (entry->data == NULL) {
+		free(entry);
+		return MPORT_ERR_FATAL;
+	}
+
+	STAILQ_INSERT_TAIL(autodirs, entry, next);
+	return MPORT_OK;
+}
+
+static int
 insert_autodir_assets(mportInstance *mport, sqlite3_stmt *insert, mportPackageMeta *pkg,
-    mportAssetList *alist, const char *physical_file)
+    mportAssetList *alist, mportAssetList *autodirs, const char *physical_file)
 {
 	char logical_file[FILENAME_MAX];
 	char dir[FILENAME_MAX];
 	size_t root_len;
+	size_t physical_len;
 
-	if (mport == NULL || pkg == NULL || pkg->prefix == NULL || physical_file == NULL)
+	if (mport == NULL || pkg == NULL || pkg->prefix == NULL || physical_file == NULL ||
+	    autodirs == NULL)
 		return MPORT_OK;
 
 	root_len = strlen(mport->root);
-	if (root_len > 0 && strncmp(physical_file, mport->root, root_len) == 0)
+	physical_len = strlen(physical_file);
+	if (root_len > 0 && physical_len >= root_len &&
+	    strncmp(physical_file, mport->root, root_len) == 0)
 		(void)strlcpy(logical_file, physical_file + root_len, sizeof(logical_file));
 	else
 		(void)strlcpy(logical_file, physical_file, sizeof(logical_file));
@@ -1449,7 +1467,9 @@ insert_autodir_assets(mportInstance *mport, sqlite3_stmt *insert, mportPackageMe
 	while (path_under_prefix(dir, pkg->prefix)) {
 		if (!mport_is_system_mtree_dir(dir) &&
 		    !asset_list_has_dir(alist, pkg->prefix, dir) &&
-		    !asset_db_has_dir(mport, pkg->name, dir)) {
+		    !asset_list_has_dir(autodirs, pkg->prefix, dir)) {
+			if (autodir_seen_add(autodirs, dir) != MPORT_OK)
+				return MPORT_ERR_FATAL;
 			if (insert_autodir(mport, insert, dir) != MPORT_OK)
 				return MPORT_ERR_FATAL;
 		}
