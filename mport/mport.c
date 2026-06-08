@@ -257,6 +257,7 @@ main(int argc, char *argv[])
 		{ "brief", no_argument, NULL, 'b' },
 		{ "chroot", required_argument, NULL, 'c' },
 		{ "force", no_argument, NULL, 'f' },
+		{ "help", no_argument, NULL, 'h' },
 		{ "output", required_argument, NULL, 'o' },
 		{ "quiet", no_argument, NULL, 'q' },
 		{ "version", no_argument, NULL, 'v' },
@@ -271,7 +272,7 @@ main(int argc, char *argv[])
 
 	setlocale(LC_ALL, "");
 
-	while ((ch = getopt_long(argc, argv, "+c:o:bfqUVv", longopts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "+c:o:bfhqUVv", longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'U':
 			noIndex++;
@@ -287,6 +288,9 @@ main(int argc, char *argv[])
 			break;
 		case 'f':
 			force = true;
+			break;
+		case 'h':
+			usage();
 			break;
 		case 'o':
 			outputPath = optarg;
@@ -845,6 +849,7 @@ usage(void)
 	    "  -c <dir>    Set chroot directory\n"
 	    "  -o <file>   Set output file\n"
 	    "  -f          Force operation\n"
+	    "  -h          Show help\n"
 	    "  -q          Quiet mode\n"
 	    "  -b          Brief output\n\n"
 	    "  -V          Verbose mode\n"
