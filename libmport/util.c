@@ -515,7 +515,13 @@ mport_directory(const char *path)
 			return NULL;
 		char *lastSlash = strrchr(dir, '/');
 		if (lastSlash != NULL) {
-			*lastSlash = '\0'; // Null-terminate at the last slash to get the directory
+			if (lastSlash == dir) {
+				// path is like "/mport" or "/"
+				*(lastSlash + 1) = '\0';
+			} else {
+				*lastSlash =
+				    '\0'; // Null-terminate at the last slash to get the directory
+			}
 			return dir;
 		} else {
 			free(dir);
