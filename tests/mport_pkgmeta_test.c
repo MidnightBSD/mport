@@ -3,6 +3,8 @@
 
 #include <atf-c.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -16,8 +18,22 @@
 /*@-mustfreefresh -noeffect -nullpass -nullret -nullstate -paramuse@*/
 /*@-retvalint -retvalother -type -unrecog@*/
 
-#define TEST_ROOT "/tmp/mport-pkgmeta-test-root"
+#define TEST_ROOT_TEMPLATE "/tmp/mport-pkgmeta-test-root.XXXXXX"
 #define SORT_TEST_PACKAGE_COUNT 4
+
+static char test_root[PATH_MAX];
+
+static const char *
+test_path(const char *suffix)
+{
+	static char paths[8][PATH_MAX];
+	static unsigned int next_path;
+	char *path;
+
+	path = paths[next_path++ % 8];
+	(void)snprintf(path, PATH_MAX, "%s%s", test_root, suffix);
+	return path;
+}
 
 static void
 cleanup_test_root(void)
@@ -25,12 +41,13 @@ cleanup_test_root(void)
 	int cwd_fd;
 
 	cwd_fd = open(".", O_RDONLY | O_DIRECTORY);
-	if (access(TEST_ROOT, F_OK) == 0)
-		(void)mport_rmtree(TEST_ROOT);
+	if (test_root[0] != '\0' && access(test_root, F_OK) == 0)
+		(void)mport_rmtree(test_root);
 	if (cwd_fd >= 0) {
 		(void)fchdir(cwd_fd);
 		(void)close(cwd_fd);
 	}
+	test_root[0] = '\0';
 	(void)unsetenv("MPORT_MTREE_DIR");
 }
 
@@ -40,14 +57,15 @@ create_test_instance(void)
 	mportInstance *mport;
 
 	cleanup_test_root();
-	ATF_REQUIRE_EQ(0, mkdir(TEST_ROOT, 0755));
-	ATF_REQUIRE_EQ(0, mkdir(TEST_ROOT "/var", 0755));
-	ATF_REQUIRE_EQ(0, mkdir(TEST_ROOT "/var/db", 0755));
+	(void)strlcpy(test_root, TEST_ROOT_TEMPLATE, sizeof(test_root));
+	ATF_REQUIRE(mkdtemp(test_root) != NULL);
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/var"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/var/db"), 0755));
 
 	mport = mport_instance_new();
 	ATF_REQUIRE(mport != NULL);
 	ATF_REQUIRE_EQ(
-	    MPORT_OK, mport_instance_init(mport, TEST_ROOT, "root", false, MPORT_VQUIET));
+	    MPORT_OK, mport_instance_init(mport, test_root, "root", false, MPORT_VQUIET));
 
 	return mport;
 }
@@ -122,9 +140,9 @@ insert_delete_package(mportInstance *mport, const char *name)
 static void
 create_local_prefix_dirs(void)
 {
-	create_dir(TEST_ROOT "/usr");
-	create_dir(TEST_ROOT "/usr/local");
-	create_dir(TEST_ROOT "/usr/local/share");
+	create_dir(test_path("/usr"));
+	create_dir(test_path("/usr/local"));
+	create_dir(test_path("/usr/local/share"));
 }
 
 ATF_TC_WITH_CLEANUP(delete_removes_autodirs);
@@ -141,9 +159,9 @@ ATF_TC_BODY(delete_removes_autodirs, tc)
 
 	mport = create_test_instance();
 	create_local_prefix_dirs();
-	create_dir(TEST_ROOT "/usr/local/share/alpha");
-	create_dir(TEST_ROOT "/usr/local/share/alpha/nested");
-	create_file(TEST_ROOT "/usr/local/share/alpha/nested/file");
+	create_dir(test_path("/usr/local/share/alpha"));
+	create_dir(test_path("/usr/local/share/alpha/nested"));
+	create_file(test_path("/usr/local/share/alpha/nested/file"));
 	insert_delete_package(mport, "alpha");
 	insert_asset(mport, "alpha", ASSET_FILE, "/usr/local/share/alpha/nested/file");
 	insert_asset(mport, "alpha", ASSET_AUTODIR, "/usr/local/share/alpha/nested");
@@ -152,13 +170,55 @@ ATF_TC_BODY(delete_removes_autodirs, tc)
 	pack = create_delete_pack("alpha");
 	ATF_REQUIRE_MSG(
 	    mport_delete_primative(mport, pack, 1) == MPORT_OK, "%s", mport_err_string());
-	ATF_REQUIRE_EQ(-1, access(TEST_ROOT "/usr/local/share/alpha", F_OK));
-	ATF_REQUIRE_EQ(0, access(TEST_ROOT "/usr/local/share", F_OK));
+	ATF_REQUIRE_EQ(-1, access(test_path("/usr/local/share/alpha"), F_OK));
+	ATF_REQUIRE_EQ(0, access(test_path("/usr/local/share"), F_OK));
 
 	mport_pkgmeta_free(pack);
 	mport_instance_free(mport);
 }
 ATF_TC_CLEANUP(delete_removes_autodirs, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(delete_keeps_nonempty_autodirs);
+ATF_TC_HEAD(delete_keeps_nonempty_autodirs, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "delete succeeds while preserving non-empty auto directories");
+}
+ATF_TC_BODY(delete_keeps_nonempty_autodirs, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta *pack;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	create_local_prefix_dirs();
+	create_dir(test_path("/usr/local/share/alpha"));
+	create_dir(test_path("/usr/local/share/alpha/nested"));
+	create_file(test_path("/usr/local/share/alpha/nested/file"));
+	create_file(test_path("/usr/local/share/alpha/nested/untracked"));
+	insert_delete_package(mport, "alpha");
+	insert_asset(mport, "alpha", ASSET_FILE, "/usr/local/share/alpha/nested/file");
+	insert_asset(mport, "alpha", ASSET_AUTODIR, "/usr/local/share/alpha/nested");
+	insert_asset(mport, "alpha", ASSET_AUTODIR, "/usr/local/share/alpha");
+
+	pack = create_delete_pack("alpha");
+	ATF_REQUIRE_MSG(
+	    mport_delete_primative(mport, pack, 1) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(-1, access(test_path("/usr/local/share/alpha/nested/file"), F_OK));
+	ATF_REQUIRE_EQ(0, access(test_path("/usr/local/share/alpha/nested/untracked"), F_OK));
+	ATF_REQUIRE_EQ(0, access(test_path("/usr/local/share/alpha/nested"), F_OK));
+	ATF_REQUIRE_EQ(0, access(test_path("/usr/local/share/alpha"), F_OK));
+
+	mport_pkgmeta_free(pack);
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(delete_keeps_nonempty_autodirs, tc)
 {
 	(void)tc;
 
@@ -181,11 +241,11 @@ ATF_TC_BODY(delete_keeps_shared_autodirs, tc)
 
 	mport = create_test_instance();
 	create_local_prefix_dirs();
-	create_dir(TEST_ROOT "/usr/local/share/shared");
-	create_dir(TEST_ROOT "/usr/local/share/shared/alpha");
-	create_dir(TEST_ROOT "/usr/local/share/shared/beta");
-	create_file(TEST_ROOT "/usr/local/share/shared/alpha/file");
-	create_file(TEST_ROOT "/usr/local/share/shared/beta/file");
+	create_dir(test_path("/usr/local/share/shared"));
+	create_dir(test_path("/usr/local/share/shared/alpha"));
+	create_dir(test_path("/usr/local/share/shared/beta"));
+	create_file(test_path("/usr/local/share/shared/alpha/file"));
+	create_file(test_path("/usr/local/share/shared/beta/file"));
 	insert_delete_package(mport, "alpha");
 	insert_delete_package(mport, "beta");
 	insert_asset(mport, "alpha", ASSET_FILE, "/usr/local/share/shared/alpha/file");
@@ -199,12 +259,12 @@ ATF_TC_BODY(delete_keeps_shared_autodirs, tc)
 	beta = create_delete_pack("beta");
 	ATF_REQUIRE_MSG(
 	    mport_delete_primative(mport, alpha, 1) == MPORT_OK, "%s", mport_err_string());
-	ATF_REQUIRE_EQ(-1, access(TEST_ROOT "/usr/local/share/shared/alpha", F_OK));
-	ATF_REQUIRE_EQ(0, access(TEST_ROOT "/usr/local/share/shared", F_OK));
+	ATF_REQUIRE_EQ(-1, access(test_path("/usr/local/share/shared/alpha"), F_OK));
+	ATF_REQUIRE_EQ(0, access(test_path("/usr/local/share/shared"), F_OK));
 
 	ATF_REQUIRE_MSG(
 	    mport_delete_primative(mport, beta, 1) == MPORT_OK, "%s", mport_err_string());
-	ATF_REQUIRE_EQ(-1, access(TEST_ROOT "/usr/local/share/shared", F_OK));
+	ATF_REQUIRE_EQ(-1, access(test_path("/usr/local/share/shared"), F_OK));
 
 	mport_pkgmeta_free(alpha);
 	mport_pkgmeta_free(beta);
@@ -231,8 +291,8 @@ ATF_TC_BODY(delete_explicit_dirrmtry_still_removes, tc)
 
 	mport = create_test_instance();
 	create_local_prefix_dirs();
-	create_dir(TEST_ROOT "/usr/local/share/explicit");
-	create_file(TEST_ROOT "/usr/local/share/explicit/file");
+	create_dir(test_path("/usr/local/share/explicit"));
+	create_file(test_path("/usr/local/share/explicit/file"));
 	insert_delete_package(mport, "alpha");
 	insert_asset(mport, "alpha", ASSET_FILE, "/usr/local/share/explicit/file");
 	insert_asset(mport, "alpha", ASSET_DIRRMTRY, "/usr/local/share/explicit");
@@ -240,7 +300,7 @@ ATF_TC_BODY(delete_explicit_dirrmtry_still_removes, tc)
 	pack = create_delete_pack("alpha");
 	ATF_REQUIRE_MSG(
 	    mport_delete_primative(mport, pack, 1) == MPORT_OK, "%s", mport_err_string());
-	ATF_REQUIRE_EQ(-1, access(TEST_ROOT "/usr/local/share/explicit", F_OK));
+	ATF_REQUIRE_EQ(-1, access(test_path("/usr/local/share/explicit"), F_OK));
 
 	mport_pkgmeta_free(pack);
 	mport_instance_free(mport);
@@ -267,15 +327,15 @@ ATF_TC_BODY(mtree_fixture_protects_system_dirs, tc)
 
 	mport = create_test_instance();
 	create_local_prefix_dirs();
-	create_dir(TEST_ROOT "/mtree");
-	fd = open(TEST_ROOT "/mtree/BSD.local.dist", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	create_dir(test_path("/mtree"));
+	fd = open(test_path("/mtree/BSD.local.dist"), O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	ATF_REQUIRE(fd >= 0);
 	const char mtree[] = ".\n/set type=dir\nbin\n..\nshare\n..\n";
 	ATF_REQUIRE_EQ((ssize_t)strlen(mtree), write(fd, mtree, strlen(mtree)));
 	ATF_REQUIRE_EQ(0, close(fd));
-	ATF_REQUIRE_EQ(0, setenv("MPORT_MTREE_DIR", TEST_ROOT "/mtree", 1));
-	create_dir(TEST_ROOT "/usr/local/bin");
-	create_file(TEST_ROOT "/usr/local/bin/tool");
+	ATF_REQUIRE_EQ(0, setenv("MPORT_MTREE_DIR", test_path("/mtree"), 1));
+	create_dir(test_path("/usr/local/bin"));
+	create_file(test_path("/usr/local/bin/tool"));
 	insert_delete_package(mport, "alpha");
 	insert_asset(mport, "alpha", ASSET_FILE, "/usr/local/bin/tool");
 	insert_asset(mport, "alpha", ASSET_AUTODIR, "/usr/local/bin");
@@ -284,12 +344,49 @@ ATF_TC_BODY(mtree_fixture_protects_system_dirs, tc)
 	pack = create_delete_pack("alpha");
 	ATF_REQUIRE_MSG(
 	    mport_delete_primative(mport, pack, 1) == MPORT_OK, "%s", mport_err_string());
-	ATF_REQUIRE_EQ(0, access(TEST_ROOT "/usr/local/bin", F_OK));
+	ATF_REQUIRE_EQ(0, access(test_path("/usr/local/bin"), F_OK));
 
 	mport_pkgmeta_free(pack);
 	mport_instance_free(mport);
 }
 ATF_TC_CLEANUP(mtree_fixture_protects_system_dirs, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(mtree_fallback_protects_system_dirs);
+ATF_TC_HEAD(mtree_fallback_protects_system_dirs, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "mtree fallback protects system directories");
+}
+ATF_TC_BODY(mtree_fallback_protects_system_dirs, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta *pack;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	create_local_prefix_dirs();
+	ATF_REQUIRE_EQ(0, setenv("MPORT_MTREE_DIR", test_path("/missing-mtree"), 1));
+	create_dir(test_path("/usr/local/bin"));
+	create_file(test_path("/usr/local/bin/tool"));
+	insert_delete_package(mport, "alpha");
+	insert_asset(mport, "alpha", ASSET_FILE, "/usr/local/bin/tool");
+	insert_asset(mport, "alpha", ASSET_AUTODIR, "/usr/local/bin");
+
+	ATF_REQUIRE(mport_is_system_mtree_dir("/usr/local/bin"));
+	pack = create_delete_pack("alpha");
+	ATF_REQUIRE_MSG(
+	    mport_delete_primative(mport, pack, 1) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(0, access(test_path("/usr/local/bin"), F_OK));
+
+	mport_pkgmeta_free(pack);
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(mtree_fallback_protects_system_dirs, tc)
 {
 	(void)tc;
 
@@ -456,8 +553,8 @@ ATF_TC_BODY(query_formats_installed_metadata, tc)
 		"INSERT INTO assets (pkg, type, data, checksum, owner, grp, mode) VALUES "
 		"('alpha', %d, '/usr/local/bin/alpha', '', '', '', '')",
 		ASSET_FILE));
-	ATF_REQUIRE_EQ(0, mkdir(TEST_ROOT "/var/db/mport/infrastructure/alpha-1.2.3", 0755));
-	int message_fd = open(TEST_ROOT "/var/db/mport/infrastructure/alpha-1.2.3/pkg-message",
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/var/db/mport/infrastructure/alpha-1.2.3"), 0755));
+	int message_fd = open(test_path("/var/db/mport/infrastructure/alpha-1.2.3/pkg-message"),
 	    O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	ATF_REQUIRE(message_fd >= 0);
 	ssize_t write_result = write(message_fd, "Read alpha notes", strlen("Read alpha notes"));
@@ -546,9 +643,11 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, sort_dependencies_dependency_first);
 	ATF_TP_ADD_TC(tp, sort_dependencies_dependent_first);
 	ATF_TP_ADD_TC(tp, delete_removes_autodirs);
+	ATF_TP_ADD_TC(tp, delete_keeps_nonempty_autodirs);
 	ATF_TP_ADD_TC(tp, delete_keeps_shared_autodirs);
 	ATF_TP_ADD_TC(tp, delete_explicit_dirrmtry_still_removes);
 	ATF_TP_ADD_TC(tp, mtree_fixture_protects_system_dirs);
+	ATF_TP_ADD_TC(tp, mtree_fallback_protects_system_dirs);
 	ATF_TP_ADD_TC(tp, query_formats_installed_metadata);
 	ATF_TP_ADD_TC(tp, query_filters_patterns_and_expressions);
 
