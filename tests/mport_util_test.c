@@ -301,6 +301,40 @@ ATF_TC_CLEANUP(mport_mkdir_existing, tc)
 	(void)rmdir(TEST_DIR);
 }
 
+ATF_TC_WITH_CLEANUP(mport_mkdir_file_exists);
+ATF_TC_HEAD(mport_mkdir_file_exists, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "mport_mkdir succeeds if a file with the same name exists");
+}
+ATF_TC_BODY(mport_mkdir_file_exists, tc)
+{
+	(void)tc;
+
+	(void)unlink(TEST_DIR);
+	create_file(TEST_DIR, "test", 4);
+
+	/*
+	 * Current implementation returns MPORT_OK because errno is EEXIST.
+	 * This is actually a bit questionable since it's not a directory,
+	 * but we are testing current behavior.
+	 */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_mkdir(TEST_DIR));
+}
+ATF_TC_CLEANUP(mport_mkdir_file_exists, tc)
+{
+	(void)tc;
+
+	(void)unlink(TEST_DIR);
+}
+
+ATF_TC_WITHOUT_HEAD(mport_mkdir_fail_parent);
+ATF_TC_BODY(mport_mkdir_fail_parent, tc)
+{
+	(void)tc;
+
+	ATF_REQUIRE(mport_mkdir("no/such/dir") != MPORT_OK);
+}
+
 ATF_TC_WITH_CLEANUP(mport_rmdir_empty);
 ATF_TC_HEAD(mport_rmdir_empty, tc)
 {
@@ -458,6 +492,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, is_elf_file_false_missing);
 	ATF_TP_ADD_TC(tp, mport_mkdir_success);
 	ATF_TP_ADD_TC(tp, mport_mkdir_existing);
+	ATF_TP_ADD_TC(tp, mport_mkdir_file_exists);
+	ATF_TP_ADD_TC(tp, mport_mkdir_fail_parent);
 	ATF_TP_ADD_TC(tp, mport_rmdir_empty);
 	ATF_TP_ADD_TC(tp, mport_rmdir_nonempty_ignore);
 	ATF_TP_ADD_TC(tp, mport_rmdir_nonempty_noignore);
