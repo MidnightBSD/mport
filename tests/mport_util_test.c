@@ -22,6 +22,7 @@ bool mport_check_answer_bool(char *);
 int mport_count_spaces(const char *);
 int mport_mkdir(const char *);
 int mport_rmdir(const char *, int);
+char *mport_directory(const char *);
 
 static void
 create_file(const char *filename, const void *data, size_t len)
@@ -391,6 +392,53 @@ ATF_TC_BODY(mport_rmdir_notfound_ignore, tc)
 	ATF_REQUIRE_EQ(MPORT_OK, mport_rmdir(test_dir, 1));
 }
 
+ATF_TC_WITHOUT_HEAD(mport_directory_null);
+ATF_TC_BODY(mport_directory_null, tc)
+{
+	(void)tc;
+
+	ATF_REQUIRE_EQ(NULL, mport_directory(NULL));
+}
+
+ATF_TC_WITHOUT_HEAD(mport_directory_absolute);
+ATF_TC_BODY(mport_directory_absolute, tc)
+{
+	char *dir;
+	(void)tc;
+
+	dir = mport_directory("/usr/local/bin/mport");
+	ATF_REQUIRE_STREQ("/usr/local/bin", dir);
+	free(dir);
+
+	dir = mport_directory("/mport");
+	ATF_REQUIRE_STREQ("/", dir);
+	free(dir);
+
+	dir = mport_directory("/");
+	ATF_REQUIRE_STREQ("/", dir);
+	free(dir);
+}
+
+ATF_TC_WITHOUT_HEAD(mport_directory_relative);
+ATF_TC_BODY(mport_directory_relative, tc)
+{
+	char *dir;
+	char cwd[PATH_MAX];
+	char expected[PATH_MAX];
+	(void)tc;
+
+	ATF_REQUIRE(getcwd(cwd, sizeof(cwd)) != NULL);
+
+	dir = mport_directory("mport");
+	ATF_REQUIRE_STREQ(cwd, dir);
+	free(dir);
+
+	dir = mport_directory("bin/mport");
+	snprintf(expected, sizeof(expected), "%s/bin", cwd);
+	ATF_REQUIRE_STREQ(expected, dir);
+	free(dir);
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, mport_check_answer_bool_null);
@@ -414,6 +462,9 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, mport_rmdir_nonempty_ignore);
 	ATF_TP_ADD_TC(tp, mport_rmdir_nonempty_noignore);
 	ATF_TP_ADD_TC(tp, mport_rmdir_notfound_ignore);
+	ATF_TP_ADD_TC(tp, mport_directory_null);
+	ATF_TP_ADD_TC(tp, mport_directory_absolute);
+	ATF_TP_ADD_TC(tp, mport_directory_relative);
 
 	return atf_no_error();
 }
