@@ -71,39 +71,7 @@ static int run_pkg_deinstall(mportInstance *, mportPackageMeta *, const char *);
 static int delete_pkg_infra(mportInstance *, mportPackageMeta *);
 static int check_for_upwards_depends(mportInstance *, mportPackageMeta *);
 static void warn_ignored_rmdir_error(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
-static bool is_safe_to_delete_dir(mportInstance *, mportPackageMeta *, const char *);
-static bool is_system_dir(const char *path);
-
-static const char *system_dirs[] = {
-	"/boot",
-	_PATH_ETC,
-	"/etc/rc.d",
-	"/root",
-	_PATH_TMP,
-	"/usr/lib",
-	"/usr/bin",
-	"/usr/sbin",
-	_PATH_MAN,
-	_PATH_LOCALE,
-	_PATH_FIRMWARE,
-	"/usr/share",
-	"/usr/local",
-	"/usr/local/bin",
-	"/usr/local/sbin",
-	"/usr/local/share",
-	"/usr/local/lib",
-	"/usr/local/libexec",
-	"/usr/local/include",
-	"/var",
-	"/var/lib",
-	"/var/log",
-	"/var/spool",
-	"/var/empty",
-	_PATH_VARDB,
-	_PATH_VARRUN,
-	_PATH_VARTMP,
-	_PATH_MAILDIR,
-};
+static bool is_safe_to_delete_dir(mportInstance *, mportPackageMeta *, const char *, const char *);
 
 MPORT_PUBLIC_API int
 mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
@@ -167,8 +135,13 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	if (run_pkg_deinstall(mport, pack, "DEINSTALL") != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	if (mport_db_prepare(mport->db, &stmt, "SELECT type,data,checksum FROM assets WHERE pkg=%Q",
-		pack->name) != MPORT_OK)
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT type,data,checksum FROM assets WHERE pkg=%Q "
+		"ORDER BY CASE WHEN type IN (%d, %d, %d, %d, %d) THEN 1 ELSE 0 END, "
+		"CASE WHEN type IN (%d, %d, %d, %d, %d) THEN length(data) ELSE 0 END DESC",
+		pack->name, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE,
+		ASSET_AUTODIR, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE,
+		ASSET_AUTODIR) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	cwd = pack->prefix;
@@ -366,13 +339,16 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 		case ASSET_DIR:
 		case ASSET_DIRRM:
 		case ASSET_DIRRMTRY:
+		case ASSET_AUTODIR:
 		case ASSET_DIR_OWNER_MODE:
-			if (is_safe_to_delete_dir(mport, pack, file)) {
+			if (is_safe_to_delete_dir(mport, pack, file, data)) {
 				mport_removeflags(mport->root, file);
-				if (mport_rmdir(file, type == ASSET_DIRRMTRY ? 1 : 0) != MPORT_OK) {
+				if (mport_rmdir(file,
+					type == ASSET_DIRRMTRY || type == ASSET_AUTODIR ? 1 : 0) !=
+				    MPORT_OK) {
 					warn_ignored_rmdir_error(mport, file);
 				}
-			} else if (type != ASSET_DIRRMTRY) {
+			} else if (type != ASSET_DIRRMTRY && type != ASSET_AUTODIR) {
 				mport_call_msg_cb(
 				    mport, "Directory in use by another package? '%s'", file);
 			}
@@ -449,24 +425,14 @@ warn_ignored_rmdir_error(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const
 	mport_set_err(MPORT_OK, NULL);
 }
 
-static bool
-is_system_dir(const char *path)
-{
-	for (size_t i = 0; i < sizeof(system_dirs) / sizeof(system_dirs[0]); i++) {
-		if (strcmp(path, system_dirs[i]) == 0) {
-			return true;
-		}
-	}
-	return false;
-}
-
 bool
-is_safe_to_delete_dir(mportInstance *mport, mportPackageMeta *pack, const char *path)
+is_safe_to_delete_dir(
+    mportInstance *mport, mportPackageMeta *pack, const char *path, const char *asset_path)
 {
 	sqlite3_stmt *stmt;
 	int count;
 
-	if (mport == NULL || pack == NULL || path == NULL) {
+	if (mport == NULL || pack == NULL || path == NULL || asset_path == NULL) {
 		return false;
 	}
 
@@ -476,22 +442,23 @@ is_safe_to_delete_dir(mportInstance *mport, mportPackageMeta *pack, const char *
 		    mport, "Skipping removal of root (DESTDIR) directory: '%s'", path);
 		return false;
 	}
-	if (pack->prefix != NULL && strcmp(pack->prefix, path) == 0) {
+	if (pack->prefix != NULL &&
+	    (strcmp(pack->prefix, path) == 0 || strcmp(pack->prefix, asset_path) == 0)) {
 		mport_call_msg_cb(
 		    mport, "Skipping removal of package prefix directory: '%s'", path);
 		return false;
 	}
 
 	/* Check if the path is a system directory */
-	if (pack->type == MPORT_TYPE_APP && is_system_dir(path)) {
+	if (pack->type == MPORT_TYPE_APP && mport_is_system_mtree_dir(asset_path)) {
 		mport_call_msg_cb(mport, "Skipping removal of system directory: '%s'", path);
 		return false;
 	}
 
 	if (mport_db_prepare(mport->db, &stmt,
-		"SELECT count(*) from assets where pkg!=%Q and type in (%d, %d, %d, %d) and data=%Q",
+		"SELECT count(*) from assets where pkg!=%Q and type in (%d, %d, %d, %d, %d) and data=%Q",
 		pack->name, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE,
-		path) != MPORT_OK) {
+		ASSET_AUTODIR, asset_path) != MPORT_OK) {
 		return false;
 	}
 

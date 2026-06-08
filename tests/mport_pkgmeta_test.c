@@ -16,22 +16,22 @@
 /*@-mustfreefresh -noeffect -nullpass -nullret -nullstate -paramuse@*/
 /*@-retvalint -retvalother -type -unrecog@*/
 
-#define TEST_ROOT "test-pkgmeta-root"
+#define TEST_ROOT "/tmp/mport-pkgmeta-test-root"
 #define SORT_TEST_PACKAGE_COUNT 4
 
 static void
 cleanup_test_root(void)
 {
-	(void)unlink(TEST_ROOT "/var/db/mport/master.db-wal");
-	(void)unlink(TEST_ROOT "/var/db/mport/master.db-shm");
-	(void)unlink(TEST_ROOT "/var/db/mport/master.db");
-	(void)unlink(TEST_ROOT "/var/db/mport/infrastructure/alpha-1.2.3/pkg-message");
-	(void)rmdir(TEST_ROOT "/var/db/mport/infrastructure/alpha-1.2.3");
-	(void)rmdir(TEST_ROOT "/var/db/mport/infrastructure");
-	(void)rmdir(TEST_ROOT "/var/db/mport");
-	(void)rmdir(TEST_ROOT "/var/db");
-	(void)rmdir(TEST_ROOT "/var");
-	(void)rmdir(TEST_ROOT);
+	int cwd_fd;
+
+	cwd_fd = open(".", O_RDONLY | O_DIRECTORY);
+	if (access(TEST_ROOT, F_OK) == 0)
+		(void)mport_rmtree(TEST_ROOT);
+	if (cwd_fd >= 0) {
+		(void)fchdir(cwd_fd);
+		(void)close(cwd_fd);
+	}
+	(void)unsetenv("MPORT_MTREE_DIR");
 }
 
 static mportInstance *
@@ -60,6 +60,240 @@ insert_package(mportInstance *mport, const char *name)
 		"INSERT INTO packages (pkg, version, origin, prefix, lang) VALUES "
 		"(%Q, '1.0', %Q, '/usr/local', '')",
 		name, name));
+}
+
+static void
+create_dir(const char *path)
+{
+	ATF_REQUIRE_EQ(0, mkdir(path, 0755));
+}
+
+static void
+create_file(const char *path)
+{
+	int fd;
+	ssize_t written;
+
+	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	ATF_REQUIRE(fd >= 0);
+	written = write(fd, "x", 1);
+	ATF_REQUIRE_EQ(1, written);
+	ATF_REQUIRE_EQ(0, close(fd));
+}
+
+static mportPackageMeta *
+create_delete_pack(const char *name)
+{
+	mportPackageMeta *pack;
+
+	pack = mport_pkgmeta_new();
+	ATF_REQUIRE(pack != NULL);
+	pack->name = strdup(name);
+	pack->version = strdup("1.0");
+	pack->prefix = strdup("/usr/local");
+	pack->origin = strdup(name);
+	pack->lang = strdup("");
+	pack->type = MPORT_TYPE_APP;
+	ATF_REQUIRE(pack->name != NULL);
+	ATF_REQUIRE(pack->version != NULL);
+	ATF_REQUIRE(pack->prefix != NULL);
+	ATF_REQUIRE(pack->origin != NULL);
+	ATF_REQUIRE(pack->lang != NULL);
+
+	return pack;
+}
+
+static void
+insert_asset(mportInstance *mport, const char *pkg, mportAssetListEntryType type, const char *data)
+{
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"INSERT INTO assets (pkg, type, data, checksum, owner, grp, mode) "
+		"VALUES (%Q, %d, %Q, '', NULL, NULL, NULL)",
+		pkg, type, data));
+}
+
+static void
+insert_delete_package(mportInstance *mport, const char *name)
+{
+	insert_package(mport, name);
+}
+
+static void
+create_local_prefix_dirs(void)
+{
+	create_dir(TEST_ROOT "/usr");
+	create_dir(TEST_ROOT "/usr/local");
+	create_dir(TEST_ROOT "/usr/local/share");
+}
+
+ATF_TC_WITH_CLEANUP(delete_removes_autodirs);
+ATF_TC_HEAD(delete_removes_autodirs, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "delete removes empty package-created auto directories");
+}
+ATF_TC_BODY(delete_removes_autodirs, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta *pack;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	create_local_prefix_dirs();
+	create_dir(TEST_ROOT "/usr/local/share/alpha");
+	create_dir(TEST_ROOT "/usr/local/share/alpha/nested");
+	create_file(TEST_ROOT "/usr/local/share/alpha/nested/file");
+	insert_delete_package(mport, "alpha");
+	insert_asset(mport, "alpha", ASSET_FILE, "/usr/local/share/alpha/nested/file");
+	insert_asset(mport, "alpha", ASSET_AUTODIR, "/usr/local/share/alpha/nested");
+	insert_asset(mport, "alpha", ASSET_AUTODIR, "/usr/local/share/alpha");
+
+	pack = create_delete_pack("alpha");
+	ATF_REQUIRE_MSG(
+	    mport_delete_primative(mport, pack, 1) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(-1, access(TEST_ROOT "/usr/local/share/alpha", F_OK));
+	ATF_REQUIRE_EQ(0, access(TEST_ROOT "/usr/local/share", F_OK));
+
+	mport_pkgmeta_free(pack);
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(delete_removes_autodirs, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(delete_keeps_shared_autodirs);
+ATF_TC_HEAD(delete_keeps_shared_autodirs, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "delete keeps auto directories still tracked by another package");
+}
+ATF_TC_BODY(delete_keeps_shared_autodirs, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta *alpha;
+	mportPackageMeta *beta;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	create_local_prefix_dirs();
+	create_dir(TEST_ROOT "/usr/local/share/shared");
+	create_dir(TEST_ROOT "/usr/local/share/shared/alpha");
+	create_dir(TEST_ROOT "/usr/local/share/shared/beta");
+	create_file(TEST_ROOT "/usr/local/share/shared/alpha/file");
+	create_file(TEST_ROOT "/usr/local/share/shared/beta/file");
+	insert_delete_package(mport, "alpha");
+	insert_delete_package(mport, "beta");
+	insert_asset(mport, "alpha", ASSET_FILE, "/usr/local/share/shared/alpha/file");
+	insert_asset(mport, "alpha", ASSET_AUTODIR, "/usr/local/share/shared/alpha");
+	insert_asset(mport, "alpha", ASSET_AUTODIR, "/usr/local/share/shared");
+	insert_asset(mport, "beta", ASSET_FILE, "/usr/local/share/shared/beta/file");
+	insert_asset(mport, "beta", ASSET_AUTODIR, "/usr/local/share/shared/beta");
+	insert_asset(mport, "beta", ASSET_AUTODIR, "/usr/local/share/shared");
+
+	alpha = create_delete_pack("alpha");
+	beta = create_delete_pack("beta");
+	ATF_REQUIRE_MSG(
+	    mport_delete_primative(mport, alpha, 1) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(-1, access(TEST_ROOT "/usr/local/share/shared/alpha", F_OK));
+	ATF_REQUIRE_EQ(0, access(TEST_ROOT "/usr/local/share/shared", F_OK));
+
+	ATF_REQUIRE_MSG(
+	    mport_delete_primative(mport, beta, 1) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(-1, access(TEST_ROOT "/usr/local/share/shared", F_OK));
+
+	mport_pkgmeta_free(alpha);
+	mport_pkgmeta_free(beta);
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(delete_keeps_shared_autodirs, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(delete_explicit_dirrmtry_still_removes);
+ATF_TC_HEAD(delete_explicit_dirrmtry_still_removes, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "explicit dirrmtry assets keep existing delete behavior");
+}
+ATF_TC_BODY(delete_explicit_dirrmtry_still_removes, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta *pack;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	create_local_prefix_dirs();
+	create_dir(TEST_ROOT "/usr/local/share/explicit");
+	create_file(TEST_ROOT "/usr/local/share/explicit/file");
+	insert_delete_package(mport, "alpha");
+	insert_asset(mport, "alpha", ASSET_FILE, "/usr/local/share/explicit/file");
+	insert_asset(mport, "alpha", ASSET_DIRRMTRY, "/usr/local/share/explicit");
+
+	pack = create_delete_pack("alpha");
+	ATF_REQUIRE_MSG(
+	    mport_delete_primative(mport, pack, 1) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(-1, access(TEST_ROOT "/usr/local/share/explicit", F_OK));
+
+	mport_pkgmeta_free(pack);
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(delete_explicit_dirrmtry_still_removes, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(mtree_fixture_protects_system_dirs);
+ATF_TC_HEAD(mtree_fixture_protects_system_dirs, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "mtree fixture protects system directories");
+}
+ATF_TC_BODY(mtree_fixture_protects_system_dirs, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta *pack;
+	int fd;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	create_local_prefix_dirs();
+	create_dir(TEST_ROOT "/mtree");
+	fd = open(TEST_ROOT "/mtree/BSD.local.dist", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	ATF_REQUIRE(fd >= 0);
+	const char mtree[] = ".\n/set type=dir\nbin\n..\nshare\n..\n";
+	ATF_REQUIRE_EQ((ssize_t)strlen(mtree), write(fd, mtree, strlen(mtree)));
+	ATF_REQUIRE_EQ(0, close(fd));
+	ATF_REQUIRE_EQ(0, setenv("MPORT_MTREE_DIR", TEST_ROOT "/mtree", 1));
+	create_dir(TEST_ROOT "/usr/local/bin");
+	create_file(TEST_ROOT "/usr/local/bin/tool");
+	insert_delete_package(mport, "alpha");
+	insert_asset(mport, "alpha", ASSET_FILE, "/usr/local/bin/tool");
+	insert_asset(mport, "alpha", ASSET_AUTODIR, "/usr/local/bin");
+
+	ATF_REQUIRE(mport_is_system_mtree_dir("/usr/local/bin"));
+	pack = create_delete_pack("alpha");
+	ATF_REQUIRE_MSG(
+	    mport_delete_primative(mport, pack, 1) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(0, access(TEST_ROOT "/usr/local/bin", F_OK));
+
+	mport_pkgmeta_free(pack);
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(mtree_fixture_protects_system_dirs, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
 }
 
 static void
@@ -311,6 +545,10 @@ ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, sort_dependencies_dependency_first);
 	ATF_TP_ADD_TC(tp, sort_dependencies_dependent_first);
+	ATF_TP_ADD_TC(tp, delete_removes_autodirs);
+	ATF_TP_ADD_TC(tp, delete_keeps_shared_autodirs);
+	ATF_TP_ADD_TC(tp, delete_explicit_dirrmtry_still_removes);
+	ATF_TP_ADD_TC(tp, mtree_fixture_protects_system_dirs);
 	ATF_TP_ADD_TC(tp, query_formats_installed_metadata);
 	ATF_TP_ADD_TC(tp, query_filters_patterns_and_expressions);
 

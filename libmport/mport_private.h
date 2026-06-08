@@ -119,6 +119,7 @@ int mport_mkdir(const char *);
 int mport_mkdirp(char *, mode_t);
 int mport_removeflags(const char *, const char *);
 int mport_rmdir(const char *, int);
+bool mport_is_system_mtree_dir(const char *);
 int mport_chdir(mportInstance *, const char *);
 int mport_xsystem(mportInstance *, const char *, ...);
 int mport_exec_linux_ldconfig(mportInstance *, const char *);
