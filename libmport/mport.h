@@ -163,7 +163,8 @@ enum _AssetListEntryType {
 	ASSET_KLD,
 	ASSET_DESKTOP_FILE_UTILS,
 	ASSET_INFO,
-	ASSET_TOUCH
+	ASSET_TOUCH,
+	ASSET_AUTODIR
 };
 
 typedef enum _AssetListEntryType mportAssetListEntryType;
