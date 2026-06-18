@@ -62,7 +62,6 @@ mport_clean_oldpackages(mportInstance *mport)
 {
 	int error_code = MPORT_OK;
 
-
 	int deleted = 0;
 	int dfd;
 	struct dirent *de;
@@ -70,16 +69,16 @@ mport_clean_oldpackages(mportInstance *mport)
 
 	dfd = open(MPORT_FETCH_STAGING_DIR, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
 	if (dfd == -1) {
-		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s", MPORT_FETCH_STAGING_DIR,
-		                        strerror(errno));
+		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s",
+		    MPORT_FETCH_STAGING_DIR, strerror(errno));
 		return error_code;
 	}
 
 	d = fdopendir(dfd);
 	if (d == NULL) {
 		close(dfd);
-		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s", MPORT_FETCH_STAGING_DIR,
-		                        strerror(errno));
+		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s",
+		    MPORT_FETCH_STAGING_DIR, strerror(errno));
 		return error_code;
 	}
 
@@ -89,7 +88,8 @@ mport_clean_oldpackages(mportInstance *mport)
 		if (strcmp(".", de->d_name) == 0 || strcmp("..", de->d_name) == 0)
 			continue;
 
-		if (mport_index_search(mport, &indexEntry, "bundlefile=%Q", de->d_name) != MPORT_OK) {
+		if (mport_index_search(mport, &indexEntry, "bundlefile=%Q", de->d_name) !=
+		    MPORT_OK) {
 			mport_call_msg_cb(mport, "failed to search index %s: ", mport_err_string());
 			continue;
 		}
@@ -104,8 +104,8 @@ mport_clean_oldpackages(mportInstance *mport)
 
 		if (indexEntry == NULL || *indexEntry == NULL) {
 			if (unlinkat(dfd, de->d_name, 0) < 0) {
-				error_code = SET_ERRORX(MPORT_ERR_FATAL, "Could not delete file %s: %s",
-				                        path, strerror(errno));
+				error_code = SET_ERRORX(MPORT_ERR_FATAL,
+				    "Could not delete file %s: %s", path, strerror(errno));
 				mport_call_msg_cb(mport, "%s\n", mport_err_string());
 			} else {
 				deleted++;
@@ -117,20 +117,27 @@ mport_clean_oldpackages(mportInstance *mport)
 
 			fd = openat(dfd, de->d_name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 			if (fd == -1) {
-				mport_call_msg_cb(mport, "Could not open %s: %s", path, strerror(errno));
+				mport_call_msg_cb(
+				    mport, "Could not open %s: %s", path, strerror(errno));
 			} else if (fstat(fd, &st) == -1) {
-				mport_call_msg_cb(mport, "Could not stat %s: %s", path, strerror(errno));
+				mport_call_msg_cb(
+				    mport, "Could not stat %s: %s", path, strerror(errno));
 				close(fd);
 			} else if (!S_ISREG(st.st_mode)) {
 				close(fd);
 			} else if (verify_hash_fd(fd, (*indexEntry)->hash) == 0) {
 				if (fstatat(dfd, de->d_name, &current, AT_SYMLINK_NOFOLLOW) == -1) {
-					error_code = SET_ERRORX(MPORT_ERR_FATAL, "Could not stat file %s: %s", path, strerror(errno));
+					error_code = SET_ERRORX(MPORT_ERR_FATAL,
+					    "Could not stat file %s: %s", path, strerror(errno));
 					mport_call_msg_cb(mport, "%s\n", mport_err_string());
-				} else if (current.st_dev == st.st_dev && current.st_ino == st.st_ino) {
+				} else if (current.st_dev == st.st_dev &&
+				    current.st_ino == st.st_ino) {
 					if (unlinkat(dfd, de->d_name, 0) < 0) {
-						error_code = SET_ERRORX(MPORT_ERR_FATAL, "Could not delete file %s: %s", path, strerror(errno));
-						mport_call_msg_cb(mport, "%s\n", mport_err_string());
+						error_code = SET_ERRORX(MPORT_ERR_FATAL,
+						    "Could not delete file %s: %s", path,
+						    strerror(errno));
+						mport_call_msg_cb(
+						    mport, "%s\n", mport_err_string());
 					} else {
 						deleted++;
 					}
@@ -197,10 +204,10 @@ mport_clean_oldmtree(mportInstance *mport)
 	int deleted = 0;
 	struct dirent *de;
 	DIR *d = opendir(MPORT_INST_INFRA_DIR);
-	
+
 	if (d == NULL) {
-		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s", MPORT_INST_INFRA_DIR,
-		                        strerror(errno));
+		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s",
+		    MPORT_INST_INFRA_DIR, strerror(errno));
 		return error_code;
 	}
 
@@ -219,7 +226,8 @@ mport_clean_oldmtree(mportInstance *mport)
 		}
 
 		if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
-			mport_call_msg_cb(mport, "failed to search master database for %s: ", mport_err_string());
+			mport_call_msg_cb(
+			    mport, "failed to search master database for %s: ", mport_err_string());
 			continue;
 		}
 
@@ -233,7 +241,8 @@ mport_clean_oldmtree(mportInstance *mport)
 
 		if (packs == NULL || *packs == NULL) {
 			if (mport_rmtree(path) != MPORT_OK) {
-				error_code = SET_ERRORX(MPORT_ERR_FATAL, "Could not delete file %s: %s", path, strerror(errno));
+				error_code = SET_ERRORX(MPORT_ERR_FATAL,
+				    "Could not delete file %s: %s", path, strerror(errno));
 				mport_call_msg_cb(mport, "%s\n", mport_err_string());
 			} else {
 				deleted++;
@@ -262,10 +271,10 @@ mport_clean_tempfiles(mportInstance *mport)
 	int deleted = 0;
 	struct dirent *de;
 	DIR *d = opendir(_PATH_TMP);
-	
+
 	if (d == NULL) {
-		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s", MPORT_INST_INFRA_DIR,
-		                        strerror(errno));
+		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s",
+		    MPORT_INST_INFRA_DIR, strerror(errno));
 		return error_code;
 	}
 
@@ -275,8 +284,7 @@ mport_clean_tempfiles(mportInstance *mport)
 			continue;
 
 		if (!mport_starts_with("mport.", de->d_name))
-	       		continue;
-
+			continue;
 
 		if (asprintf(&path, "%s%s", _PATH_TMP, de->d_name) == -1) {
 			continue;
@@ -285,12 +293,13 @@ mport_clean_tempfiles(mportInstance *mport)
 		int result = unlink(path);
 
 		if (result != 0) {
-			error_code = SET_ERRORX(MPORT_ERR_FATAL, "Could not delete file %s: %s", path, strerror(errno));
+			error_code = SET_ERRORX(
+			    MPORT_ERR_FATAL, "Could not delete file %s: %s", path, strerror(errno));
 			mport_call_msg_cb(mport, "%s\n", mport_err_string());
 		} else {
 			deleted++;
 		}
-	 
+
 		free(path);
 		path = NULL;
 	}

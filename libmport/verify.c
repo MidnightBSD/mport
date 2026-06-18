@@ -57,9 +57,10 @@ mport_verify_package(mportInstance *mport, mportPackageMeta *pack)
 	const char *data, *checksum;
 	struct stat st;
 	char hash[65];
-	
+
 	mport_call_msg_cb(mport, "Verifying %s-%s", pack->name, pack->version);
-	if (mport_db_prepare(mport->db, &stmt, "SELECT type,data,checksum FROM assets WHERE pkg=%Q", pack->name) != MPORT_OK) {
+	if (mport_db_prepare(mport->db, &stmt, "SELECT type,data,checksum FROM assets WHERE pkg=%Q",
+		pack->name) != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
 	}
@@ -77,14 +78,15 @@ mport_verify_package(mportInstance *mport, mportPackageMeta *pack)
 			RETURN_CURRENT_ERROR;
 		}
 
-		type = (mportAssetListEntryType) sqlite3_column_int(stmt, 0);
+		type = (mportAssetListEntryType)sqlite3_column_int(stmt, 0);
 		data = sqlite3_column_text(stmt, 1);
 		checksum = sqlite3_column_text(stmt, 2);
 
 		char file[FILENAME_MAX];
 		/* XXX TMP */
 		if (data == NULL) {
-			/* XXX data is null when ASSET_CHMOD (mode) or similar commands are in plist */
+			/* XXX data is null when ASSET_CHMOD (mode) or similar commands are in plist
+			 */
 			snprintf(file, sizeof(file), "%s", mport->root);
 		} else if (*data == '/') {
 			/* we don't use mport->root because it's an absolute path like /var */
@@ -117,20 +119,21 @@ mport_verify_package(mportInstance *mport, mportPackageMeta *pack)
 					mport_call_msg_cb(
 					    mport, "Source checksum missing %s", file);
 				} else {
-                    size_t len = strlen(checksum);
-                    if (len < 34) {
-					    if (MD5File(file, hash) == NULL) {
-						    mport_call_msg_cb(mport, "Can't MD5 %s: %s", file,
-						        strerror(errno));
-                            continue;
-                        }
-                    } else {
-					    if (SHA256_File(file, hash) == NULL) {
-						    mport_call_msg_cb(mport, "Can't SHA256 %s: %s",
-						        file, strerror(errno));
-                            continue;
-                        }
-                    }
+					size_t len = strlen(checksum);
+					if (len < 34) {
+						if (MD5File(file, hash) == NULL) {
+							mport_call_msg_cb(mport, "Can't MD5 %s: %s",
+							    file, strerror(errno));
+							continue;
+						}
+					} else {
+						if (SHA256_File(file, hash) == NULL) {
+							mport_call_msg_cb(mport,
+							    "Can't SHA256 %s: %s", file,
+							    strerror(errno));
+							continue;
+						}
+					}
 
 					if (strcmp(hash, checksum) != 0)
 						mport_call_msg_cb(mport,
@@ -163,9 +166,8 @@ verify_mtree(mportInstance *mport, mportPackageMeta *pack)
 	pid_t pid;
 	int error, pstat;
 
-	(void)snprintf(mtree_path, sizeof(mtree_path), "%s%s/%s-%s/%s",
-	    mport->root, MPORT_INST_INFRA_DIR, pack->name, pack->version,
-	    MPORT_MTREE_FILE);
+	(void)snprintf(mtree_path, sizeof(mtree_path), "%s%s/%s-%s/%s", mport->root,
+	    MPORT_INST_INFRA_DIR, pack->name, pack->version, MPORT_MTREE_FILE);
 
 	if (!mport_file_exists(mtree_path))
 		return;
@@ -180,8 +182,8 @@ verify_mtree(mportInstance *mport, mportPackageMeta *pack)
 	if ((error = posix_spawn_file_actions_init(&action)) != 0) {
 		close(pipefd[0]);
 		close(pipefd[1]);
-		mport_call_msg_cb(mport, "mtree verify: posix_spawn_file_actions_init: %s",
-		    strerror(error));
+		mport_call_msg_cb(
+		    mport, "mtree verify: posix_spawn_file_actions_init: %s", strerror(error));
 		return;
 	}
 	if ((error = posix_spawn_file_actions_adddup2(&action, pipefd[1], STDOUT_FILENO)) != 0 ||
@@ -193,8 +195,7 @@ verify_mtree(mportInstance *mport, mportPackageMeta *pack)
 		return;
 	}
 
-	char *const args[] = { MPORT_MTREE_BIN, "-f", mtree_path, "-d", "-e",
-	    "-p", prefix, NULL };
+	char *const args[] = { MPORT_MTREE_BIN, "-f", mtree_path, "-d", "-e", "-p", prefix, NULL };
 
 	error = posix_spawn(&pid, MPORT_MTREE_BIN, &action, NULL, args, environ);
 	posix_spawn_file_actions_destroy(&action);
@@ -214,8 +215,8 @@ verify_mtree(mportInstance *mport, mportPackageMeta *pack)
 			if (len > 0 && line[len - 1] == '\n')
 				line[len - 1] = '\0';
 			if (line[0] != '\0')
-				mport_call_msg_cb(mport, "mtree %s-%s: %s",
-				    pack->name, pack->version, line);
+				mport_call_msg_cb(
+				    mport, "mtree %s-%s: %s", pack->name, pack->version, line);
 		}
 		fclose(fp);
 	} else {
@@ -228,15 +229,15 @@ verify_mtree(mportInstance *mport, mportPackageMeta *pack)
 	} while (wres == -1 && errno == EINTR);
 
 	if (wres == -1) {
-		mport_call_msg_cb(mport, "mtree %s-%s: waitpid failed: %s",
-		    pack->name, pack->version, strerror(errno));
+		mport_call_msg_cb(mport, "mtree %s-%s: waitpid failed: %s", pack->name,
+		    pack->version, strerror(errno));
 	} else if (WIFSIGNALED(pstat)) {
-		mport_call_msg_cb(mport, "mtree %s-%s: terminated by signal %d",
-		    pack->name, pack->version, WTERMSIG(pstat));
+		mport_call_msg_cb(mport, "mtree %s-%s: terminated by signal %d", pack->name,
+		    pack->version, WTERMSIG(pstat));
 	} else if (WIFEXITED(pstat) && WEXITSTATUS(pstat) > 1) {
 		/* exit 1 means discrepancies found (normal); >1 indicates a tool error */
-		mport_call_msg_cb(mport, "mtree %s-%s: exited with status %d",
-		    pack->name, pack->version, WEXITSTATUS(pstat));
+		mport_call_msg_cb(mport, "mtree %s-%s: exited with status %d", pack->name,
+		    pack->version, WEXITSTATUS(pstat));
 	}
 }
 
@@ -265,11 +266,11 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 		RETURN_CURRENT_ERROR;
 	}
 
-    if (mport_db_do(mport->db, "BEGIN TRANSACTION") != MPORT_OK) {
+	if (mport_db_do(mport->db, "BEGIN TRANSACTION") != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		sqlite3_finalize(update_stmt);
 		RETURN_CURRENT_ERROR;
-    }
+	}
 
 	while (1) {
 		ret = sqlite3_step(stmt);
@@ -280,7 +281,7 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 		if (ret != SQLITE_ROW) {
 			/* some error occured */
 			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
-            mport_db_do(mport->db, "ROLLBACK");
+			mport_db_do(mport->db, "ROLLBACK");
 			sqlite3_finalize(stmt);
 			sqlite3_finalize(update_stmt);
 			RETURN_CURRENT_ERROR;
@@ -327,7 +328,7 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 					mport_call_msg_cb(
 					    mport, "Source checksum missing %s", file);
 				} else {
-                    size_t len = strlen(checksum);
+					size_t len = strlen(checksum);
 					if (len < 34) {
 						if (MD5File(file, hash) == NULL) {
 							mport_call_msg_cb(mport, "Can't MD5 %s: %s",
@@ -375,8 +376,8 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 	sqlite3_finalize(stmt);
 	sqlite3_finalize(update_stmt);
 
-    if (mport_db_do(mport->db, "COMMIT") != MPORT_OK)
-        RETURN_CURRENT_ERROR;
+	if (mport_db_do(mport->db, "COMMIT") != MPORT_OK)
+		RETURN_CURRENT_ERROR;
 
 	return (MPORT_OK);
 }
@@ -396,32 +397,30 @@ mport_check_missing_depends(mportInstance *mport)
 	int ret;
 
 	if (mport_db_prepare(mport->db, &stmt,
-	    "SELECT d.pkg, d.depend_pkgname, d.depend_pkgversion "
-	    "FROM depends d "
-	    "WHERE EXISTS ("
-	    "  SELECT 1 FROM packages p WHERE p.pkg = d.pkg"
-	    ") "
-	    "AND NOT EXISTS ("
-	    "  SELECT 1 FROM packages p2 WHERE p2.pkg = d.depend_pkgname"
-	    ") "
-	    "ORDER BY d.pkg, d.depend_pkgname") != MPORT_OK) {
+		"SELECT d.pkg, d.depend_pkgname, d.depend_pkgversion "
+		"FROM depends d "
+		"WHERE EXISTS ("
+		"  SELECT 1 FROM packages p WHERE p.pkg = d.pkg"
+		") "
+		"AND NOT EXISTS ("
+		"  SELECT 1 FROM packages p2 WHERE p2.pkg = d.depend_pkgname"
+		") "
+		"ORDER BY d.pkg, d.depend_pkgname") != MPORT_OK) {
 		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 		return (-1);
 	}
 
 	while ((ret = sqlite3_step(stmt)) == SQLITE_ROW) {
-		const char *pkg     = (const char *)sqlite3_column_text(stmt, 0);
-		const char *dep     = (const char *)sqlite3_column_text(stmt, 1);
-		const char *ver     = (const char *)sqlite3_column_text(stmt, 2);
+		const char *pkg = (const char *)sqlite3_column_text(stmt, 0);
+		const char *dep = (const char *)sqlite3_column_text(stmt, 1);
+		const char *ver = (const char *)sqlite3_column_text(stmt, 2);
 
 		if (ver != NULL && *ver != '\0') {
 			mport_call_msg_cb(mport,
-			    "Missing dependency: %s requires %s-%s (not installed)",
-			    pkg, dep, ver);
+			    "Missing dependency: %s requires %s-%s (not installed)", pkg, dep, ver);
 		} else {
-			mport_call_msg_cb(mport,
-			    "Missing dependency: %s requires %s (not installed)",
-			    pkg, dep);
+			mport_call_msg_cb(
+			    mport, "Missing dependency: %s requires %s (not installed)", pkg, dep);
 		}
 		missing++;
 	}

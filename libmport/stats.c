@@ -38,7 +38,7 @@
 MPORT_PUBLIC_API mportStats *
 mport_stats_new(void)
 {
-	return (mportStats *) calloc(1, sizeof(mportStats));
+	return (mportStats *)calloc(1, sizeof(mportStats));
 }
 
 MPORT_PUBLIC_API int
@@ -73,10 +73,9 @@ mport_stats(mportInstance *mport, mportStats **stats)
 		goto cleanup;
 	}
 
-	s->pkg_installed = (unsigned int) sqlite3_column_int(stmt, 0);
+	s->pkg_installed = (unsigned int)sqlite3_column_int(stmt, 0);
 	sqlite3_finalize(stmt);
 	stmt = NULL;
-
 
 	if (mport_db_prepare(db, &stmt, "SELECT sum(flatsize) FROM packages") != MPORT_OK) {
 		result = mport_err_code();
@@ -95,8 +94,10 @@ mport_stats(mportInstance *mport, mportStats **stats)
 
 	if (mport_db_prepare(db, &stmt, "SELECT COUNT(*) FROM idx.packages") != MPORT_OK) {
 		int errcode = sqlite3_errcode(db);
-		/* If the index is missing or detached, we still want to return what we have for local */
-		if (errcode == SQLITE_ERROR && strstr(sqlite3_errmsg(db), "no such table") != NULL) {
+		/* If the index is missing or detached, we still want to return what we have for
+		 * local */
+		if (errcode == SQLITE_ERROR &&
+		    strstr(sqlite3_errmsg(db), "no such table") != NULL) {
 			s->pkg_available = 0;
 			sqlite3_finalize(stmt);
 			stmt = NULL;
@@ -108,7 +109,7 @@ mport_stats(mportInstance *mport, mportStats **stats)
 		if (sqlite3_step(stmt) != SQLITE_ROW) {
 			s->pkg_available = 0;
 		} else {
-			s->pkg_available = (unsigned int) sqlite3_column_int(stmt, 0);
+			s->pkg_available = (unsigned int)sqlite3_column_int(stmt, 0);
 		}
 		sqlite3_finalize(stmt);
 		stmt = NULL;

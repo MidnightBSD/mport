@@ -70,23 +70,8 @@ static int run_special_unexec(mportInstance *, mportPackageMeta *);
 static int run_pkg_deinstall(mportInstance *, mportPackageMeta *, const char *);
 static int delete_pkg_infra(mportInstance *, mportPackageMeta *);
 static int check_for_upwards_depends(mportInstance *, mportPackageMeta *);
-static bool is_safe_to_delete_dir(mportInstance *, mportPackageMeta *, const char *);
-static bool is_system_dir(const char *path);
-
-static const char *system_dirs[] = {
-	"/boot", 
-	_PATH_ETC, "/etc/rc.d", 
-	"/root",
-	_PATH_TMP,
-    "/usr/lib", "/usr/bin", "/usr/sbin", _PATH_MAN, _PATH_LOCALE, _PATH_FIRMWARE,
-    "/usr/share", 
-	"/usr/local", "/usr/local/bin", "/usr/local/sbin",
-	"/usr/local/share", "/usr/local/lib", "/usr/local/libexec",
-    "/usr/local/include", 
-	"/var", "/var/lib", "/var/log", "/var/spool", "/var/empty", 
-	_PATH_VARDB, _PATH_VARRUN, _PATH_VARTMP, _PATH_MAILDIR,
-};
-
+static void warn_ignored_rmdir_error(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
+static bool is_safe_to_delete_dir(mportInstance *, mportPackageMeta *, const char *, const char *);
 
 MPORT_PUBLIC_API int
 mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
@@ -150,8 +135,13 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	if (run_pkg_deinstall(mport, pack, "DEINSTALL") != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	if (mport_db_prepare(mport->db, &stmt, "SELECT type,data,checksum FROM assets WHERE pkg=%Q",
-		pack->name) != MPORT_OK)
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT type,data,checksum FROM assets WHERE pkg=%Q "
+		"ORDER BY CASE WHEN type IN (%d, %d, %d, %d, %d) THEN 1 ELSE 0 END, "
+		"CASE WHEN type IN (%d, %d, %d, %d, %d) THEN length(data) ELSE 0 END DESC",
+		pack->name, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE,
+		ASSET_AUTODIR, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE,
+		ASSET_AUTODIR) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	cwd = pack->prefix;
@@ -260,19 +250,30 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 							if (fileargv[1] != NULL) {
 								/* Case 2: @sample src dest */
 								if (fileargv[1][0] == '/')
-									strlcpy(dest_path, fileargv[1], FILENAME_MAX);
+									strlcpy(dest_path,
+									    fileargv[1],
+									    FILENAME_MAX);
 								else
-									(void) snprintf(dest_path, FILENAME_MAX, "%s%s/%s", mport->root, cwd, fileargv[1]);
+									(void)snprintf(dest_path,
+									    FILENAME_MAX, "%s%s/%s",
+									    mport->root, cwd,
+									    fileargv[1]);
 								dest_path_set = true;
 							} else if (fileargv[0] != NULL) {
 								/* Case 1: @sample file.sample */
 								char nonSample[FILENAME_MAX];
-								strlcpy(nonSample, file, FILENAME_MAX);
-								
-								char *sptr = strcasestr(nonSample, ".sample");
+								strlcpy(
+								    nonSample, file, FILENAME_MAX);
+
+								char *sptr = strcasestr(
+								    nonSample, ".sample");
 								if (sptr != NULL) {
-									sptr[0] = '\0'; /* hack off .sample */
-									strlcpy(dest_path, nonSample, FILENAME_MAX);
+									sptr[0] =
+									    '\0'; /* hack off
+										     .sample */
+									strlcpy(dest_path,
+									    nonSample,
+									    FILENAME_MAX);
 									dest_path_set = true;
 								}
 							}
@@ -284,20 +285,28 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 					if (dest_path_set && mport_file_exists(dest_path)) {
 						bool hashes_match = false;
 						if (strlen(checksum) < 34) {
-							if (MD5File(dest_path, sample_hash) != NULL && strcmp(sample_hash, hash) == 0) {
+							if (MD5File(dest_path, sample_hash) !=
+								NULL &&
+							    strcmp(sample_hash, hash) == 0) {
 								hashes_match = true;
 							}
 						} else {
-							if (SHA256_File(dest_path, sample_hash) != NULL && strcmp(sample_hash, hash) == 0) {
+							if (SHA256_File(dest_path, sample_hash) !=
+								NULL &&
+							    strcmp(sample_hash, hash) == 0) {
 								hashes_match = true;
 							}
 						}
 
 						if (hashes_match) {
 							if (unlink(dest_path) != 0)
-								mport_call_msg_cb(mport, "Could not unlink %s: %s", dest_path, strerror(errno));
+								mport_call_msg_cb(mport,
+								    "Could not unlink %s: %s",
+								    dest_path, strerror(errno));
 						} else {
-							mport_call_msg_cb(mport, "File does not match sample, remove file %s manually.", dest_path);
+							mport_call_msg_cb(mport,
+							    "File does not match sample, remove file %s manually.",
+							    dest_path);
 						}
 					}
 				}
@@ -330,15 +339,18 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 		case ASSET_DIR:
 		case ASSET_DIRRM:
 		case ASSET_DIRRMTRY:
+		case ASSET_AUTODIR:
 		case ASSET_DIR_OWNER_MODE:
-			if (is_safe_to_delete_dir(mport, pack, file)) {
+			if (is_safe_to_delete_dir(mport, pack, file, data)) {
 				mport_removeflags(mport->root, file);
-				if (mport_rmdir(file, type == ASSET_DIRRMTRY ? 1 : 0) != MPORT_OK) {
-					mport_call_msg_cb(mport, "Could not remove directory '%s': %s",
-				    	file, mport_err_string());
+				if (mport_rmdir(file,
+					type == ASSET_DIRRMTRY || type == ASSET_AUTODIR ? 1 : 0) !=
+				    MPORT_OK) {
+					warn_ignored_rmdir_error(mport, file);
 				}
-			} else if (type != ASSET_DIRRMTRY) {
-				mport_call_msg_cb(mport, "Directory in use by another package? '%s'", file);
+			} else if (type != ASSET_DIRRMTRY && type != ASSET_AUTODIR) {
+				mport_call_msg_cb(
+				    mport, "Directory in use by another package? '%s'", file);
 			}
 
 			break;
@@ -403,43 +415,50 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	return (MPORT_OK);
 }
 
-static bool is_system_dir(const char *path) {
-    for (size_t i = 0; i < sizeof(system_dirs) / sizeof(system_dirs[0]); i++) {
-        if (strcmp(path, system_dirs[i]) == 0) {
-            return true;
-        }
-    }
-    return false;
+static void
+warn_ignored_rmdir_error(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *dir)
+{
+	const char *err_msg = mport_err_string();
+
+	mport_call_msg_cb(mport, "Could not remove directory '%s': %s", dir,
+	    err_msg != NULL ? err_msg : "unknown error");
+	mport_set_err(MPORT_OK, NULL);
 }
 
-bool is_safe_to_delete_dir(mportInstance *mport, mportPackageMeta *pack, const char *path) 
+bool
+is_safe_to_delete_dir(
+    mportInstance *mport, mportPackageMeta *pack, const char *path, const char *asset_path)
 {
 	sqlite3_stmt *stmt;
 	int count;
-    
-	if (mport == NULL || pack == NULL || path == NULL) {
+
+	if (mport == NULL || pack == NULL || path == NULL || asset_path == NULL) {
 		return false;
 	}
 
 	/* Don't delete the root or the package prefix directories */
 	if (mport->root != NULL && strcmp(mport->root, path) == 0) {
-		mport_call_msg_cb(mport, "Skipping removal of root (DESTDIR) directory: '%s'", path);
+		mport_call_msg_cb(
+		    mport, "Skipping removal of root (DESTDIR) directory: '%s'", path);
 		return false;
 	}
-	if (pack->prefix != NULL && strcmp(pack->prefix, path) == 0) {
-		mport_call_msg_cb(mport, "Skipping removal of package prefix directory: '%s'", path);
+	if (pack->prefix != NULL &&
+	    (strcmp(pack->prefix, path) == 0 || strcmp(pack->prefix, asset_path) == 0)) {
+		mport_call_msg_cb(
+		    mport, "Skipping removal of package prefix directory: '%s'", path);
 		return false;
 	}
 
 	/* Check if the path is a system directory */
-	if (pack->type == MPORT_TYPE_APP && is_system_dir(path)) {
+	if (pack->type == MPORT_TYPE_APP && mport_is_system_mtree_dir(asset_path)) {
 		mport_call_msg_cb(mport, "Skipping removal of system directory: '%s'", path);
 		return false;
-	}	
+	}
 
 	if (mport_db_prepare(mport->db, &stmt,
-		"SELECT count(*) from assets where pkg!=%Q and type in (%d, %d, %d, %d) and data=%Q",
-		pack->name, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE, path) != MPORT_OK) {
+		"SELECT count(*) from assets where pkg!=%Q and type in (%d, %d, %d, %d, %d) and data=%Q",
+		pack->name, ASSET_DIR, ASSET_DIRRM, ASSET_DIRRMTRY, ASSET_DIR_OWNER_MODE,
+		ASSET_AUTODIR, asset_path) != MPORT_OK) {
 		return false;
 	}
 
@@ -500,18 +519,19 @@ run_unldconfig(mportInstance *mport, mportPackageMeta *pkg)
 				goto UNLDCONFIG_ERROR;
 			}
 			break;
-			case ASSET_LDCONFIG_LINUX:
-				if (data == NULL) {
-					if (mport_xsystem(mport, "/compat/linux/sbin/ldconfig") !=
-					    MPORT_OK) {
-						goto UNLDCONFIG_ERROR;
-					}
-				} else {
-					if (mport_exec_linux_ldconfig(mport, (const char *)data) != MPORT_OK) {
-						goto UNLDCONFIG_ERROR;
-					}
+		case ASSET_LDCONFIG_LINUX:
+			if (data == NULL) {
+				if (mport_xsystem(mport, "/compat/linux/sbin/ldconfig") !=
+				    MPORT_OK) {
+					goto UNLDCONFIG_ERROR;
 				}
-				break;
+			} else {
+				if (mport_exec_linux_ldconfig(mport, (const char *)data) !=
+				    MPORT_OK) {
+					goto UNLDCONFIG_ERROR;
+				}
+			}
+			break;
 		default:
 			break;
 		}
@@ -564,39 +584,39 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg)
 		data = sqlite3_column_text(assets, 1);
 
 		switch (type) {
-			case ASSET_GLIB_SCHEMAS:
-				if (mport_file_exists("/usr/local/bin/glib-compile-schemas") &&
-				    mport_exec_glib_compile_schemas(mport, data == NULL ? pkg->prefix : (const char *)data) != MPORT_OK) {
-					goto SPECIAL_ERROR;
-				}
-				break;
+		case ASSET_GLIB_SCHEMAS:
+			if (mport_file_exists("/usr/local/bin/glib-compile-schemas") &&
+			    mport_exec_glib_compile_schemas(mport,
+				data == NULL ? pkg->prefix : (const char *)data) != MPORT_OK) {
+				goto SPECIAL_ERROR;
+			}
+			break;
 		case ASSET_INFO:
 			if (data != NULL) {
 				strlcpy(in, data, sizeof(in));
 			} else {
 				strlcpy(in, "/usr/local/share/info", sizeof(in));
 			}
-				char *abs_path = realpath(in, NULL);
-				if (abs_path == NULL)
-					goto SPECIAL_ERROR;
-				char *info_dir = dirname(abs_path);
-				if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") &&
-				    mport_exec_indexinfo(mport, info_dir) != MPORT_OK) {
-					free(abs_path);
-					goto SPECIAL_ERROR;
-				}
+			char *abs_path = realpath(in, NULL);
+			if (abs_path == NULL)
+				goto SPECIAL_ERROR;
+			char *info_dir = dirname(abs_path);
+			if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") &&
+			    mport_exec_indexinfo(mport, info_dir) != MPORT_OK) {
 				free(abs_path);
-				break;
-			case ASSET_KLD:
-				if (mport_exec_kldxref(mport, (const char *)data) != MPORT_OK) {
-					goto SPECIAL_ERROR;
-				}
+				goto SPECIAL_ERROR;
+			}
+			free(abs_path);
+			break;
+		case ASSET_KLD:
+			if (mport_exec_kldxref(mport, (const char *)data) != MPORT_OK) {
+				goto SPECIAL_ERROR;
+			}
 			/* attempt to remove the directory containing the kernel
 			 * module, if it's not /boot/modules */
 			if (strcmp("/boot/modules", data) != 0 &&
 			    mport_rmdir(data, 1) != MPORT_OK) {
-				mport_call_msg_cb(mport, "Could not remove directory '%s': %s",
-				    data, mport_err_string());
+				warn_ignored_rmdir_error(mport, data);
 			}
 			break;
 		case ASSET_DESKTOP_FILE_UTILS:
@@ -703,40 +723,37 @@ delete_pkg_infra(mportInstance *mport, mportPackageMeta *pack)
 {
 	char dir[FILENAME_MAX];
 	char file[FILENAME_MAX];
-	
+
 	/* delete mtree file */
-	(void) snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR, pack->name,
-	                pack->version,
-	                MPORT_MTREE_FILE);
+	(void)snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR,
+	    pack->name, pack->version, MPORT_MTREE_FILE);
 
 	if (mport_file_exists(file) && unlink(file) != 0)
-		mport_call_msg_cb(
-		    mport, "Could not unlink %s: %s", file, strerror(errno));
+		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));
 
 	/* delete pkg message file */
-	(void) snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR, pack->name,
-                    pack->version, MPORT_MESSAGE_FILE);
+	(void)snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR,
+	    pack->name, pack->version, MPORT_MESSAGE_FILE);
 	if (mport_file_exists(file) && unlink(file) != 0)
-		mport_call_msg_cb(
-		    mport, "Could not unlink %s: %s", file, strerror(errno));
+		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));
 
 	/* delete lua files */
-	(void) snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR, pack->name,
-		pack->version, MPORT_LUA_POST_INSTALL_FILE);
+	(void)snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR,
+	    pack->name, pack->version, MPORT_LUA_POST_INSTALL_FILE);
 	if (mport_file_exists(file) && unlink(file) != 0)
 		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));
-	(void) snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR, pack->name,
-		pack->version, MPORT_LUA_PRE_INSTALL_FILE);
+	(void)snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR,
+	    pack->name, pack->version, MPORT_LUA_PRE_INSTALL_FILE);
 	if (mport_file_exists(file) && unlink(file) != 0)
 		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));
-	(void) snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR, pack->name,
-		pack->version, MPORT_LUA_POST_DEINSTALL_FILE);
+	(void)snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR,
+	    pack->name, pack->version, MPORT_LUA_POST_DEINSTALL_FILE);
 	if (mport_file_exists(file) && unlink(file) != 0)
 		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));
-	(void) snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR, pack->name,
-		pack->version, MPORT_LUA_PRE_DEINSTALL_FILE);
+	(void)snprintf(file, FILENAME_MAX, "%s%s/%s-%s/%s", mport->root, MPORT_STUB_INFRA_DIR,
+	    pack->name, pack->version, MPORT_LUA_PRE_DEINSTALL_FILE);
 	if (mport_file_exists(file) && unlink(file) != 0)
-		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));	
+		mport_call_msg_cb(mport, "Could not unlink %s: %s", file, strerror(errno));
 
 	(void)snprintf(dir, FILENAME_MAX, "%s%s/%s-%s", mport->root, MPORT_INST_INFRA_DIR,
 	    pack->name, pack->version);
