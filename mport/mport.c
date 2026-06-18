@@ -523,8 +523,40 @@ main(int argc, char *argv[])
 		}
 		resultCode = mport_list_print(mport, &opts);
 	} else if (!strcmp(cmd, "info")) {
-		loadIndex(mport);
-		resultCode = info(mport, argv[1]);
+		int local_argc = argc;
+		char *const *local_argv = argv;
+		int eflag = 0;
+
+		if (local_argc > 1) {
+			int ch2;
+			while ((ch2 = getopt(local_argc, local_argv, "e")) != -1) {
+				switch (ch2) {
+				case 'e':
+					eflag = 1;
+					break;
+				}
+			}
+			local_argc -= optind;
+			local_argv += optind;
+		}
+
+		if (local_argc < 1) {
+			mport_instance_free(mport);
+			usage();
+		}
+
+		if (eflag) {
+			mportPackageMeta **packs = NULL;
+			if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", local_argv[0]) == MPORT_OK && packs != NULL) {
+				mport_pkgmeta_vec_free(packs);
+				resultCode = 0;
+			} else {
+				resultCode = 1;
+			}
+		} else {
+			loadIndex(mport);
+			resultCode = info(mport, local_argv[0]);
+		}
 	} else if (!strcmp(cmd, "index")) {
 		resultCode = mport_index_get(mport);
 		if (resultCode != MPORT_OK) {
@@ -775,7 +807,7 @@ usage(void)
 	    "    deleteall                   Remove all installed packages\n\n"
 	    "  Information:\n"
 	    "    search <query>              Search for packages\n"
-	    "    info <package>              Display package information\n"
+	    "    info [-e] <package>         Display package information\n"
 	    "    list [updates|prime]        List installed packages\n"
 	    "    which [-qo] <file>          Find which package provides a file\n"
 	    "    stats                       Show package statistics\n\n"
