@@ -99,6 +99,21 @@ create_file(const char *path)
 	ATF_REQUIRE_EQ(0, close(fd));
 }
 
+static void
+create_file_with_contents(const char *path, const char *contents)
+{
+	int fd;
+	size_t len;
+	ssize_t written;
+
+	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	ATF_REQUIRE(fd >= 0);
+	len = strlen(contents);
+	written = write(fd, contents, len);
+	ATF_REQUIRE_EQ((ssize_t)len, written);
+	ATF_REQUIRE_EQ(0, close(fd));
+}
+
 static mportPackageMeta *
 create_delete_pack(const char *name)
 {
@@ -393,6 +408,81 @@ ATF_TC_CLEANUP(mtree_fallback_protects_system_dirs, tc)
 	cleanup_test_root();
 }
 
+ATF_TC_WITH_CLEANUP(delete_info_asset_keeps_post_uninstall_working);
+ATF_TC_HEAD(delete_info_asset_keeps_post_uninstall_working, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "delete handles @info assets after unlinking the info file");
+}
+ATF_TC_BODY(delete_info_asset_keeps_post_uninstall_working, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta *pack;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	create_local_prefix_dirs();
+	create_dir(test_path("/usr/local/share/info"));
+	create_file(test_path("/usr/local/share/info/alpha.info"));
+	insert_delete_package(mport, "alpha");
+	insert_asset(mport, "alpha", ASSET_INFO, "/usr/local/share/info/alpha.info");
+
+	pack = create_delete_pack("alpha");
+	ATF_REQUIRE_MSG(
+	    mport_delete_primative(mport, pack, 1) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(-1, access(test_path("/usr/local/share/info/alpha.info"), F_OK));
+
+	mport_pkgmeta_free(pack);
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(delete_info_asset_keeps_post_uninstall_working, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(rooted_infrastructure_path_uses_instance_root);
+ATF_TC_HEAD(rooted_infrastructure_path_uses_instance_root, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "infrastructure helper resolves package files underneath the instance root");
+}
+ATF_TC_BODY(rooted_infrastructure_path_uses_instance_root, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta *pack;
+	char path[PATH_MAX];
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pack = create_delete_pack("alpha");
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/var/db/mport/infrastructure/alpha-1.0"), 0755));
+	create_file_with_contents(
+	    test_path("/var/db/mport/infrastructure/alpha-1.0/pkg-deinstall"), "#!/bin/sh\nexit 0\n");
+
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_build_infrastructure_path(mport, pack, MPORT_DEINSTALL_FILE, true,
+			   path, sizeof(path)));
+	ATF_REQUIRE_STREQ(test_path("/var/db/mport/infrastructure/alpha-1.0/pkg-deinstall"), path);
+	ATF_REQUIRE_EQ(0, access(path, F_OK));
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_build_infrastructure_path(mport, pack, MPORT_DEINSTALL_FILE, false,
+			   path, sizeof(path)));
+	ATF_REQUIRE_STREQ("/var/db/mport/infrastructure/alpha-1.0/pkg-deinstall", path);
+
+	mport_pkgmeta_free(pack);
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(rooted_infrastructure_path_uses_instance_root, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 static void
 insert_query_package(mportInstance *mport, const char *name, const char *version,
     const char *origin, const char *comment, int automatic, int locked, int64_t flatsize)
@@ -648,6 +738,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, delete_explicit_dirrmtry_still_removes);
 	ATF_TP_ADD_TC(tp, mtree_fixture_protects_system_dirs);
 	ATF_TP_ADD_TC(tp, mtree_fallback_protects_system_dirs);
+	ATF_TP_ADD_TC(tp, delete_info_asset_keeps_post_uninstall_working);
+	ATF_TP_ADD_TC(tp, rooted_infrastructure_path_uses_instance_root);
 	ATF_TP_ADD_TC(tp, query_formats_installed_metadata);
 	ATF_TP_ADD_TC(tp, query_filters_patterns_and_expressions);
 
