@@ -72,6 +72,8 @@ static int delete_pkg_infra(mportInstance *, mportPackageMeta *);
 static int check_for_upwards_depends(mportInstance *, mportPackageMeta *);
 static void warn_ignored_rmdir_error(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
 static bool is_safe_to_delete_dir(mportInstance *, mportPackageMeta *, const char *, const char *);
+static int build_info_dir_path(
+    /*@notnull@*/ mportPackageMeta *, /*@null@*/ const char *, /*@out@*/ char *, size_t);
 
 MPORT_PUBLIC_API int
 mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
@@ -477,6 +479,48 @@ is_safe_to_delete_dir(
 }
 
 static int
+build_info_dir_path(
+    /*@notnull@*/ mportPackageMeta *pkg, /*@null@*/ const char *data, /*@out@*/ char *path,
+    size_t path_size)
+{
+	char info_path[FILENAME_MAX];
+	char path_copy[FILENAME_MAX];
+	char *dirpath;
+
+	if (pkg == NULL || path == NULL || path_size == 0)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid info asset path arguments.");
+
+	if (data == NULL) {
+		if (strlcpy(path, "/usr/local/share/info", path_size) >= path_size)
+			RETURN_ERROR(MPORT_ERR_FATAL, "Info directory path is too long.");
+		return (MPORT_OK);
+	}
+
+	if (*data == '/') {
+		if (strlcpy(info_path, data, sizeof(info_path)) >= sizeof(info_path))
+			RETURN_ERROR(MPORT_ERR_FATAL, "Info asset path is too long.");
+	} else {
+		if (pkg->prefix == NULL)
+			RETURN_ERROR(MPORT_ERR_FATAL, "Package prefix is undefined for info asset.");
+		if (snprintf(info_path, sizeof(info_path), "%s/%s", pkg->prefix, data) >=
+		    (int)sizeof(info_path)) {
+			RETURN_ERROR(MPORT_ERR_FATAL, "Info asset path is too long.");
+		}
+	}
+
+	if (strlcpy(path_copy, info_path, sizeof(path_copy)) >= sizeof(path_copy))
+		RETURN_ERROR(MPORT_ERR_FATAL, "Info asset path is too long.");
+
+	dirpath = dirname(path_copy);
+	if (dirpath == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Unable to determine info directory.");
+
+	if (strlcpy(path, dirpath, path_size) >= path_size)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Info directory path is too long.");
+	return (MPORT_OK);
+}
+
+static int
 run_unldconfig(mportInstance *mport, mportPackageMeta *pkg)
 {
 	int ret;
@@ -551,7 +595,7 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg)
 {
 	int ret;
 	char cwd[FILENAME_MAX];
-	char in[FILENAME_MAX];
+	char info_dir[FILENAME_MAX];
 	sqlite3_stmt *assets = NULL;
 	sqlite3 *db;
 	const char *data;
@@ -592,21 +636,12 @@ run_special_unexec(mportInstance *mport, mportPackageMeta *pkg)
 			}
 			break;
 		case ASSET_INFO:
-			if (data != NULL) {
-				strlcpy(in, data, sizeof(in));
-			} else {
-				strlcpy(in, "/usr/local/share/info", sizeof(in));
-			}
-			char *abs_path = realpath(in, NULL);
-			if (abs_path == NULL)
+			if (build_info_dir_path(pkg, data, info_dir, sizeof(info_dir)) != MPORT_OK)
 				goto SPECIAL_ERROR;
-			char *info_dir = dirname(abs_path);
-			if (info_dir != NULL && mport_file_exists("/usr/local/bin/indexinfo") &&
+			if (mport_file_exists("/usr/local/bin/indexinfo") &&
 			    mport_exec_indexinfo(mport, info_dir) != MPORT_OK) {
-				free(abs_path);
 				goto SPECIAL_ERROR;
 			}
-			free(abs_path);
 			break;
 		case ASSET_KLD:
 			if (mport_exec_kldxref(mport, (const char *)data) != MPORT_OK) {
@@ -699,17 +734,23 @@ static int
 run_pkg_deinstall(mportInstance *mport, mportPackageMeta *pack, const char *mode)
 {
 	char file[FILENAME_MAX];
+	char command_file[FILENAME_MAX];
 	int ret;
 
-	(void)snprintf(file, FILENAME_MAX, "%s/%s-%s/%s", MPORT_INST_INFRA_DIR, pack->name,
-	    pack->version, MPORT_DEINSTALL_FILE);
+	if (mport_build_infrastructure_path(mport, pack, MPORT_DEINSTALL_FILE, true, file,
+		sizeof(file)) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	if (mport_build_infrastructure_path(mport, pack, MPORT_DEINSTALL_FILE, false,
+		command_file, sizeof(command_file)) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
 
 	if (mport_file_exists(file)) {
 		if (chmod(file, 755) != 0)
 			RETURN_ERRORX(MPORT_ERR_FATAL, "chmod(%s, 755): %s", file, strerror(errno));
 
-		if ((ret = mport_xsystem(mport, "PKG_PREFIX=%s %s %s %s", pack->prefix, file,
-			 pack->name, mode)) != 0)
+		if ((ret = mport_xsystem(mport, "PKG_PREFIX=%s %s %s %s", pack->prefix,
+			 command_file, pack->name, mode)) != 0)
 			RETURN_ERRORX(MPORT_ERR_FATAL, "%s %s returned non-zero: %i",
 			    MPORT_INSTALL_FILE, mode, ret);
 	}
