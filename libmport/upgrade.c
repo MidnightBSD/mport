@@ -48,22 +48,40 @@
 /*@-mustfreeonly -nullpass -nullret -nullstate -paramuse -predboolint -retvalint@*/
 /*@-temptrans -unrecog -usedef -varuse@*/
 
+#if defined(__MidnightBSD__) && __MidnightBSD_version >= 401002
+static /*@null@*/ void *ecalloc(size_t, size_t, void *);
+static void efree(void *, void *);
+#else
 static /*@null@*/ void *ecalloc(size_t, void *);
 static void efree(void *, size_t, void *);
+#endif
 
 static /*@null@*/ void *
+#if defined(__MidnightBSD__) && __MidnightBSD_version >= 401002
+ecalloc(size_t nmemb, size_t size, void *data)
+#else
 ecalloc(size_t s1, void *data)
+#endif
 {
 	void *p;
 
+#if defined(__MidnightBSD__) && __MidnightBSD_version >= 401002
+	if (!(p = calloc(nmemb, size)))
+		err(1, "calloc");
+#else
 	if (!(p = malloc(s1)))
 		err(1, "malloc");
 	memset(p, 0, s1);
+#endif
 	return p;
 }
 
 static void
+#if defined(__MidnightBSD__) && __MidnightBSD_version >= 401002
+efree(void *p, void *data)
+#else
 efree(void *p, size_t s1, void *data)
+#endif
 {
 	free(p);
 }
