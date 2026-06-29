@@ -35,6 +35,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 #include "mport.h"
 #include "mport_private.h"
 
@@ -97,6 +98,16 @@ mport_default_confirm_cb(const char *msg, const char *yes, const char *no, int d
 		return (MPORT_OK);
 	}
 
+	if (!isatty(fileno(stdin))) {
+		(void)fprintf(stderr,
+		    "%s\nCannot prompt for confirmation: stdin is not a terminal. "
+		    "Re-run with -y or set ASSUME_ALWAYS_YES=1 to proceed.\n",
+		    msg);
+		mport_set_errx(MPORT_ERR_FATAL,
+		    "stdin is not a terminal; use -y or ASSUME_ALWAYS_YES to confirm");
+		return mport_err_code();
+	}
+
 	if (color_terminal) {
 		(void)fprintf(stderr, "%s%s (Y/N) [%s]:%s ", KCYN, msg, def == 1 ? yes : no, KNRM);
 	} else {
@@ -152,6 +163,15 @@ mport_default_select_cb(const char *msg, mportIndexEntry **choices, int def)
 
 	if (getenv("ASSUME_ALWAYS_YES") != NULL || getenv("MAGUS") != NULL) {
 		return def >= 0 ? def : 0;
+	}
+
+	if (!isatty(fileno(stdin))) {
+		(void)fprintf(stderr,
+		    "Cannot prompt for a selection: stdin is not a terminal. "
+		    "Re-run with -y or set ASSUME_ALWAYS_YES=1 to pick the default.\n");
+		mport_set_errx(MPORT_ERR_FATAL,
+		    "stdin is not a terminal; use -y or ASSUME_ALWAYS_YES to select");
+		return -1;
 	}
 
 	if (color_terminal) {
