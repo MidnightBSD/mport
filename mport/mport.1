@@ -324,6 +324,11 @@ ignore missing dependencies and attempt the installation anyway.
 With
 .Fl y ,
 assume yes for confirmation prompts.
+If a requested package is not available in the package index and a populated
+.Pa /usr/mports
+tree is present,
+.Nm
+prints guidance for installing a matching port or searching the ports tree.
 .It Cm list Op Cm updates | Cm up | Cm prime
 Without arguments, list installed packages.
 The

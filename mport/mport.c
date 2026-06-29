@@ -28,6 +28,8 @@
 
 #include <sys/cdefs.h>
 
+#include <sys/stat.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -55,6 +57,7 @@ static /*@only@*/ mportIndexEntry **lookupIndex(
 static int add(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *filename,
     mportAutomatic automatic);
 static int install(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *, mportAutomatic);
+static void print_ports_install_hint(/*@notnull@*/ const char *);
 static int reinstall_dependents(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
 static int reinstall_dependents_impl(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *,
     /*@notnull@*/ /*@out@*/ char ***, /*@notnull@*/ /*@out@*/ size_t *,
@@ -1243,6 +1246,116 @@ add(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *filename,
 	return mport_install_primative(mport, filename, NULL, automatic);
 }
 
+static bool
+ports_tree_populated(/*@notnull@*/ const char *portsDir)
+{
+	DIR *dir;
+	struct dirent *entry;
+	struct stat sb;
+	char path[FILENAME_MAX];
+
+	if (stat(portsDir, &sb) != 0 || !S_ISDIR(sb.st_mode))
+		return false;
+
+	dir = opendir(portsDir);
+	if (dir == NULL)
+		return false;
+
+	while ((entry = readdir(dir)) != NULL) {
+		if (entry->d_name[0] == '.')
+			continue;
+		if (snprintf(path, sizeof(path), "%s/%s", portsDir, entry->d_name) >=
+		    (int)sizeof(path))
+			continue;
+		if (stat(path, &sb) == 0 && S_ISDIR(sb.st_mode)) {
+			closedir(dir);
+			return true;
+		}
+	}
+
+	closedir(dir);
+	return false;
+}
+
+static bool
+find_port_origin(/*@notnull@*/ const char *portsDir, /*@notnull@*/ const char *portName,
+    /*@out@*/ char *origin, size_t originSize)
+{
+	DIR *dir;
+	struct dirent *entry;
+	struct stat sb;
+	char path[FILENAME_MAX];
+
+	if (originSize == 0)
+		return false;
+
+	dir = opendir(portsDir);
+	if (dir == NULL)
+		return false;
+
+	while ((entry = readdir(dir)) != NULL) {
+		if (entry->d_name[0] == '.')
+			continue;
+		if (snprintf(path, sizeof(path), "%s/%s/%s/Makefile", portsDir, entry->d_name,
+			portName) >= (int)sizeof(path))
+			continue;
+		if (stat(path, &sb) == 0 && S_ISREG(sb.st_mode)) {
+			if (snprintf(origin, originSize, "%s/%s", entry->d_name, portName) >=
+			    (int)originSize) {
+				closedir(dir);
+				return false;
+			}
+			closedir(dir);
+			return true;
+		}
+	}
+
+	closedir(dir);
+	return false;
+}
+
+static void
+print_ports_install_hint(/*@notnull@*/ const char *packageName)
+{
+	const char *portsDir = "/usr/mports";
+	char origin[FILENAME_MAX];
+	char stripped[FILENAME_MAX];
+	char *last_dash;
+	const char *hintName = packageName;
+
+	if (!ports_tree_populated(portsDir))
+		return;
+
+	if (!find_port_origin(portsDir, packageName, origin, sizeof(origin))) {
+		if (strlcpy(stripped, packageName, sizeof(stripped)) >= sizeof(stripped))
+			stripped[0] = '\0';
+		last_dash = strrchr(stripped, '-');
+		if (last_dash != NULL && last_dash != stripped) {
+			*last_dash = '\0';
+			if (find_port_origin(portsDir, stripped, origin, sizeof(origin)))
+				hintName = stripped;
+		}
+	}
+
+	if (hintName != packageName ||
+	    find_port_origin(portsDir, packageName, origin, sizeof(origin))) {
+		fprintf(stderr,
+		    "The package '%s' is not available as a binary package, but a port exists "
+		    "in %s.\n"
+		    "You can install it manually by running:\n"
+		    "  cd %s/%s\n"
+		    "  make install clean\n",
+		    packageName, portsDir, portsDir, origin);
+		return;
+	}
+
+	fprintf(stderr,
+	    "A ports tree exists in %s. To look for a matching port, run:\n"
+	    "  cd %s\n"
+	    "  make search name=%s\n",
+	    portsDir, portsDir, packageName);
+}
+
 static int
 install(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageName,
     mportAutomatic automatic)
@@ -1281,6 +1394,10 @@ install(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageNam
 			    strcmp(v, (*indexEntry)->version) != 0) {
 				fprintf(
 				    stderr, "Package %s not found in the index.\n", packageName);
+				print_ports_install_hint(packageName);
+				if (indexEntry != NULL)
+					mport_index_entry_free_vec(indexEntry);
+				free(d);
 				exit(4);
 			}
 			free(d);
@@ -1289,6 +1406,7 @@ install(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageNam
 
 	if (indexEntry == NULL || *indexEntry == NULL) {
 		fprintf(stderr, "Package %s not found in the index.\n", packageName);
+		print_ports_install_hint(packageName);
 		exit(4);
 	}
 
