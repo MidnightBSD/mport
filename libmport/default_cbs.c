@@ -87,6 +87,24 @@ mport_is_color_terminal(void)
 	return colorterm_support || term_supports_color || term_is_256color || clicolor_support;
 }
 
+/*
+ * Refuse an interactive prompt when stdin is not a terminal, recording an
+ * actionable error. Shared by the confirm and select callbacks so both behave
+ * identically. Returns -1, a non-MPORT_OK value the callers already treat as
+ * "not confirmed" / "no selection".
+ */
+static int
+mport_refuse_non_tty_prompt(const char *what)
+{
+	(void)fprintf(stderr,
+	    "Cannot prompt for %s: stdin is not a terminal. "
+	    "Re-run with -y or set ASSUME_ALWAYS_YES=1 to proceed.\n",
+	    what);
+	mport_set_errx(MPORT_ERR_FATAL,
+	    "cannot prompt for %s: stdin is not a terminal; use -y or ASSUME_ALWAYS_YES", what);
+	return -1;
+}
+
 int
 mport_default_confirm_cb(const char *msg, const char *yes, const char *no, int def)
 {
@@ -98,15 +116,8 @@ mport_default_confirm_cb(const char *msg, const char *yes, const char *no, int d
 		return (MPORT_OK);
 	}
 
-	if (!isatty(fileno(stdin))) {
-		(void)fprintf(stderr,
-		    "%s\nCannot prompt for confirmation: stdin is not a terminal. "
-		    "Re-run with -y or set ASSUME_ALWAYS_YES=1 to proceed.\n",
-		    msg);
-		mport_set_errx(MPORT_ERR_FATAL,
-		    "stdin is not a terminal; use -y or ASSUME_ALWAYS_YES to confirm");
-		return mport_err_code();
-	}
+	if (!isatty(fileno(stdin)))
+		return mport_refuse_non_tty_prompt("confirmation");
 
 	if (color_terminal) {
 		(void)fprintf(stderr, "%s%s (Y/N) [%s]:%s ", KCYN, msg, def == 1 ? yes : no, KNRM);
@@ -165,14 +176,8 @@ mport_default_select_cb(const char *msg, mportIndexEntry **choices, int def)
 		return def >= 0 ? def : 0;
 	}
 
-	if (!isatty(fileno(stdin))) {
-		(void)fprintf(stderr,
-		    "Cannot prompt for a selection: stdin is not a terminal. "
-		    "Re-run with -y or set ASSUME_ALWAYS_YES=1 to pick the default.\n");
-		mport_set_errx(MPORT_ERR_FATAL,
-		    "stdin is not a terminal; use -y or ASSUME_ALWAYS_YES to select");
-		return -1;
-	}
+	if (!isatty(fileno(stdin)))
+		return mport_refuse_non_tty_prompt("a selection");
 
 	if (color_terminal) {
 		(void)fprintf(stderr, "%s%s%s\n", KCYN, msg, KNRM);
