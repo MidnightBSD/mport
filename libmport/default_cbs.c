@@ -88,13 +88,15 @@ mport_is_color_terminal(void)
 }
 
 /*
- * Refuse an interactive prompt when stdin is not a terminal, recording an
- * actionable error. Shared by the confirm and select callbacks so both behave
- * identically. Returns -1, a non-MPORT_OK value the callers already treat as
- * "not confirmed" / "no selection".
+ * Print an actionable error and record it when an interactive prompt is needed
+ * but stdin is not a terminal. Shared by the confirm and select callbacks for
+ * the message/error; each caller returns its own appropriate value afterwards
+ * (the confirm callback returns mport_err_code(), while the select callback
+ * must return -1 because its return value is a choice index where any
+ * non-negative value would be a valid selection).
  */
-static int
-mport_refuse_non_tty_prompt(const char *what)
+static void
+mport_warn_non_tty_prompt(const char *what)
 {
 	(void)fprintf(stderr,
 	    "Cannot prompt for %s: stdin is not a terminal. "
@@ -102,7 +104,6 @@ mport_refuse_non_tty_prompt(const char *what)
 	    what);
 	mport_set_errx(MPORT_ERR_FATAL,
 	    "cannot prompt for %s: stdin is not a terminal; use -y or ASSUME_ALWAYS_YES", what);
-	return -1;
 }
 
 int
@@ -116,8 +117,10 @@ mport_default_confirm_cb(const char *msg, const char *yes, const char *no, int d
 		return (MPORT_OK);
 	}
 
-	if (!isatty(fileno(stdin)))
-		return mport_refuse_non_tty_prompt("confirmation");
+	if (!isatty(fileno(stdin))) {
+		mport_warn_non_tty_prompt("confirmation");
+		return mport_err_code();
+	}
 
 	if (color_terminal) {
 		(void)fprintf(stderr, "%s%s (Y/N) [%s]:%s ", KCYN, msg, def == 1 ? yes : no, KNRM);
@@ -176,8 +179,10 @@ mport_default_select_cb(const char *msg, mportIndexEntry **choices, int def)
 		return def >= 0 ? def : 0;
 	}
 
-	if (!isatty(fileno(stdin)))
-		return mport_refuse_non_tty_prompt("a selection");
+	if (!isatty(fileno(stdin))) {
+		mport_warn_non_tty_prompt("a selection");
+		return -1;
+	}
 
 	if (color_terminal) {
 		(void)fprintf(stderr, "%s%s%s\n", KCYN, msg, KNRM);
