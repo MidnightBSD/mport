@@ -37,6 +37,8 @@
 
 static char **get_dependencies(mportInstance *mport, mportPackageMeta *pack);
 static char *find_file_with_prefix(const char *dir, const char *prefix);
+static /*@only@*/ mportPackageMeta **lookup_current_os_installed(
+    /*@notnull@*/ mportInstance *, /*@notnull@*/ mportPackageMeta *);
 
 #define GOTO_CLEANUP_ON_MPORT_ERR(expr)         \
 	do {                                    \
@@ -144,6 +146,33 @@ find_file_with_prefix(const char *dir, const char *prefix)
 	return found_file;
 }
 
+static mportPackageMeta **
+lookup_current_os_installed(mportInstance *mport, mportPackageMeta *pkg)
+{
+	mportPackageMeta **installed = NULL;
+	char *system_os_release;
+
+	if (mport_pkgmeta_search_master(mport, &installed, "pkg=%Q", pkg->name) != MPORT_OK)
+		return NULL;
+	if (installed == NULL)
+		return NULL;
+	if (installed[0] == NULL) {
+		mport_pkgmeta_vec_free(installed);
+		return NULL;
+	}
+
+	system_os_release = mport_get_osrelease(mport);
+	if (system_os_release == NULL || installed[0]->os_release == NULL ||
+	    strcmp(installed[0]->os_release, system_os_release) != 0) {
+		free(system_os_release);
+		mport_pkgmeta_vec_free(installed);
+		return NULL;
+	}
+
+	free(system_os_release);
+	return installed;
+}
+
 MPORT_PUBLIC_API int
 mport_install_primative(
     mportInstance *mport, const char *filename, const char *prefix, mportAutomatic automatic)
@@ -184,19 +213,32 @@ mport_install_primative(
 			goto cleanup;
 		}
 
-		/* if we previously installed it and want to force, allow it.
-		   In this case, automatic flag from previous install not honored
-		*/
-		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_INSTALLED) !=
-		    MPORT_OK) {
-			if (mport->force) {
-				mport_delete_primative(mport, pkgs[0], 1);
+		already_installed = lookup_current_os_installed(mport, pkgs[0]);
+		if (already_installed != NULL && already_installed[0] != NULL) {
+			int version_cmp =
+			    mport_version_cmp(already_installed[0]->version, pkgs[0]->version);
+
+			if (mport->force || version_cmp < 0) {
+				automatic = already_installed[0]->automatic;
+				if (version_cmp < 0) {
+					mport_call_msg_cb(mport, "Updating %s from %s to %s.",
+					    pkgs[0]->name, already_installed[0]->version,
+					    pkgs[0]->version);
+				}
+				if (mport_delete_primative(mport, already_installed[0], 1) !=
+				    MPORT_OK) {
+					ret = mport_err_code();
+					goto cleanup;
+				}
 			} else {
 				mport_call_msg_cb(mport, "%s-%s: already installed.", pkgs[0]->name,
 				    pkgs[0]->version);
 				ret = MPORT_OK;
 				goto cleanup;
 			}
+
+			mport_pkgmeta_vec_free(already_installed);
+			already_installed = NULL;
 		}
 
 		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_CONFLICTS) !=

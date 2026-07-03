@@ -247,6 +247,10 @@ package files.
 If
 .Fl A
 is specified, mark the installed package as automatic.
+If the package is already installed and the local package file contains a newer
+version,
+.Nm
+updates it by removing the installed package and installing the local file.
 For repository installs, use
 .Cm install .
 .It Cm annotate Op Fl a Op Fl q Fl S Ar package Ar tag
