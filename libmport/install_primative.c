@@ -37,8 +37,9 @@
 
 static char **get_dependencies(mportInstance *mport, mportPackageMeta *pack);
 static char *find_file_with_prefix(const char *dir, const char *prefix);
-static /*@only@*/ mportPackageMeta **lookup_current_os_installed(
-    /*@notnull@*/ mportInstance *, /*@notnull@*/ mportPackageMeta *);
+static /*@null@*/ /*@only@*/ mportPackageMeta **lookup_current_os_installed(
+    /*@notnull@*/ mportInstance *, /*@notnull@*/ mportPackageMeta *,
+    /*@out@*/ mportPackageMeta **);
 
 #define GOTO_CLEANUP_ON_MPORT_ERR(expr)         \
 	do {                                    \
@@ -146,30 +147,50 @@ find_file_with_prefix(const char *dir, const char *prefix)
 	return found_file;
 }
 
+/*
+ * Return the installed package(s) matching pkg->name, and set *match to the
+ * single entry whose os_release equals the running system's. The package name
+ * is not unique in the master DB (the same name can be installed under a
+ * different os_release), so scan every returned row rather than assuming the
+ * current-OS entry is first. Returns NULL (and sets *match to NULL) when the
+ * package is not installed under the current OS release; the caller owns the
+ * returned vector, and *match is an observer into it.
+ */
 static mportPackageMeta **
-lookup_current_os_installed(mportInstance *mport, mportPackageMeta *pkg)
+lookup_current_os_installed(mportInstance *mport, mportPackageMeta *pkg, mportPackageMeta **match)
 {
 	mportPackageMeta **installed = NULL;
 	char *system_os_release;
+	int i;
+
+	*match = NULL;
 
 	if (mport_pkgmeta_search_master(mport, &installed, "pkg=%Q", pkg->name) != MPORT_OK)
 		return NULL;
 	if (installed == NULL)
 		return NULL;
-	if (installed[0] == NULL) {
+
+	system_os_release = mport_get_osrelease(mport);
+	if (system_os_release == NULL) {
 		mport_pkgmeta_vec_free(installed);
 		return NULL;
 	}
 
-	system_os_release = mport_get_osrelease(mport);
-	if (system_os_release == NULL || installed[0]->os_release == NULL ||
-	    strcmp(installed[0]->os_release, system_os_release) != 0) {
-		free(system_os_release);
-		mport_pkgmeta_vec_free(installed);
-		return NULL;
+	for (i = 0; installed[i] != NULL; i++) {
+		if (installed[i]->os_release != NULL &&
+		    strcmp(installed[i]->os_release, system_os_release) == 0) {
+			*match = installed[i];
+			break;
+		}
 	}
 
 	free(system_os_release);
+
+	if (*match == NULL) {
+		mport_pkgmeta_vec_free(installed);
+		return NULL;
+	}
+
 	return installed;
 }
 
@@ -179,6 +200,7 @@ mport_install_primative(
 {
 	mportBundleRead *bundle = NULL;
 	mportPackageMeta **already_installed = NULL;
+	mportPackageMeta *current_installed = NULL;
 	mportPackageMeta **pkgs = NULL;
 	mportPackageMeta *pkg = NULL;
 	int i;
@@ -213,19 +235,26 @@ mport_install_primative(
 			goto cleanup;
 		}
 
-		already_installed = lookup_current_os_installed(mport, pkgs[0]);
-		if (already_installed != NULL && already_installed[0] != NULL) {
+		/*
+		 * Only packages installed under the current OS release are treated
+		 * as update/reinstall candidates here. A copy installed under a
+		 * different os_release is left for the normal install path below,
+		 * where MPORT_PRECHECK_INSTALLED considers a differing os_release to
+		 * be a distinct package (matching pre-existing --force behavior).
+		 */
+		already_installed = lookup_current_os_installed(mport, pkgs[0], &current_installed);
+		if (current_installed != NULL) {
 			int version_cmp =
-			    mport_version_cmp(already_installed[0]->version, pkgs[0]->version);
+			    mport_version_cmp(current_installed->version, pkgs[0]->version);
 
 			if (mport->force || version_cmp < 0) {
-				automatic = already_installed[0]->automatic;
+				automatic = current_installed->automatic;
 				if (version_cmp < 0) {
 					mport_call_msg_cb(mport, "Updating %s from %s to %s.",
-					    pkgs[0]->name, already_installed[0]->version,
+					    pkgs[0]->name, current_installed->version,
 					    pkgs[0]->version);
 				}
-				if (mport_delete_primative(mport, already_installed[0], 1) !=
+				if (mport_delete_primative(mport, current_installed, 1) !=
 				    MPORT_OK) {
 					ret = mport_err_code();
 					goto cleanup;
