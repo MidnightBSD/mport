@@ -1508,7 +1508,7 @@ do_post_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta 
 static int
 run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 {
-	mportAssetList *alist;
+	mportAssetList *alist = NULL;
 	mportAssetListEntry *e = NULL;
 	char cwd[FILENAME_MAX];
 	char in[FILENAME_MAX];
@@ -1628,7 +1628,7 @@ run_postexec(mportInstance *mport, mportPackageMeta *pkg)
 	return MPORT_OK;
 
 ERROR:
-	// TODO: asset list free
+	mport_assetlist_free(alist);
 	RETURN_CURRENT_ERROR;
 }
 

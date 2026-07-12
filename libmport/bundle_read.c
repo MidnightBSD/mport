@@ -102,7 +102,7 @@ mport_bundle_read_finish(mportInstance *mport, mportBundleRead *bundle)
 			ret = SET_ERROR(MPORT_ERR_FATAL, archive_error_string(bundle->archive));
 		}
 
-		if (ret != MPORT_ERR_FATAL && archive_read_free(bundle->archive) != ARCHIVE_OK) {
+		if (archive_read_free(bundle->archive) != ARCHIVE_OK && ret == MPORT_OK) {
 			mport_call_msg_cb(
 			    mport, "Unable to free memory used by package archive file.");
 			ret = SET_ERROR(MPORT_ERR_FATAL, archive_error_string(bundle->archive));

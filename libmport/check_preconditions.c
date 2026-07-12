@@ -44,6 +44,17 @@ static int check_if_older_installed(mportInstance *, mportPackageMeta *);
 static int check_if_older_os(mportInstance *, mportPackageMeta *);
 static int check_file_conflicts(mportInstance *, mportPackageMeta *);
 
+static void
+free_moved_entries(mportIndexMovedEntry **entries)
+{
+	if (entries == NULL)
+		return;
+
+	for (mportIndexMovedEntry **entry = entries; *entry != NULL; entry++)
+		free(*entry);
+	free(entries);
+}
+
 /* Run the checks requested by the flags given.
  *
  * Flags:
@@ -86,49 +97,44 @@ mport_check_preconditions(mportInstance *mport, mportPackageMeta *pack, long fla
 static int
 check_if_moved(mportInstance *mport, mportPackageMeta *pack)
 {
-	mportIndexMovedEntry **movedEntries;
+	mportIndexMovedEntry **movedEntries = NULL;
+	int ret = MPORT_OK;
 
 	if (mport_moved_lookup(mport, pack->origin, &movedEntries) != MPORT_OK) {
+		free_moved_entries(movedEntries);
 		SET_ERROR(MPORT_ERR_FATAL, "The moved lookup failed.");
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (movedEntries == NULL || *movedEntries != NULL) {
-		return MPORT_OK;
-	}
-
-	if ((*movedEntries)->date[0] != '\0')
-		return MPORT_OK; // it expired, not moved
-
-	if ((*movedEntries)->moved_to != NULL && (*movedEntries)->moved_to[0] != '\0') {
+	if (movedEntries != NULL && *movedEntries != NULL && (*movedEntries)->date[0] == '\0' &&
+	    (*movedEntries)->moved_to[0] != '\0') {
 		SET_ERRORX(MPORT_ERR_FATAL, "The package %s has been moved to %s", pack->name,
 		    (*movedEntries)->moved_to);
-		RETURN_CURRENT_ERROR;
+		ret = mport_err_code();
 	}
 
-	return MPORT_OK; // just pass it if it didn't match either scenario
+	free_moved_entries(movedEntries);
+	return ret;
 }
 
 static int
 check_if_deprecated(mportInstance *mport, mportPackageMeta *pack)
 {
-	mportIndexMovedEntry **movedEntries;
+	mportIndexMovedEntry **movedEntries = NULL;
+	int ret = MPORT_OK;
 
 	if (mport_moved_lookup(mport, pack->origin, &movedEntries) != MPORT_OK) {
+		free_moved_entries(movedEntries);
 		SET_ERROR(MPORT_ERR_FATAL, "The moved lookup failed.");
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (movedEntries == NULL || *movedEntries != NULL) {
-		return MPORT_OK;
-	}
+	if (movedEntries != NULL && *movedEntries != NULL && (*movedEntries)->date[0] != '\0')
+		ret = SET_ERRORX(MPORT_ERR_FATAL, "%s expires on %s.", pack->name,
+		    (*movedEntries)->date);
 
-	if ((*movedEntries)->date[0] != '\0') {
-		SET_ERRORX(MPORT_ERR_FATAL, "%s expires on %s.", pack->name, (*movedEntries)->date);
-		RETURN_CURRENT_ERROR;
-	}
-
-	return MPORT_OK;
+	free_moved_entries(movedEntries);
+	return ret;
 }
 
 static int

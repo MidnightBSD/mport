@@ -394,8 +394,11 @@ mport_call_progress_init_cb(mportInstance *mport, const char *fmt, ...)
 	va_start(args, fmt);
 	(void)vasprintf(&title, fmt, args);
 
-	if (title == NULL)
+	if (title == NULL) {
+		va_end(args);
 		RETURN_ERROR(MPORT_ERR_WARN, "Unable to format progress title");
+	}
+	va_end(args);
 
 	(mport->progress_init_cb)(title);
 
