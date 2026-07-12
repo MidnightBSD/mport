@@ -38,9 +38,43 @@
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 static int verify_hash_fd(int, const char *);
+
+static int
+remove_tree_at(int parentfd, const char *name)
+{
+	int fd = openat(parentfd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+	if (fd == -1) {
+		if (errno == ENOTDIR || errno == ELOOP)
+			return unlinkat(parentfd, name, 0);
+		return -1;
+	}
+
+	DIR *dir = fdopendir(fd);
+	if (dir == NULL) {
+		close(fd);
+		return -1;
+	}
+
+	int ret = 0;
+	struct dirent *de;
+	while ((de = readdir(dir)) != NULL) {
+		if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+			continue;
+		if (remove_tree_at(fd, de->d_name) != 0)
+			ret = -1;
+	}
+
+	if (closedir(dir) != 0)
+		ret = -1;
+	if (ret == 0 && unlinkat(parentfd, name, AT_REMOVEDIR) != 0)
+		ret = -1;
+
+	return ret;
+}
 
 MPORT_PUBLIC_API int
 mport_clean_database(mportInstance *mport)
@@ -203,9 +237,12 @@ mport_clean_oldmtree(mportInstance *mport)
 
 	int deleted = 0;
 	struct dirent *de;
-	DIR *d = opendir(MPORT_INST_INFRA_DIR);
+	int dfd = open(MPORT_INST_INFRA_DIR, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+	DIR *d = dfd == -1 ? NULL : fdopendir(dfd);
 
 	if (d == NULL) {
+		if (dfd != -1)
+			close(dfd);
 		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s",
 		    MPORT_INST_INFRA_DIR, strerror(errno));
 		return error_code;
@@ -213,7 +250,6 @@ mport_clean_oldmtree(mportInstance *mport)
 
 	while ((de = readdir(d)) != NULL) {
 		mportPackageMeta **packs;
-		char *path;
 		if (strcmp(".", de->d_name) == 0 || strcmp("..", de->d_name) == 0)
 			continue;
 
@@ -231,18 +267,11 @@ mport_clean_oldmtree(mportInstance *mport)
 			continue;
 		}
 
-		if (asprintf(&path, "%s/%s", MPORT_INST_INFRA_DIR, de->d_name) == -1) {
-			if (packs != NULL) {
-				mport_pkgmeta_vec_free(packs);
-				packs = NULL;
-			}
-			continue;
-		}
-
 		if (packs == NULL || *packs == NULL) {
-			if (mport_rmtree(path) != MPORT_OK) {
+			if (remove_tree_at(dfd, de->d_name) != 0) {
 				error_code = SET_ERRORX(MPORT_ERR_FATAL,
-				    "Could not delete file %s: %s", path, strerror(errno));
+				    "Could not delete file %s/%s: %s", MPORT_INST_INFRA_DIR,
+				    de->d_name, strerror(errno));
 				mport_call_msg_cb(mport, "%s\n", mport_err_string());
 			} else {
 				deleted++;
@@ -252,8 +281,6 @@ mport_clean_oldmtree(mportInstance *mport)
 			packs = NULL;
 		}
 
-		free(path);
-		path = NULL;
 	}
 
 	closedir(d);
