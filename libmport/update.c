@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2021 Lucas Holt
+ * Copyright (c) 2021, 2026 Lucas Holt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,17 @@
 #include <string.h>
 #include <stdlib.h>
 
+static void
+free_moved_entries(mportIndexMovedEntry **entries)
+{
+	if (entries == NULL)
+		return;
+
+	for (mportIndexMovedEntry **entry = entries; *entry != NULL; entry++)
+		free(*entry);
+	free(entries);
+}
+
 MPORT_PUBLIC_API int
 mport_update(mportInstance *mport, const char *packageName)
 {
@@ -39,10 +50,54 @@ mport_update(mportInstance *mport, const char *packageName)
 	mportDependsEntry **depends_orig = NULL;
 	mportIndexEntry **indexEntries = NULL;
 	mportIndexEntry *indexEntry = NULL;
+	mportPackageMeta **packs_meta = NULL;
+	/*@null@*/ mportIndexMovedEntry **movedEntries = NULL;
 
 	if (packageName == NULL) {
 		return (MPORT_ERR_WARN);
 	}
+
+	/* Check for MOVE operations: look up the installed package to get its origin,
+	 * then consult the moved table in the index. */
+	if (mport_pkgmeta_search_master(mport, &packs_meta, "pkg=%Q", packageName) == MPORT_OK &&
+	    packs_meta != NULL && *packs_meta != NULL && (*packs_meta)->origin != NULL) {
+		if (mport_moved_lookup(mport, (*packs_meta)->origin, &movedEntries) == MPORT_OK &&
+		    movedEntries != NULL && *movedEntries != NULL) {
+			if ((*movedEntries)->date[0] != '\0') {
+				/* Package is deprecated/expired; save date, then warn and refuse.
+				 */
+				char expiry[32];
+				strlcpy(expiry, (*movedEntries)->date, sizeof(expiry));
+				mport_call_msg_cb(mport,
+				    "Package %s is deprecated and expired on %s\n", packageName,
+				    expiry);
+				free_moved_entries(movedEntries);
+				mport_pkgmeta_vec_free(packs_meta);
+				return SET_ERRORX(MPORT_ERR_WARN,
+				    "Package %s is deprecated (expiry: %s)", packageName, expiry);
+			}
+
+			if ((*movedEntries)->moved_to_pkgname[0] != '\0') {
+				/* Package has been moved to a new name; migrate it. */
+				mportAutomatic automatic = (*packs_meta)->automatic;
+				mport_call_msg_cb(mport,
+				    "Package %s has moved to %s. Migrating to %s\n", packageName,
+				    (*movedEntries)->moved_to_pkgname,
+				    (*movedEntries)->moved_to_pkgname);
+				(*packs_meta)->action = MPORT_ACTION_UPGRADE;
+				mport_delete_primative(mport, *packs_meta, 1);
+				int ret = mport_install_single(mport,
+				    (*movedEntries)->moved_to_pkgname, NULL, NULL, automatic);
+				free_moved_entries(movedEntries);
+				mport_pkgmeta_vec_free(packs_meta);
+				return ret;
+			}
+		}
+		free_moved_entries(movedEntries);
+		movedEntries = NULL;
+	}
+	mport_pkgmeta_vec_free(packs_meta);
+	packs_meta = NULL;
 
 	if (mport_index_select_pkgname(mport, packageName, "Multiple packages match your query.",
 		&indexEntries, &indexEntry) != MPORT_OK)
