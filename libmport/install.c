@@ -30,6 +30,9 @@
 #include "mport_private.h"
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /**
@@ -83,6 +86,10 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
 {
 	mportIndexEntry **e = NULL;
 	char *filename = NULL;
+	char fd_filename[64];
+	char error_path[FILENAME_MAX];
+	int bundle_fd = -1;
+	struct stat bundle_st;
 	int ret = MPORT_OK;
 	int e_loc = 0;
 
@@ -171,24 +178,51 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
 		}
 	}
 
-	if (mport_verify_hash(filename, e[e_loc]->hash) == 0) {
+	bundle_fd = open(filename, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+	if (bundle_fd == -1) {
+		int error = errno;
+		strlcpy(error_path, filename, sizeof(error_path));
 		mport_index_entry_free_vec(e);
-
-		if (unlink(filename) == 0) {
-			free(filename);
-			filename = NULL;
-			RETURN_ERROR(
-			    MPORT_ERR_FATAL, "Package failed hash verification and was removed.\n");
-		} else {
-			free(filename);
-			filename = NULL;
-			RETURN_ERROR(MPORT_ERR_FATAL,
-			    "Package failed hash verification, but could not be removed.\n");
-		}
+		free(filename);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open package %s: %s", error_path,
+		    strerror(error));
 	}
 
-	ret = mport_install_primative(mport, filename, prefix, automatic);
+	if (fstat(bundle_fd, &bundle_st) != 0) {
+		int error = errno;
+		strlcpy(error_path, filename, sizeof(error_path));
+		close(bundle_fd);
+		mport_index_entry_free_vec(e);
+		free(filename);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't stat package %s: %s", error_path,
+		    strerror(error));
+	}
+	if (!S_ISREG(bundle_st.st_mode)) {
+		strlcpy(error_path, filename, sizeof(error_path));
+		close(bundle_fd);
+		mport_index_entry_free_vec(e);
+		free(filename);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Package is not a regular file: %s", error_path);
+	}
 
+	if (snprintf(fd_filename, sizeof(fd_filename), "/dev/fd/%d", bundle_fd) >=
+	    (int)sizeof(fd_filename)) {
+		close(bundle_fd);
+		mport_index_entry_free_vec(e);
+		free(filename);
+		RETURN_ERROR(MPORT_ERR_FATAL, "Package descriptor path is too long.");
+	}
+
+	if (mport_verify_hash(fd_filename, e[e_loc]->hash) == 0) {
+		close(bundle_fd);
+		mport_index_entry_free_vec(e);
+		free(filename);
+		RETURN_ERROR(MPORT_ERR_FATAL, "Package failed hash verification.\n");
+	}
+
+	ret = mport_install_primative(mport, fd_filename, prefix, automatic);
+
+	close(bundle_fd);
 	free(filename);
 	filename = NULL;
 	mport_index_entry_free_vec(e);

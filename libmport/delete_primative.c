@@ -38,6 +38,7 @@
 #include <sha256.h>
 #include <stdlib.h>
 #include <libgen.h>
+#include <fcntl.h>
 #include <syslog.h>
 #include <stdarg.h>
 
@@ -74,6 +75,44 @@ static void warn_ignored_rmdir_error(/*@notnull@*/ mportInstance *, /*@notnull@*
 static bool is_safe_to_delete_dir(mportInstance *, mportPackageMeta *, const char *, const char *);
 static int build_info_dir_path(
     /*@notnull@*/ mportPackageMeta *, /*@null@*/ const char *, /*@out@*/ char *, size_t);
+
+static int
+unlink_if_unchanged(const char *path, const struct stat *expected)
+{
+	char parent[FILENAME_MAX];
+	char *name;
+	int parentfd;
+	struct stat current;
+
+	if (path == NULL || expected == NULL)
+		return -1;
+
+	strlcpy(parent, path, sizeof(parent));
+	name = strrchr(parent, '/');
+	if (name == NULL) {
+		strlcpy(parent, ".", sizeof(parent));
+		name = (char *)path;
+	} else {
+		*name++ = '\0';
+		if (parent[0] == '\0')
+			strlcpy(parent, "/", sizeof(parent));
+	}
+
+	parentfd = open(parent, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+	if (parentfd == -1)
+		return -1;
+
+	if (fstatat(parentfd, name, &current, AT_SYMLINK_NOFOLLOW) != 0 ||
+	    current.st_dev != expected->st_dev || current.st_ino != expected->st_ino) {
+		close(parentfd);
+		errno = EAGAIN;
+		return -1;
+	}
+
+	int ret = unlinkat(parentfd, name, 0);
+	close(parentfd);
+	return ret;
+}
 
 MPORT_PUBLIC_API int
 mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
@@ -190,7 +229,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 
 			// remove the file if it is empty
 			if (S_ISREG(st.st_mode) && st.st_size == 0) {
-				if (unlink(file) != 0)
+				if (unlink_if_unchanged(file, &st) != 0)
 					mport_call_msg_cb(mport, "Could not unlink %s: %s", file,
 					    strerror(errno));
 			}
@@ -314,7 +353,7 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 				}
 			}
 
-			if (unlink(file) != 0)
+			if (unlink_if_unchanged(file, &st) != 0)
 				mport_call_msg_cb(
 				    mport, "Could not unlink %s: %s", file, strerror(errno));
 
