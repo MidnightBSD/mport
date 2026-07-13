@@ -34,10 +34,12 @@
 static void
 free_moved_entries(mportIndexMovedEntry **entries)
 {
+	mportIndexMovedEntry **entry;
+
 	if (entries == NULL)
 		return;
 
-	for (mportIndexMovedEntry **entry = entries; *entry != NULL; entry++)
+	for (entry = entries; *entry != NULL; entry++)
 		free(*entry);
 	free(entries);
 }
@@ -52,6 +54,11 @@ mport_update(mportInstance *mport, const char *packageName)
 	mportIndexEntry *indexEntry = NULL;
 	mportPackageMeta **packs_meta = NULL;
 	/*@null@*/ mportIndexMovedEntry **movedEntries = NULL;
+	char *replacement_path = NULL;
+	char expiry[32];
+	mportAutomatic automatic = MPORT_EXPLICIT;
+	int result;
+	int ret;
 
 	if (packageName == NULL) {
 		return (MPORT_ERR_WARN);
@@ -66,7 +73,6 @@ mport_update(mportInstance *mport, const char *packageName)
 			if ((*movedEntries)->date[0] != '\0') {
 				/* Package is deprecated/expired; save date, then warn and refuse.
 				 */
-				char expiry[32];
 				strlcpy(expiry, (*movedEntries)->date, sizeof(expiry));
 				mport_call_msg_cb(mport,
 				    "Package %s is deprecated and expired on %s\n", packageName,
@@ -79,15 +85,30 @@ mport_update(mportInstance *mport, const char *packageName)
 
 			if ((*movedEntries)->moved_to_pkgname[0] != '\0') {
 				/* Package has been moved to a new name; migrate it. */
-				mportAutomatic automatic = (*packs_meta)->automatic;
+				automatic = (*packs_meta)->automatic;
 				mport_call_msg_cb(mport,
 				    "Package %s has moved to %s. Migrating to %s\n", packageName,
 				    (*movedEntries)->moved_to_pkgname,
 				    (*movedEntries)->moved_to_pkgname);
+				ret = mport_download(mport, (*movedEntries)->moved_to_pkgname,
+				    false, false, &replacement_path);
+				if (ret != MPORT_OK) {
+					free_moved_entries(movedEntries);
+					mport_pkgmeta_vec_free(packs_meta);
+					return ret;
+				}
+				if (replacement_path == NULL) {
+					free_moved_entries(movedEntries);
+					mport_pkgmeta_vec_free(packs_meta);
+					return SET_ERROR(
+					    MPORT_ERR_FATAL, "Downloaded package path is missing");
+				}
 				(*packs_meta)->action = MPORT_ACTION_UPGRADE;
-				mport_delete_primative(mport, *packs_meta, 1);
-				int ret = mport_install_single(mport,
-				    (*movedEntries)->moved_to_pkgname, NULL, NULL, automatic);
+				ret = mport_delete_primative(mport, *packs_meta, 1);
+				if (ret == MPORT_OK)
+					ret = mport_install_primative(
+					    mport, replacement_path, NULL, automatic);
+				free(replacement_path);
 				free_moved_entries(movedEntries);
 				mport_pkgmeta_vec_free(packs_meta);
 				return ret;
@@ -103,7 +124,7 @@ mport_update(mportInstance *mport, const char *packageName)
 		&indexEntries, &indexEntry) != MPORT_OK)
 		return mport_err_code();
 
-	int result = mport_download(
+	result = mport_download(
 	    mport, indexEntry == NULL ? packageName : indexEntry->pkgname, false, false, &path);
 	if (result != MPORT_OK) {
 		mport_index_entry_free_vec(indexEntries);
