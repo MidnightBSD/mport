@@ -31,19 +31,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-static void
-free_moved_entries(mportIndexMovedEntry **entries)
-{
-	mportIndexMovedEntry **entry;
-
-	if (entries == NULL)
-		return;
-
-	for (entry = entries; *entry != NULL; entry++)
-		free(*entry);
-	free(entries);
-}
-
 MPORT_PUBLIC_API int
 mport_update(mportInstance *mport, const char *packageName)
 {
@@ -77,7 +64,7 @@ mport_update(mportInstance *mport, const char *packageName)
 				mport_call_msg_cb(mport,
 				    "Package %s is deprecated and expired on %s\n", packageName,
 				    expiry);
-				free_moved_entries(movedEntries);
+				mport_index_moved_entry_free_vec(movedEntries);
 				mport_pkgmeta_vec_free(packs_meta);
 				return SET_ERRORX(MPORT_ERR_WARN,
 				    "Package %s is deprecated (expiry: %s)", packageName, expiry);
@@ -93,12 +80,12 @@ mport_update(mportInstance *mport, const char *packageName)
 				ret = mport_download(mport, (*movedEntries)->moved_to_pkgname,
 				    false, false, &replacement_path);
 				if (ret != MPORT_OK) {
-					free_moved_entries(movedEntries);
+					mport_index_moved_entry_free_vec(movedEntries);
 					mport_pkgmeta_vec_free(packs_meta);
 					return ret;
 				}
 				if (replacement_path == NULL) {
-					free_moved_entries(movedEntries);
+					mport_index_moved_entry_free_vec(movedEntries);
 					mport_pkgmeta_vec_free(packs_meta);
 					return SET_ERROR(
 					    MPORT_ERR_FATAL, "Downloaded package path is missing");
@@ -109,12 +96,12 @@ mport_update(mportInstance *mport, const char *packageName)
 					ret = mport_install_primative(
 					    mport, replacement_path, NULL, automatic);
 				free(replacement_path);
-				free_moved_entries(movedEntries);
+				mport_index_moved_entry_free_vec(movedEntries);
 				mport_pkgmeta_vec_free(packs_meta);
 				return ret;
 			}
 		}
-		free_moved_entries(movedEntries);
+		mport_index_moved_entry_free_vec(movedEntries);
 		movedEntries = NULL;
 	}
 	mport_pkgmeta_vec_free(packs_meta);

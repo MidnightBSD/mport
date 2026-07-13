@@ -141,6 +141,7 @@ char *mport_tokenize(char **args);
 char *mport_get_osreleasedate(void);
 int mport_index_select_pkgname(
     mportInstance *, const char *, const char *, mportIndexEntry ***, mportIndexEntry **);
+void mport_index_moved_entry_free_vec(mportIndexMovedEntry **);
 
 enum parse_states {
 	START,

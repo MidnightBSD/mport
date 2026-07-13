@@ -873,7 +873,7 @@ mport_moved_lookup(mportInstance *mport, const char *origin, mportIndexMovedEntr
 {
 	int count;
 	int i = 0, step;
-	sqlite3_stmt *stmt;
+	sqlite3_stmt *stmt = NULL;
 	int ret = MPORT_OK;
 	mportIndexMovedEntry **e = NULL;
 
@@ -1097,6 +1097,24 @@ mport_index_entry_free(mportIndexEntry *e)
 	free(e->license);
 	free(e->hash);
 	free(e);
+}
+
+void
+mport_index_moved_entry_free_vec(mportIndexMovedEntry **e)
+{
+	mportIndexMovedEntry **e_orig = e;
+
+	if (e == NULL) {
+		return;
+	}
+
+	while (*e != NULL) {
+		free(*e);
+		e++;
+	}
+
+	free(e_orig);
+	e_orig = NULL;
 }
 
 MPORT_PUBLIC_API void

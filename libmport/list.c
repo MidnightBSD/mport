@@ -86,7 +86,7 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 						mport_call_msg_cb(mport,
 						    "%-30s %9s     was moved to %s", (*packs)->name,
 						    (*packs)->version, (*movedEntries)->moved_to);
-						free(movedEntries);
+						mport_index_moved_entry_free_vec(movedEntries);
 						movedEntries = NULL;
 						packs++;
 						continue;
@@ -96,13 +96,13 @@ mport_list_print(mportInstance *mport, mportListPrint *print)
 						mport_call_msg_cb(mport,
 						    "%-30s %9s     expired on %s", (*packs)->name,
 						    (*packs)->version, (*movedEntries)->date);
-						free(movedEntries);
+						mport_index_moved_entry_free_vec(movedEntries);
 						movedEntries = NULL;
 						packs++;
 						continue;
 					}
 
-					free(movedEntries);
+					mport_index_moved_entry_free_vec(movedEntries);
 					movedEntries = NULL;
 				}
 

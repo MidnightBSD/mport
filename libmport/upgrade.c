@@ -149,6 +149,7 @@ mport_upgrade(mportInstance *mport)
 
 		if (mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK ||
 		    movedEntries == NULL || *movedEntries == NULL) {
+			mport_index_moved_entry_free_vec(movedEntries);
 			packs++;
 			continue;
 		}
@@ -165,6 +166,7 @@ mport_upgrade(mportInstance *mport)
 #endif
 			}
 
+			mport_index_moved_entry_free_vec(movedEntries);
 			packs++;
 			continue;
 		}
@@ -185,6 +187,7 @@ mport_upgrade(mportInstance *mport)
 			ohash_insert(&h, slot, (*movedEntries)->moved_to_pkgname);
 #endif
 		}
+		mport_index_moved_entry_free_vec(movedEntries);
 		packs++;
 	}
 

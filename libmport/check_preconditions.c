@@ -44,17 +44,6 @@ static int check_if_older_installed(mportInstance *, mportPackageMeta *);
 static int check_if_older_os(mportInstance *, mportPackageMeta *);
 static int check_file_conflicts(mportInstance *, mportPackageMeta *);
 
-static void
-free_moved_entries(mportIndexMovedEntry **entries)
-{
-	if (entries == NULL)
-		return;
-
-	for (mportIndexMovedEntry **entry = entries; *entry != NULL; entry++)
-		free(*entry);
-	free(entries);
-}
-
 /* Run the checks requested by the flags given.
  *
  * Flags:
@@ -101,7 +90,7 @@ check_if_moved(mportInstance *mport, mportPackageMeta *pack)
 	int ret = MPORT_OK;
 
 	if (mport_moved_lookup(mport, pack->origin, &movedEntries) != MPORT_OK) {
-		free_moved_entries(movedEntries);
+		mport_index_moved_entry_free_vec(movedEntries);
 		SET_ERROR(MPORT_ERR_FATAL, "The moved lookup failed.");
 		RETURN_CURRENT_ERROR;
 	}
@@ -113,7 +102,7 @@ check_if_moved(mportInstance *mport, mportPackageMeta *pack)
 		ret = mport_err_code();
 	}
 
-	free_moved_entries(movedEntries);
+	mport_index_moved_entry_free_vec(movedEntries);
 	return ret;
 }
 
@@ -124,16 +113,16 @@ check_if_deprecated(mportInstance *mport, mportPackageMeta *pack)
 	int ret = MPORT_OK;
 
 	if (mport_moved_lookup(mport, pack->origin, &movedEntries) != MPORT_OK) {
-		free_moved_entries(movedEntries);
+		mport_index_moved_entry_free_vec(movedEntries);
 		SET_ERROR(MPORT_ERR_FATAL, "The moved lookup failed.");
 		RETURN_CURRENT_ERROR;
 	}
 
 	if (movedEntries != NULL && *movedEntries != NULL && (*movedEntries)->date[0] != '\0')
-		ret = SET_ERRORX(MPORT_ERR_FATAL, "%s expires on %s.", pack->name,
-		    (*movedEntries)->date);
+		ret = SET_ERRORX(
+		    MPORT_ERR_FATAL, "%s expires on %s.", pack->name, (*movedEntries)->date);
 
-	free_moved_entries(movedEntries);
+	mport_index_moved_entry_free_vec(movedEntries);
 	return ret;
 }
 
