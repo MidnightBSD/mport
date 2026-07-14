@@ -320,33 +320,54 @@ mport_rmtree(const char *filename)
 
 /*
  * Copy file fromname to toname
+ * Uses O_NOFOLLOW to prevent symlink attacks (TOCTOU mitigation)
  */
+/*@requires fromName != NULL && toName != NULL @*/
+/*@ensures result == MPORT_OK || result == MPORT_ERR_FATAL @*/
 int
-mport_copy_file(const char *fromName, const char *toName)
+mport_copy_file(/*@notnull@*/ /*@observer@*/ const char *fromName,
+    /*@notnull@*/ /*@observer@*/ const char *toName)
 {
 	char buf[BUFSIZ];
-	size_t size;
+	ssize_t size;
+	int from_fd = -1;
+	int to_fd = -1;
+	int ret = MPORT_OK;
 
-	FILE *fsrc = fopen(fromName, "re");
-	if (fsrc == NULL)
+	from_fd = open(fromName, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+	if (from_fd == -1) {
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open source file for copying %s: %s",
 		    fromName, strerror(errno));
+	}
 
-	FILE *fdest = fopen(toName, "we");
-	if (fdest == NULL) {
-		fclose(fsrc);
+	to_fd = open(toName, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0644);
+	if (to_fd == -1) {
+		close(from_fd);
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open destination file for copying %s: %s",
 		    toName, strerror(errno));
 	}
 
-	while ((size = fread(buf, 1, BUFSIZ, fsrc)) > 0) {
-		fwrite(buf, 1, size, fdest);
+	while ((size = read(from_fd, buf, BUFSIZ)) > 0) {
+		if (write(to_fd, buf, size) != size) {
+			ret = SET_ERRORX(MPORT_ERR_FATAL, "Error writing to %s: %s",
+			    toName, strerror(errno));
+			goto cleanup;
+		}
 	}
 
-	fclose(fsrc);
-	fclose(fdest);
+	if (size == -1) {
+		ret = SET_ERRORX(MPORT_ERR_FATAL, "Error reading from %s: %s",
+		    fromName, strerror(errno));
+		goto cleanup;
+	}
 
-	return (MPORT_OK);
+cleanup:
+	if (from_fd != -1)
+		close(from_fd);
+	if (to_fd != -1)
+		close(to_fd);
+
+	return (ret);
 }
 
 int
@@ -373,10 +394,25 @@ mport_copy_fd(int from_fd, int to_fd)
 /*
  * create a directory with mode 755.  Do not fail if the
  * directory exists already.
+ * Uses lstat to check for symlinks before mkdir (TOCTOU mitigation)
  */
+/*@requires dir != NULL @*/
+/*@ensures result == MPORT_OK || result == MPORT_ERR_FATAL @*/
 int
-mport_mkdir(const char *dir)
+mport_mkdir(/*@notnull@*/ /*@observer@*/ const char *dir)
 {
+	struct stat sb;
+
+	/* Check if path exists and is a symlink - refuse to follow it */
+	if (lstat(dir, &sb) == 0) {
+		if (S_ISLNK(sb.st_mode)) {
+			RETURN_ERRORX(
+			    MPORT_ERR_FATAL, "Refusing to mkdir %s: path is a symlink", dir);
+		}
+		/* Path exists and is not a symlink - mkdir will fail with EEXIST */
+		return (MPORT_OK);
+	}
+
 	if (mkdir(dir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) != 0) {
 		if (errno != EEXIST)
 			RETURN_ERRORX(
