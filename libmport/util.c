@@ -212,8 +212,8 @@ mport_build_infrastructure_path(mportInstance *mport, mportPackageMeta *pkg, con
 	int len;
 	const char *root;
 
-	if (pkg == NULL || pkg->name == NULL || pkg->version == NULL || name == NULL || path == NULL ||
-	    path_size == 0) {
+	if (pkg == NULL || pkg->name == NULL || pkg->version == NULL || name == NULL ||
+	    path == NULL || path_size == 0) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid infrastructure path arguments.");
 	}
 
@@ -349,15 +349,15 @@ mport_copy_file(/*@notnull@*/ /*@observer@*/ const char *fromName,
 
 	while ((size = read(from_fd, buf, BUFSIZ)) > 0) {
 		if (write(to_fd, buf, size) != size) {
-			ret = SET_ERRORX(MPORT_ERR_FATAL, "Error writing to %s: %s",
-			    toName, strerror(errno));
+			ret = SET_ERRORX(
+			    MPORT_ERR_FATAL, "Error writing to %s: %s", toName, strerror(errno));
 			goto cleanup;
 		}
 	}
 
 	if (size == -1) {
-		ret = SET_ERRORX(MPORT_ERR_FATAL, "Error reading from %s: %s",
-		    fromName, strerror(errno));
+		ret = SET_ERRORX(
+		    MPORT_ERR_FATAL, "Error reading from %s: %s", fromName, strerror(errno));
 		goto cleanup;
 	}
 
@@ -846,7 +846,7 @@ mport_xsystem(mportInstance *mport, const char *fmt, ...)
 void
 mport_parselist(char *opt, char ***list, size_t *list_size)
 {
-	char *input;
+	char *input, *input_ptr;
 	char *field;
 	char *scan, *scan_ptr;
 
@@ -857,6 +857,7 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 		*list = NULL;
 		return;
 	}
+	input_ptr = input;
 
 	if ((scan = strdup(opt)) == NULL) {
 		free(input);
@@ -889,7 +890,7 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 	char **vec = *list;
 
 	size_t loc = 0;
-	while ((field = strsep(&input, " \t\n")) != NULL) {
+	while ((field = strsep(&input_ptr, " \t\n")) != NULL) {
 		if (loc == *list_size)
 			break;
 
