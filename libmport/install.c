@@ -265,11 +265,12 @@ mport_install_depends(
 			if (mport_install_depends(mport, (*dep)->d_pkgname, (*dep)->d_version,
 				MPORT_AUTOMATIC) != MPORT_OK) {
 				mport_call_msg_cb(mport, "%s", mport_err_string());
-				mport_index_depends_free_vec(depends_orig);
-				depends_orig = NULL;
 				if (mport->ignoreMissing) {
 					continue;
 				}
+				mport_index_depends_free_vec(depends_orig);
+				depends_orig = NULL;
+				depends = NULL;
 				return mport_err_code();
 			}
 		}

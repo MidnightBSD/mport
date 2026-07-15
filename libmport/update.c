@@ -128,8 +128,10 @@ mport_update(mportInstance *mport, const char *packageName)
 			&depends_orig) != MPORT_OK) {
 			mport_call_msg_cb(mport, "Failed to get dependency list for %s: %s\n",
 			    packageName, mport_err_string());
+			result = mport_err_code();
 			mport_index_entry_free_vec(indexEntries);
-			return mport_err_code();
+			free(path);
+			return result;
 		}
 
 		depends = depends_orig;
@@ -137,8 +139,7 @@ mport_update(mportInstance *mport, const char *packageName)
 			if (mport_install_depends(mport, (*depends)->d_pkgname,
 				(*depends)->d_version, MPORT_AUTOMATIC) != MPORT_OK) {
 				mport_call_msg_cb(mport, "%s", mport_err_string());
-				mport_index_depends_free_vec(depends);
-				mport_index_entry_free_vec(indexEntries);
+
 				if (mport->ignoreMissing) {
 					mport_call_msg_cb(mport,
 					    "Ignoring missing dependency %s-%s\n",
@@ -146,7 +147,12 @@ mport_update(mportInstance *mport, const char *packageName)
 					depends++;
 					continue;
 				}
-				return mport_err_code();
+
+				result = mport_err_code();
+				mport_index_depends_free_vec(depends_orig);
+				mport_index_entry_free_vec(indexEntries);
+				free(path);
+				return result;
 			}
 			depends++;
 		}
