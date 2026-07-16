@@ -182,8 +182,8 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
 		strlcpy(error_path, filename, sizeof(error_path));
 		mport_index_entry_free_vec(e);
 		free(filename);
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open package %s: %s", error_path,
-		    strerror(error));
+		RETURN_ERRORX(
+		    MPORT_ERR_FATAL, "Couldn't open package %s: %s", error_path, strerror(error));
 	}
 
 	if (fstat(bundle_fd, &bundle_st) != 0) {
@@ -192,8 +192,8 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
 		close(bundle_fd);
 		mport_index_entry_free_vec(e);
 		free(filename);
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't stat package %s: %s", error_path,
-		    strerror(error));
+		RETURN_ERRORX(
+		    MPORT_ERR_FATAL, "Couldn't stat package %s: %s", error_path, strerror(error));
 	}
 	if (!S_ISREG(bundle_st.st_mode)) {
 		strlcpy(error_path, filename, sizeof(error_path));
@@ -243,7 +243,8 @@ mport_install_depends(
 	}
 
 	if (mport_index_depends_list(mport, packageName, version, &depends_orig) != MPORT_OK) {
-		RETURN_CURRENT_ERROR;
+		mport_call_msg_cb(mport, "%s", mport_err_string());
+		return mport_err_code();
 	}
 	depends = depends_orig;
 

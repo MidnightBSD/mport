@@ -212,8 +212,8 @@ mport_build_infrastructure_path(mportInstance *mport, mportPackageMeta *pkg, con
 	int len;
 	const char *root;
 
-	if (pkg == NULL || pkg->name == NULL || pkg->version == NULL || name == NULL || path == NULL ||
-	    path_size == 0) {
+	if (pkg == NULL || pkg->name == NULL || pkg->version == NULL || name == NULL ||
+	    path == NULL || path_size == 0) {
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid infrastructure path arguments.");
 	}
 
@@ -349,15 +349,15 @@ mport_copy_file(/*@notnull@*/ /*@observer@*/ const char *fromName,
 
 	while ((size = read(from_fd, buf, BUFSIZ)) > 0) {
 		if (write(to_fd, buf, size) != size) {
-			ret = SET_ERRORX(MPORT_ERR_FATAL, "Error writing to %s: %s",
-			    toName, strerror(errno));
+			ret = SET_ERRORX(
+			    MPORT_ERR_FATAL, "Error writing to %s: %s", toName, strerror(errno));
 			goto cleanup;
 		}
 	}
 
 	if (size == -1) {
-		ret = SET_ERRORX(MPORT_ERR_FATAL, "Error reading from %s: %s",
-		    fromName, strerror(errno));
+		ret = SET_ERRORX(
+		    MPORT_ERR_FATAL, "Error reading from %s: %s", fromName, strerror(errno));
 		goto cleanup;
 	}
 
@@ -846,7 +846,7 @@ mport_xsystem(mportInstance *mport, const char *fmt, ...)
 void
 mport_parselist(char *opt, char ***list, size_t *list_size)
 {
-	char *input;
+	char *input, *input_ptr;
 	char *field;
 	char *scan, *scan_ptr;
 
@@ -857,6 +857,7 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 		*list = NULL;
 		return;
 	}
+	input_ptr = input;
 
 	if ((scan = strdup(opt)) == NULL) {
 		free(input);
@@ -889,7 +890,7 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 	char **vec = *list;
 
 	size_t loc = 0;
-	while ((field = strsep(&input, " \t\n")) != NULL) {
+	while ((field = strsep(&input_ptr, " \t\n")) != NULL) {
 		if (loc == *list_size)
 			break;
 
@@ -966,70 +967,70 @@ int
 mport_run_asset_exec(mportInstance *mport, const char *fmt, const char *cwd, const char *last_file)
 {
 	size_t l;
+	size_t remaining;
 	char *cmnd = NULL;
 	char *pos = NULL;
 	char *name = NULL;
 	char *lfcpy = NULL;
 	int ret;
-	static int max = 0;
-	size_t maxlen = sizeof(max);
+	static int argmax = 0;
+	size_t argmaxlen = sizeof(argmax);
 
-	if (max == 0) {
-		if (sysctlbyname("kern.argmax", &max, &maxlen, NULL, 0) < 0)
+	/* argmax is a cached kern.argmax; it must never be decremented, or a
+	   later call would malloc a stale (eventually negative/huge) size. */
+	if (argmax <= 0) {
+		if (sysctlbyname("kern.argmax", &argmax, &argmaxlen, NULL, 0) < 0 || argmax <= 0)
 			RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't determine maximum argument length");
 	}
 
-	if ((cmnd = malloc(max * sizeof(char))) == NULL)
+	if ((cmnd = malloc((size_t)argmax)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
 	pos = cmnd;
+	remaining = (size_t)argmax; /* bytes left in cmnd, including the final NUL slot */
 
-	while (*fmt && max > 0) {
+	while (*fmt && remaining > 1) {
 		if (*fmt == '%') {
 			fmt++;
 			switch (*fmt) {
 			case 'F':
 				/* last_file is absolute, so we skip the cwd at the begining */
-				(void)strlcpy(pos, last_file + strlen(cwd) + 1, max);
-				l = strlen(last_file + strlen(cwd) + 1);
-				pos += l;
-				max -= l;
+				l = strlcpy(pos, last_file + strlen(cwd) + 1, remaining);
 				break;
 			case 'D':
-				(void)strlcpy(pos, cwd, max);
-				l = strlen(cwd);
-				pos += l;
-				max -= l;
+				l = strlcpy(pos, cwd, remaining);
 				break;
 			case 'B':
 				lfcpy = strdup(last_file);
-				if (lfcpy == NULL)
+				if (lfcpy == NULL) {
+					free(cmnd);
 					RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+				}
 				name = dirname(lfcpy); /* dirname(3) in MidnightBSD 3.0 and higher
 							  modifies the source. */
-				(void)strlcpy(pos, name, max);
-				l = strlen(name);
-				pos += l;
-				max -= l;
+				l = strlcpy(pos, name, remaining);
 				free(lfcpy);
+				lfcpy = NULL;
 				break;
 			case 'f':
 				name = basename((char *)last_file);
-				(void)strlcpy(pos, name, max);
-				l = strlen(name);
-				pos += l;
-				max -= l;
+				l = strlcpy(pos, name, remaining);
 				break;
 			default:
-				*pos = *fmt;
-				max--;
-				pos++;
+				*pos++ = *fmt;
+				remaining--;
+				fmt++;
+				continue;
 			}
+			/* strlcpy returns the length it tried to write; clamp to
+			   what actually fit so pos never advances past cmnd. */
+			if (l >= remaining)
+				l = remaining - 1;
+			pos += l;
+			remaining -= l;
 			fmt++;
 		} else {
-			*pos = *fmt;
-			pos++;
-			fmt++;
-			max--;
+			*pos++ = *fmt++;
+			remaining--;
 		}
 	}
 
