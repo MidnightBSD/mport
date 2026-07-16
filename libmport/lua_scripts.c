@@ -239,6 +239,8 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 		close(cur_pipe[1]);
 
 		ret = mport_script_run_child(mport, pid, &pstat, cur_pipe[0], "lua");
+
+		close(cur_pipe[0]);
 	}
 
 cleanup:
@@ -252,6 +254,7 @@ mport_lua_script_to_ucl(stringlist_t *scripts)
 	ucl_object_t *array;
 
 	array = ucl_object_typed_new(UCL_ARRAY);
+	/* cppcheck-suppress unknownMacro ; tll_foreach is a tllist loop macro */
 	tll_foreach(*scripts, s) ucl_array_append(array,
 	    ucl_object_fromstring_common(
 		s->item, strlen(s->item), UCL_STRING_RAW | UCL_STRING_TRIM));
@@ -315,13 +318,19 @@ mport_lua_script_read_file(
 	if ((file = fopen(filename, "re")) == NULL)
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open %s: %s", filename, strerror(errno));
 
-	if ((buf = (char *)calloc((size_t)(st.st_size + 1), sizeof(char))) == NULL)
+	if ((buf = (char *)calloc((size_t)(st.st_size + 1), sizeof(char))) == NULL) {
+		fclose(file);
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+	}
 
 	if (fread(buf, sizeof(char), (size_t)st.st_size, file) != (size_t)st.st_size) {
 		free(buf);
+		fclose(file);
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Read error: %s", strerror(errno));
 	}
+
+	fclose(file);
+	file = NULL;
 
 	buf[st.st_size] = '\0';
 
@@ -344,6 +353,8 @@ mport_lua_script_read_file(
 
 		ucl_parser_free(parser);
 	}
+
+	free(buf);
 
 	return (MPORT_OK);
 }

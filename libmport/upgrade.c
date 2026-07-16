@@ -155,16 +155,20 @@ mport_upgrade(mportInstance *mport)
 		}
 
 		if ((*movedEntries)->date[0] != '\0') {
-			asprintf(&msg,
-			    "Package %s is deprecated with expiration date %s. Do you want to remove it?",
-			    (*packs)->name, (*movedEntries)->date);
-			if ((mport->confirm_cb)(msg, "Delete", "Don't delete", 1) == MPORT_OK) {
+			if (asprintf(&msg,
+				"Package %s is deprecated with expiration date %s. Do you want to remove it?",
+				(*packs)->name, (*movedEntries)->date) == -1)
+				msg = NULL;
+			if (msg != NULL &&
+			    (mport->confirm_cb)(msg, "Delete", "Don't delete", 1) == MPORT_OK) {
 				(*packs)->action = MPORT_ACTION_DELETE;
 				mport_delete_primative(mport, (*packs), 1);
 #if defined(__MidnightBSD__)
 				ohash_insert(&h, slot, (*packs)->name);
 #endif
 			}
+			free(msg);
+			msg = NULL;
 
 			mport_index_moved_entry_free_vec(movedEntries);
 			packs++;
@@ -228,6 +232,8 @@ mport_upgrade(mportInstance *mport)
 				}
 
 				if (ieUpdateMe == NULL || *ieUpdateMe == NULL) {
+					mport_index_entry_free_vec(ieUpdateMe);
+					ieUpdateMe = NULL;
 					continue;
 				}
 
@@ -235,8 +241,9 @@ mport_upgrade(mportInstance *mport)
 				(void)asprintf(&replace_msg,
 				    "The package you have installed %s appears to have been replaced by %s. Do you want to update?",
 				    pack->name, (*ieUpdateMe)->pkgname);
-				if ((mport->confirm_cb)(replace_msg, "Update", "Don't Update", 0) !=
-				    MPORT_OK) {
+				if (replace_msg != NULL &&
+				    (mport->confirm_cb)(replace_msg, "Update", "Don't Update", 0) !=
+					MPORT_OK) {
 					pack->action = MPORT_ACTION_UPGRADE;
 					mport_delete_primative(mport, pack, 1);
 					// TODO: how to mark this action as an update?
@@ -248,6 +255,9 @@ mport_upgrade(mportInstance *mport)
 					updated++;
 				}
 				free(replace_msg);
+				replace_msg = NULL;
+				mport_index_entry_free_vec(ieUpdateMe);
+				ieUpdateMe = NULL;
 			}
 #if defined(__MidnightBSD__)
 		}
