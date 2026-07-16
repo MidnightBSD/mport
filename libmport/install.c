@@ -163,8 +163,6 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
 			/* neither location works. Download from the internet. */
 			if (mport_fetch_bundle(
 				mport, MPORT_FETCH_STAGING_DIR, e[e_loc]->bundlefile) != MPORT_OK) {
-				free(filename);
-				filename = NULL;
 				mport_index_entry_free_vec(e);
 				e = NULL;
 				RETURN_CURRENT_ERROR;
@@ -184,8 +182,8 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
 		strlcpy(error_path, filename, sizeof(error_path));
 		mport_index_entry_free_vec(e);
 		free(filename);
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't open package %s: %s", error_path,
-		    strerror(error));
+		RETURN_ERRORX(
+		    MPORT_ERR_FATAL, "Couldn't open package %s: %s", error_path, strerror(error));
 	}
 
 	if (fstat(bundle_fd, &bundle_st) != 0) {
@@ -194,8 +192,8 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
 		close(bundle_fd);
 		mport_index_entry_free_vec(e);
 		free(filename);
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't stat package %s: %s", error_path,
-		    strerror(error));
+		RETURN_ERRORX(
+		    MPORT_ERR_FATAL, "Couldn't stat package %s: %s", error_path, strerror(error));
 	}
 	if (!S_ISREG(bundle_st.st_mode)) {
 		strlcpy(error_path, filename, sizeof(error_path));
@@ -244,7 +242,10 @@ mport_install_depends(
 		RETURN_ERROR(MPORT_ERR_WARN, "Dependency name or version is null");
 	}
 
-	mport_index_depends_list(mport, packageName, version, &depends_orig);
+	if (mport_index_depends_list(mport, packageName, version, &depends_orig) != MPORT_OK) {
+		mport_call_msg_cb(mport, "%s", mport_err_string());
+		return mport_err_code();
+	}
 	depends = depends_orig;
 
 	if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
