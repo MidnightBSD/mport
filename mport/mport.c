@@ -640,7 +640,9 @@ main(int argc, char *argv[])
 
 		if (eflag) {
 			mportPackageMeta **packs = NULL;
-			if (mport_pkgmeta_search_master(mport, &packs, "LOWER(pkg)=LOWER(%Q)", local_argv[0]) == MPORT_OK && packs != NULL) {
+			if (mport_pkgmeta_search_master(
+				mport, &packs, "LOWER(pkg)=LOWER(%Q)", local_argv[0]) == MPORT_OK &&
+			    packs != NULL) {
 				mport_pkgmeta_vec_free(packs);
 				resultCode = 0;
 			} else {
@@ -987,17 +989,23 @@ selectMirror(/*@notnull@*/ mportInstance *mport)
 	const char *country = "us";
 
 	while (mirrorEntry != NULL && *mirrorEntry != NULL) {
-		char *p = strchr((*mirrorEntry)->url, '/');
-		if (p != NULL) {
-			*p = '\0';
-			p++;
-			p++;
-		}
-		char *end = strchr(p, '/');
+		const char *url = (*mirrorEntry)->url;
+		/* Extract the host from "scheme://host/path"; tolerate a
+		   missing scheme or path in remote-supplied mirror data. */
+		const char *host = strstr(url, "://");
+		host = (host != NULL) ? host + 3 : url;
+
+		strlcpy(hostname, host, sizeof(hostname));
+		char *end = strchr(hostname, '/');
 		if (end != NULL) {
 			*end = '\0';
 		}
-		strlcpy(hostname, p, sizeof(hostname));
+
+		if (hostname[0] == '\0') {
+			mirrorEntry++;
+			continue;
+		}
+
 		mport_call_msg_cb(mport, "Trying mirror %s %s", (*mirrorEntry)->country, hostname);
 		long rtt = ping(hostname);
 

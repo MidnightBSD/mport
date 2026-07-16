@@ -459,8 +459,15 @@ mport_index_mirror_list(mportInstance *mport, mportMirrorEntry ***entry_vec)
 				goto DONE;
 			}
 
-			strlcpy(e[i]->country, (const char *)sqlite3_column_text(stmt, 0), 5);
-			strlcpy(e[i]->url, (const char *)sqlite3_column_text(stmt, 1), 256);
+			const unsigned char *country = sqlite3_column_text(stmt, 0);
+			const unsigned char *url = sqlite3_column_text(stmt, 1);
+			/* Downloaded index columns are nullable; calloc left the
+			   fields as empty strings, so only copy non-NULL values. */
+			if (country != NULL)
+				strlcpy(
+				    e[i]->country, (const char *)country, sizeof(e[i]->country));
+			if (url != NULL)
+				strlcpy(e[i]->url, (const char *)url, sizeof(e[i]->url));
 			i++;
 		} else if (ret == SQLITE_DONE) {
 			break;
@@ -915,10 +922,21 @@ mport_moved_lookup(mportInstance *mport, const char *origin, mportIndexMovedEntr
 				goto MOVED_DONE;
 			}
 
-			strlcpy(e[i]->port, sqlite3_column_text(stmt, 0), 128);
-			strlcpy(e[i]->moved_to, sqlite3_column_text(stmt, 1), 128);
-			strlcpy(e[i]->why, sqlite3_column_text(stmt, 2), 128);
-			strlcpy(e[i]->date, sqlite3_column_text(stmt, 3), 32);
+			const unsigned char *port = sqlite3_column_text(stmt, 0);
+			const unsigned char *moved_to = sqlite3_column_text(stmt, 1);
+			const unsigned char *why = sqlite3_column_text(stmt, 2);
+			const unsigned char *date = sqlite3_column_text(stmt, 3);
+			/* Downloaded MOVED columns are nullable; calloc left the
+			   fields as empty strings, so only copy non-NULL values. */
+			if (port != NULL)
+				strlcpy(e[i]->port, (const char *)port, sizeof(e[i]->port));
+			if (moved_to != NULL)
+				strlcpy(
+				    e[i]->moved_to, (const char *)moved_to, sizeof(e[i]->moved_to));
+			if (why != NULL)
+				strlcpy(e[i]->why, (const char *)why, sizeof(e[i]->why));
+			if (date != NULL)
+				strlcpy(e[i]->date, (const char *)date, sizeof(e[i]->date));
 
 			// TODO: fix
 			char *orig_pkg = NULL;
