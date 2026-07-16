@@ -967,70 +967,70 @@ int
 mport_run_asset_exec(mportInstance *mport, const char *fmt, const char *cwd, const char *last_file)
 {
 	size_t l;
+	size_t remaining;
 	char *cmnd = NULL;
 	char *pos = NULL;
 	char *name = NULL;
 	char *lfcpy = NULL;
 	int ret;
-	static int max = 0;
-	size_t maxlen = sizeof(max);
+	static int argmax = 0;
+	size_t argmaxlen = sizeof(argmax);
 
-	if (max == 0) {
-		if (sysctlbyname("kern.argmax", &max, &maxlen, NULL, 0) < 0)
+	/* argmax is a cached kern.argmax; it must never be decremented, or a
+	   later call would malloc a stale (eventually negative/huge) size. */
+	if (argmax <= 0) {
+		if (sysctlbyname("kern.argmax", &argmax, &argmaxlen, NULL, 0) < 0 || argmax <= 0)
 			RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't determine maximum argument length");
 	}
 
-	if ((cmnd = malloc(max * sizeof(char))) == NULL)
+	if ((cmnd = malloc((size_t)argmax)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
 	pos = cmnd;
+	remaining = (size_t)argmax; /* bytes left in cmnd, including the final NUL slot */
 
-	while (*fmt && max > 0) {
+	while (*fmt && remaining > 1) {
 		if (*fmt == '%') {
 			fmt++;
 			switch (*fmt) {
 			case 'F':
 				/* last_file is absolute, so we skip the cwd at the begining */
-				(void)strlcpy(pos, last_file + strlen(cwd) + 1, max);
-				l = strlen(last_file + strlen(cwd) + 1);
-				pos += l;
-				max -= l;
+				l = strlcpy(pos, last_file + strlen(cwd) + 1, remaining);
 				break;
 			case 'D':
-				(void)strlcpy(pos, cwd, max);
-				l = strlen(cwd);
-				pos += l;
-				max -= l;
+				l = strlcpy(pos, cwd, remaining);
 				break;
 			case 'B':
 				lfcpy = strdup(last_file);
-				if (lfcpy == NULL)
+				if (lfcpy == NULL) {
+					free(cmnd);
 					RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+				}
 				name = dirname(lfcpy); /* dirname(3) in MidnightBSD 3.0 and higher
 							  modifies the source. */
-				(void)strlcpy(pos, name, max);
-				l = strlen(name);
-				pos += l;
-				max -= l;
+				l = strlcpy(pos, name, remaining);
 				free(lfcpy);
+				lfcpy = NULL;
 				break;
 			case 'f':
 				name = basename((char *)last_file);
-				(void)strlcpy(pos, name, max);
-				l = strlen(name);
-				pos += l;
-				max -= l;
+				l = strlcpy(pos, name, remaining);
 				break;
 			default:
-				*pos = *fmt;
-				max--;
-				pos++;
+				*pos++ = *fmt;
+				remaining--;
+				fmt++;
+				continue;
 			}
+			/* strlcpy returns the length it tried to write; clamp to
+			   what actually fit so pos never advances past cmnd. */
+			if (l >= remaining)
+				l = remaining - 1;
+			pos += l;
+			remaining -= l;
 			fmt++;
 		} else {
-			*pos = *fmt;
-			pos++;
-			fmt++;
-			max--;
+			*pos++ = *fmt++;
+			remaining--;
 		}
 	}
 
