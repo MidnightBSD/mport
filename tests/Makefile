@@ -11,6 +11,7 @@ CFLAGS+=	-I${.CURDIR}/../libmport \
 		-I${LOCALBASE}/include
 
 ATF_TESTS_C+=	mport_confirm_test \
+		mport_db_test \
 		mport_fetch_test \
 		mport_index_test \
 		mport_osrelease_test \
@@ -29,6 +30,12 @@ LDFLAGS.mport_fetch_test+=	-L${.CURDIR}/../libmport \
 				-Wl,-rpath,${.CURDIR}/../libmport \
 				-Wl,-rpath,${LOCALBASE}/lib
 LDADD.mport_fetch_test+=	-lmport -latf-c
+
+LDFLAGS.mport_db_test+=		-L${.CURDIR}/../libmport \
+				-L${LOCALBASE}/lib \
+				-Wl,-rpath,${.CURDIR}/../libmport \
+				-Wl,-rpath,${LOCALBASE}/lib
+LDADD.mport_db_test+=		-lmport -latf-c -lsqlite3
 
 LDFLAGS.mport_index_test+=	-L${.CURDIR}/../libmport \
 				-L${LOCALBASE}/lib \
