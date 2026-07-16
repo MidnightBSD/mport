@@ -243,8 +243,7 @@ mport_install_depends(
 	}
 
 	if (mport_index_depends_list(mport, packageName, version, &depends_orig) != MPORT_OK) {
-		mport_call_msg_cb(mport, "%s", mport_err_string());
-		return mport_err_code();
+		RETURN_CURRENT_ERROR;
 	}
 	depends = depends_orig;
 
