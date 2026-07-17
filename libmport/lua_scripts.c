@@ -183,7 +183,7 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 			/* parse and set arguments of the line is in the comments */
 			if (mport_starts_with("-- args: ", s->item)) {
 				char *walk, *begin, *line = NULL;
-				int spaces, argc = 0;
+				int argc = 0;
 				char **args = NULL;
 				char *args_base = NULL;
 
@@ -195,13 +195,18 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 					line = strdup(begin);
 
 				if (line != NULL) {
-					spaces = mport_count_spaces(line);
-					args = calloc((spaces + 2), sizeof(char *));
+					/* mport_tokenize consumes at least one char per
+					   token, so the count cannot exceed the input
+					   length. A spaces-based size undercounts adjacent
+					   quoted tokens (e.g. "a""b""c") and overflowed
+					   args; size to the length and cap the loop. */
+					size_t cap = strlen(line) + 2;
+					args = calloc(cap, sizeof(char *));
 					if (args != NULL) {
 						args_base = strdup(line);
 						if (args_base != NULL) {
 							walk = args_base;
-							while (walk != NULL) {
+							while (walk != NULL && (size_t)argc < cap) {
 								args[argc++] =
 								    mport_tokenize(&walk);
 							}

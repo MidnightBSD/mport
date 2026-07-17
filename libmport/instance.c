@@ -111,14 +111,19 @@ mport_instance_init(mportInstance *mport, const char *root, const char *outputPa
 	/* dir is a file here, just trying to save memory */
 	(void)snprintf(dir, FILENAME_MAX, "%s/%s", mport->root, MPORT_MASTER_DB_FILE);
 	if (sqlite3_open(dir, &(mport->db)) != 0) {
+		/* capture the message before closing; errmsg is invalid afterwards */
+		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 		sqlite3_close(mport->db);
-		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		mport->db = NULL;
+		RETURN_CURRENT_ERROR;
 	}
 
 	if (sqlite3_create_function(mport->db, "mport_version_cmp", 2, SQLITE_ANY, NULL,
 		&mport_version_cmp_sqlite, NULL, NULL) != SQLITE_OK) {
+		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 		sqlite3_close(mport->db);
-		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		mport->db = NULL;
+		RETURN_CURRENT_ERROR;
 	}
 
 	/* set the default UI callbacks */
