@@ -325,13 +325,16 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 
 					if (dest_path_set && mport_file_exists(dest_path)) {
 						bool hashes_match = false;
-						if (strlen(checksum) < 34) {
+						/* checksum may be NULL, and hash is only computed
+						   above when it is not; without it we cannot
+						   verify, so treat the sample as unmatched. */
+						if (checksum != NULL && strlen(checksum) < 34) {
 							if (MD5File(dest_path, sample_hash) !=
 								NULL &&
 							    strcmp(sample_hash, hash) == 0) {
 								hashes_match = true;
 							}
-						} else {
+						} else if (checksum != NULL) {
 							if (SHA256_File(dest_path, sample_hash) !=
 								NULL &&
 							    strcmp(sample_hash, hash) == 0) {
@@ -540,7 +543,8 @@ build_info_dir_path(
 			RETURN_ERROR(MPORT_ERR_FATAL, "Info asset path is too long.");
 	} else {
 		if (pkg->prefix == NULL)
-			RETURN_ERROR(MPORT_ERR_FATAL, "Package prefix is undefined for info asset.");
+			RETURN_ERROR(
+			    MPORT_ERR_FATAL, "Package prefix is undefined for info asset.");
 		if (snprintf(info_path, sizeof(info_path), "%s/%s", pkg->prefix, data) >=
 		    (int)sizeof(info_path)) {
 			RETURN_ERROR(MPORT_ERR_FATAL, "Info asset path is too long.");
@@ -776,12 +780,12 @@ run_pkg_deinstall(mportInstance *mport, mportPackageMeta *pack, const char *mode
 	char command_file[FILENAME_MAX];
 	int ret;
 
-	if (mport_build_infrastructure_path(mport, pack, MPORT_DEINSTALL_FILE, true, file,
-		sizeof(file)) != MPORT_OK)
+	if (mport_build_infrastructure_path(
+		mport, pack, MPORT_DEINSTALL_FILE, true, file, sizeof(file)) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	if (mport_build_infrastructure_path(mport, pack, MPORT_DEINSTALL_FILE, false,
-		command_file, sizeof(command_file)) != MPORT_OK)
+	if (mport_build_infrastructure_path(mport, pack, MPORT_DEINSTALL_FILE, false, command_file,
+		sizeof(command_file)) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	if (mport_file_exists(file)) {

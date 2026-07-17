@@ -926,7 +926,7 @@ mport_parselist(char *opt, char ***list, size_t *list_size)
 void
 mport_parselist_tll(char *opt, stringlist_t *list)
 {
-	char *input;
+	char *input, *input_ptr;
 	char *field;
 
 	if (opt == NULL || list == NULL)
@@ -935,10 +935,9 @@ mport_parselist_tll(char *opt, stringlist_t *list)
 	if ((input = strdup(opt)) == NULL) {
 		return;
 	}
+	input_ptr = input;
 
-	while ((field = strsep(&input, " \t\n")) != NULL) {
-		if (field != NULL && *field != '\0')
-			tll_push_back(*list, strdup(field));
+	while ((field = strsep(&input_ptr, " \t\n")) != NULL) {
 		if (field != NULL && *field != '\0') {
 			char *s = strdup(field);
 			if (s != NULL)

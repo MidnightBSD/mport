@@ -816,6 +816,12 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 			if (mport_bundle_read_next_entry(bundle, &entry) != MPORT_OK)
 				goto ERROR;
 
+			if (e->data == NULL) {
+				SET_ERROR(
+				    MPORT_ERR_FATAL, "Corrupt bundle: file asset has no path");
+				goto ERROR;
+			}
+
 			if (e->data[0] == '/') {
 				(void)snprintf(file, FILENAME_MAX, "%s", e->data);
 			} else {

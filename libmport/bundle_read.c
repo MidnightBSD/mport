@@ -212,7 +212,14 @@ mport_bundle_read_skip_metafiles(mportBundleRead *bundle)
 		if (mport_bundle_read_next_entry(bundle, &entry) != MPORT_OK)
 			RETURN_CURRENT_ERROR;
 
-		if (*(archive_entry_pathname(entry)) != '+') {
+		/* next_entry returns MPORT_OK with entry == NULL at end of
+		   archive; a truncated bundle reaches EOF with no data files. */
+		if (entry == NULL)
+			RETURN_ERROR(
+			    MPORT_ERR_FATAL, "Corrupt bundle: no data files found in archive");
+
+		const char *pathname = archive_entry_pathname(entry);
+		if (pathname != NULL && *pathname != '+') {
 			bundle->firstreal = entry;
 			break;
 		}
