@@ -144,6 +144,10 @@ mport_clean_oldpackages(mportInstance *mport)
 			} else {
 				deleted++;
 			}
+			/* mport_index_search allocates a (possibly empty) vector even
+			   when nothing matched; free it here. */
+			mport_index_entry_free_vec(indexEntry);
+			indexEntry = NULL;
 		} else {
 			int fd;
 			struct stat st;
@@ -269,9 +273,9 @@ mport_clean_oldmtree(mportInstance *mport)
 
 		if (packs == NULL || *packs == NULL) {
 			if (remove_tree_at(dfd, de->d_name) != 0) {
-				error_code = SET_ERRORX(MPORT_ERR_FATAL,
-				    "Could not delete file %s/%s: %s", MPORT_INST_INFRA_DIR,
-				    de->d_name, strerror(errno));
+				error_code =
+				    SET_ERRORX(MPORT_ERR_FATAL, "Could not delete file %s/%s: %s",
+					MPORT_INST_INFRA_DIR, de->d_name, strerror(errno));
 				mport_call_msg_cb(mport, "%s\n", mport_err_string());
 			} else {
 				deleted++;
@@ -280,7 +284,6 @@ mport_clean_oldmtree(mportInstance *mport)
 			mport_pkgmeta_vec_free(packs);
 			packs = NULL;
 		}
-
 	}
 
 	closedir(d);
