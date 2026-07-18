@@ -331,29 +331,41 @@ mport_index_get_mirror_list(mportInstance *mport, char ***list_p, int *list_size
 	int ret, i;
 	int len;
 	sqlite3_stmt *stmt;
-	char *mirror_region;
+	char *mirror_region_setting;
+	const char *mirror_region;
 
-	mirror_region = mport_setting_get(mport, MPORT_SETTING_MIRROR_REGION);
-	if (mirror_region == NULL) {
-		mirror_region = "us";
-	}
+	/* mirror_region_setting owns heap memory; mirror_region may instead
+	   point at the "us" literal, so keep them separate for freeing. */
+	mirror_region_setting = mport_setting_get(mport, MPORT_SETTING_MIRROR_REGION);
+	mirror_region = (mirror_region_setting != NULL) ? mirror_region_setting : "us";
 
 	/* XXX the country is hard coded until a configuration system is created */
 	if (mport_db_count(mport->db, &len, "SELECT COUNT(*) FROM idx.mirrors WHERE country=%Q",
 		mirror_region) != MPORT_OK) {
+		free(mirror_region_setting);
 		RETURN_CURRENT_ERROR;
 	}
 
 	*list_size = len;
 	list = calloc((size_t)len + 1, sizeof(char *));
+	if (list == NULL) {
+		free(mirror_region_setting);
+		*list_p = NULL;
+		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate mirror list.");
+	}
 	*list_p = list;
 	i = 0;
 
 	if (mport_db_prepare(mport->db, &stmt, "SELECT mirror FROM idx.mirrors WHERE country=%Q",
 		mirror_region) != MPORT_OK) {
+		free(mirror_region_setting);
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
 	}
+
+	free(mirror_region_setting);
+	mirror_region_setting = NULL;
+	mirror_region = NULL;
 
 	while (1) {
 		ret = sqlite3_step(stmt);

@@ -46,14 +46,20 @@ mport_update_primative(mportInstance *mport, const char *filename)
 	if ((bundle = mport_bundle_read_new()) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
-	if (mport_bundle_read_init(bundle, filename) != MPORT_OK)
+	if (mport_bundle_read_init(bundle, filename) != MPORT_OK) {
+		mport_bundle_read_finish(mport, bundle);
 		RETURN_CURRENT_ERROR;
+	}
 
-	if (mport_bundle_read_prep_for_install(mport, bundle) != MPORT_OK)
+	if (mport_bundle_read_prep_for_install(mport, bundle) != MPORT_OK) {
+		mport_bundle_read_finish(mport, bundle);
 		RETURN_CURRENT_ERROR;
+	}
 
-	if (mport_pkgmeta_read_stub(mport, &pkgs) != MPORT_OK)
+	if (mport_pkgmeta_read_stub(mport, &pkgs) != MPORT_OK) {
+		mport_bundle_read_finish(mport, bundle);
 		RETURN_CURRENT_ERROR;
+	}
 
 	packs_start = pkgs;
 	for (int i = 0; *(pkgs + i) != NULL; i++) {
