@@ -257,19 +257,19 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 				if (checksum == NULL) {
 					mport_call_msg_cb(mport, "Checksum mismatch: %s", file);
 				} else if (strlen(checksum) < 34) {
+					/* hash is a stack buffer, only written on success;
+					   don't strcmp it if MD5File failed. */
 					if (MD5File(file, hash) == NULL)
 						mport_call_msg_cb(mport, "Can't MD5 %s: %s", file,
 						    strerror(errno));
-
-					if (hash == NULL || strcmp(hash, checksum) != 0)
+					else if (strcmp(hash, checksum) != 0)
 						mport_call_msg_cb(
 						    mport, "Checksum mismatch: %s", file);
 				} else {
 					if (SHA256_File(file, hash) == NULL)
 						mport_call_msg_cb(mport, "Can't SHA256 %s: %s",
 						    file, strerror(errno));
-
-					if (hash == NULL || strcmp(hash, checksum) != 0)
+					else if (strcmp(hash, checksum) != 0)
 						mport_call_msg_cb(
 						    mport, "Checksum mismatch: %s", file);
 				}

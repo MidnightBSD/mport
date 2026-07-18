@@ -132,7 +132,7 @@ set_prefix_to_installed(mportInstance *mport, mportPackageMeta *pkg)
 	case SQLITE_ROW:
 		prefix = sqlite3_column_text(stmt, 0);
 
-		if (strcmp(prefix, pkg->prefix) != 0) {
+		if (prefix != NULL && strcmp(prefix, pkg->prefix) != 0) {
 			free(pkg->prefix);
 			if ((pkg->prefix = strdup(prefix)) == NULL) {
 				ret = MPORT_ERR_FATAL;
