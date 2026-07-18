@@ -262,6 +262,11 @@ build_create_extras_depends(mportInstance *mport, mportPackageMeta *pkg, mportCr
 		ret = sqlite3_step(stmt);
 
 		if (ret == SQLITE_ROW) {
+			/* depends was sized from a separate COUNT query; if a
+			   concurrent insert added rows, stop rather than write past
+			   the allocation. */
+			if (i >= count)
+				break;
 			if (asprintf(&entry, "%s:%s:%s", sqlite3_column_text(stmt, 0),
 				sqlite3_column_text(stmt, 2), sqlite3_column_text(stmt, 1)) == -1) {
 				sqlite3_finalize(stmt);
