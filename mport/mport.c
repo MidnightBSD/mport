@@ -141,6 +141,11 @@ updateMany(mportInstance *mport, int argc, char **argv)
 
 	if (argc > 1 && strchr(argv[1], '*') != NULL) {
 		char *pkg = mport_string_replace(argv[1], "*", "%");
+		if (pkg == NULL) {
+			warnx("Out of memory");
+			free(results);
+			return (MPORT_ERR_FATAL);
+		}
 		if (mport_pkgmeta_search_master(mport, &results[0], "pkg like %Q", pkg) !=
 		    MPORT_OK) {
 			warnx("%s", mport_err_string());
@@ -322,6 +327,8 @@ main(int argc, char *argv[])
 	}
 
 	mport = mport_instance_new();
+	if (mport == NULL)
+		errx(1, "Out of memory.");
 
 	if (mport_instance_init(mport, NULL, outputPath, noIndex != 0,
 		mport_verbosity(quiet, verbose, brief)) != MPORT_OK) {
@@ -959,7 +966,7 @@ show_version(/*@null@*/ mportInstance *mport, int count)
 		version = mport_version_short(mport);
 	else
 		version = mport_version(mport);
-	fprintf(stderr, "%s", version);
+	fprintf(stderr, "%s", version != NULL ? version : "");
 	if (mport == NULL)
 		fprintf(stderr, "(Host OS version, not configured)\n\n");
 	free(version);
@@ -1258,6 +1265,8 @@ which(/*@notnull@*/ mportInstance *mport, /*@null@*/ const char *filePath, bool 
 			    pack->version);
 		}
 	}
+
+	mport_pkgmeta_free(pack);
 
 	return (0);
 }
