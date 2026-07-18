@@ -577,10 +577,18 @@ main(int argc, char *argv[])
 		free(flag);
 		free(buf);
 	} else if (!strcmp(cmd, "import")) {
-		loadIndex(mport);
-		resultCode = mport_import(mport, argv[2]);
+		if (argc > 1) {
+			loadIndex(mport);
+			resultCode = mport_import(mport, argv[1]);
+		} else {
+			usage();
+		}
 	} else if (!strcmp(cmd, "export")) {
-		resultCode = mport_export(mport, argv[2]);
+		if (argc > 1) {
+			resultCode = mport_export(mport, argv[1]);
+		} else {
+			usage();
+		}
 	} else if (!strcmp(cmd, "lock")) {
 		if (argc > 1) {
 			lock(mport, argv[1]);
@@ -713,8 +721,16 @@ main(int argc, char *argv[])
 			}
 			resultCode = MPORT_OK;
 		} else if (!strcmp(argv[1], "get")) {
+			if (argc < 3) {
+				mport_instance_free(mport);
+				usage();
+			}
 			resultCode = configGet(mport, argv[2]);
 		} else if (!strcmp(argv[1], "set")) {
+			if (argc < 4) {
+				mport_instance_free(mport);
+				usage();
+			}
 			resultCode = configSet(mport, argv[2], argv[3]);
 		}
 	} else if (!strcmp(cmd, "mirror")) {
@@ -1428,7 +1444,18 @@ install(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *packageNam
 			item++;
 			i2++;
 		}
-		while (scanf("%d", &choice) < 1 || choice > item || choice < 0) {
+		int scan_result;
+		while ((scan_result = scanf("%d", &choice)) < 1 || choice >= item || choice < 0) {
+			if (scan_result == EOF) {
+				fprintf(stderr, "\nNo selection made.\n");
+				mport_index_entry_free_vec(ie);
+				exit(4);
+			}
+			/* scanf left the offending input in the buffer; discard the
+			   rest of the line so we don't spin forever. */
+			int ch;
+			while ((ch = getchar()) != '\n' && ch != EOF)
+				;
 			fprintf(stderr, "Please select an entry 0 - %d\n", item - 1);
 		}
 		item = 0;
