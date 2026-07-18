@@ -237,7 +237,7 @@ do_pre_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *
 	return MPORT_OK;
 
 ERROR:
-	// TODO: asset list free
+	mport_assetlist_free(alist);
 	RETURN_CURRENT_ERROR;
 }
 
