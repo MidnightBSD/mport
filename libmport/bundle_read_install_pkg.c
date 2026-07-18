@@ -718,6 +718,7 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 	char file[FILENAME_MAX], cwd[FILENAME_MAX];
 	sqlite3_stmt *insert = NULL;
 	mportAssetList *autodirs = NULL;
+	char *filePtr = NULL, *cwdPtr = NULL;
 
 	/* sadly, we can't just use abs pathnames, because it will break hardlinks */
 	orig_cwd = getcwd(NULL, 0);
@@ -1128,8 +1129,12 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 		}
 
 		/* insert this asset into the master database */
-		char *filePtr = strdup(file);
-		char *cwdPtr = strdup(cwd);
+		filePtr = strdup(file);
+		cwdPtr = strdup(cwd);
+		if (filePtr == NULL || cwdPtr == NULL) {
+			SET_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+			goto ERROR;
+		}
 
 		char dir[FILENAME_MAX];
 		if (sqlite3_bind_int(insert, 1, (int)e->type) != SQLITE_OK) {
@@ -1259,7 +1264,9 @@ do_actual_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMet
 		sqlite3_reset(insert);
 
 		free(filePtr);
+		filePtr = NULL;
 		free(cwdPtr);
+		cwdPtr = NULL;
 	}
 
 	if (mport_db_do(mport->db, "COMMIT") != MPORT_OK) {
@@ -1282,6 +1289,8 @@ ERROR:
 		close(filefd);
 	sqlite3_finalize(insert);
 	(mport->progress_free_cb)();
+	free(filePtr);
+	free(cwdPtr);
 	free(orig_cwd);
 	mport_assetlist_free(autodirs);
 	mport_assetlist_free(alist);
