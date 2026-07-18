@@ -529,17 +529,16 @@ main(int argc, char *argv[])
 			local_argv += optind;
 		}
 
-		if (local_argc > 1 && Sflag) {
-			int index = quiet == true ? 2 : 0;
-			if (aflag == 0) {
-				resultCode =
-				    annotate_show(mport, local_argv[index], local_argv[index + 1]);
-			} else {
-				resultCode = annotate_list(mport, local_argv[1]);
-			}
-		} else if (local_argc > 1 && Dflag) {
+		int index = quiet == true ? 2 : 0;
+		/* annotate_* require non-NULL args and deref them; only call when
+		   the accessed positions are real (in-bounds, non-NULL) args. */
+		if (Sflag && aflag && local_argc > 1) {
+			resultCode = annotate_list(mport, local_argv[1]);
+		} else if (Sflag && !aflag && local_argc > index + 1) {
+			resultCode = annotate_show(mport, local_argv[index], local_argv[index + 1]);
+		} else if (Dflag && local_argc > 2) {
 			resultCode = annotate_delete(mport, local_argv[1], local_argv[2]);
-		} else if (local_argc > 2 && Aflag) {
+		} else if (Aflag && local_argc > 3) {
 			resultCode =
 			    annotate_add(mport, local_argv[1], local_argv[2], local_argv[3]);
 		} else {
