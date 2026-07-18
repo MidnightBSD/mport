@@ -175,8 +175,10 @@ check_if_installed(mportInstance *mport, mportPackageMeta *pack)
 		os_release = sqlite3_column_text(stmt, 1);
 		system_os_release = (char *)mport_get_osrelease(mport);
 
-		/* Different os release version should not be considered the same package */
-		if (strcmp(os_release, system_os_release) != 0) {
+		/* Different os release version should not be considered the same package.
+		   A NULL from either source means we cannot confirm a match. */
+		if (os_release == NULL || system_os_release == NULL ||
+		    strcmp(os_release, system_os_release) != 0) {
 			free(system_os_release);
 			break;
 		}
@@ -296,7 +298,8 @@ check_depends(mportInstance *mport, mportPackageMeta *pack)
 				os_release = sqlite3_column_text(lookup, 1);
 				int ok;
 
-				if (strcmp(os_release, system_os_release) != 0) {
+				if (os_release == NULL || system_os_release == NULL ||
+				    strcmp(os_release, system_os_release) != 0) {
 					SET_ERRORX(MPORT_ERR_FATAL,
 					    "%s depends on %s version %s.  Version %s for MidnightBSD %s is installed.",
 					    pack->name, depend_pkg,
