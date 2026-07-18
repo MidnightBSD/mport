@@ -98,6 +98,9 @@ mport_info(mportInstance *mport, const char *packageName)
 	if (packs != NULL &&
 	    mport_moved_lookup(mport, (*packs)->origin, &movedEntries) != MPORT_OK) {
 		SET_ERROR(MPORT_ERR_FATAL, "The moved lookup failed.");
+		mport_index_moved_entry_free_vec(movedEntries);
+		mport_index_entry_free_vec(indexEntries);
+		mport_pkgmeta_vec_free(packs);
 		return (NULL);
 	}
 
@@ -157,9 +160,11 @@ mport_info(mportInstance *mport, const char *packageName)
 		expirationDate = (*packs)->expiration_date;
 		if (expirationDate == 0 && movedEntries != NULL && *movedEntries != NULL &&
 		    (*movedEntries)->date[0] != '\0') {
-			struct tm expDate;
-			strptime((*movedEntries)->date, "%Y-%m-%d", &expDate);
-			expirationDate = mktime(&expDate);
+			/* zero-init: strptime fills only the date fields, and
+			   mktime reads tm_hour/min/sec/isdst too. */
+			struct tm expDate = { 0 };
+			if (strptime((*movedEntries)->date, "%Y-%m-%d", &expDate) != NULL)
+				expirationDate = mktime(&expDate);
 		}
 		options = (*packs)->options;
 
@@ -288,10 +293,10 @@ mport_info(mportInstance *mport, const char *packageName)
 		    options, type == MPORT_TYPE_APP ? "Application" : "System", flatsize_str, desc);
 	}
 
-	if (info_text == NULL) {
+	/* info_text may be NULL here (asprintf OOM); fall through to the shared
+	   cleanup below and return it (NULL) rather than leaking everything. */
+	if (info_text == NULL)
 		SET_ERROR(MPORT_ERR_FATAL, "Out of memory.");
-		return (NULL);
-	}
 
 	if (packs == NULL) {
 		free(status);
