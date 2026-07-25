@@ -43,6 +43,7 @@ static int check_depends(mportInstance *mport, mportPackageMeta *);
 static int check_if_older_installed(mportInstance *, mportPackageMeta *);
 static int check_if_older_os(mportInstance *, mportPackageMeta *);
 static int check_file_conflicts(mportInstance *, mportPackageMeta *);
+static int asset_owned_by_pkg(mportInstance *, mportPackageMeta *, const char *);
 
 /* Run the checks requested by the flags given.
  *
@@ -449,6 +450,42 @@ check_if_older_os(mportInstance *mport, mportPackageMeta *pkg)
 	return ret;
 }
 
+/*
+ * Return 1 when path is already recorded as an asset of pack in the master
+ * database, 0 when it is not, and -1 on error.  The same package name can be
+ * registered more than once (a copy installed under a different os_release is
+ * treated as a distinct package by check_if_installed()), so a file owned by
+ * pack itself is replaced by this install rather than being a conflict.
+ */
+static int
+asset_owned_by_pkg(mportInstance *mport, mportPackageMeta *pack, const char *path)
+{
+	sqlite3_stmt *stmt = NULL;
+	int ret;
+
+	if (mport_db_prepare(mport->db, &stmt, "SELECT 1 FROM assets WHERE data=%Q AND pkg=%Q",
+		path, pack->name) != MPORT_OK) {
+		sqlite3_finalize(stmt);
+		return -1;
+	}
+
+	switch (sqlite3_step(stmt)) {
+	case SQLITE_ROW:
+		ret = 1;
+		break;
+	case SQLITE_DONE:
+		ret = 0;
+		break;
+	default:
+		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		ret = -1;
+		break;
+	}
+
+	sqlite3_finalize(stmt);
+	return ret;
+}
+
 static int
 check_file_conflicts(mportInstance *mport, mportPackageMeta *pack)
 {
@@ -560,6 +597,19 @@ check_file_conflicts(mportInstance *mport, mportPackageMeta *pack)
 			sqlite3_finalize(stmt);
 			RETURN_CURRENT_ERROR;
 		} else if (lret == SQLITE_DONE) {
+			int owned = asset_owned_by_pkg(mport, pack, masterpath);
+
+			if (owned < 0) {
+				sqlite3_finalize(lookup);
+				sqlite3_finalize(stmt);
+				RETURN_CURRENT_ERROR;
+			}
+
+			/* the file belongs to this package already; it is replaced, not
+			 * conflicted */
+			if (owned == 1)
+				continue;
+
 			SET_ERRORX(MPORT_ERR_FATAL,
 			    "%s already exists but is not managed by mport; use -f to overwrite.",
 			    fullpath);
