@@ -40,6 +40,8 @@ static char *find_file_with_prefix(const char *dir, const char *prefix);
 static /*@null@*/ /*@only@*/ mportPackageMeta **lookup_current_os_installed(
     /*@notnull@*/ mportInstance *, /*@notnull@*/ mportPackageMeta *,
     /*@out@*/ mportPackageMeta **);
+static int remove_stale_os_release_copy(/*@notnull@*/ mportInstance *,
+    /*@notnull@*/ mportPackageMeta *);
 
 #define GOTO_CLEANUP_ON_MPORT_ERR(expr)         \
 	do {                                    \
@@ -192,6 +194,84 @@ lookup_current_os_installed(mportInstance *mport, mportPackageMeta *pkg, mportPa
 	}
 
 	return installed;
+}
+
+/*
+ * Remove a copy of pkg that is registered under a different os_release than the
+ * running system.  check_if_installed() considers such a copy to be a distinct
+ * package, so without this the install proceeds while the old copy still owns
+ * the same files on disk: the file conflict precheck reports them as "not
+ * managed by mport" and, when forced, the registry ends up with two rows and
+ * two identical asset sets for one package.
+ *
+ * The os_release difference is itself the reason to replace, so the versions
+ * are not compared here -- rebuilding the same version against a new OS release
+ * is the common case.  Nothing is removed when a copy is registered under the
+ * current os_release; that copy is handled by the existing update/force paths.
+ */
+static int
+remove_stale_os_release_copy(mportInstance *mport, mportPackageMeta *pkg)
+{
+	mportPackageMeta **installed = NULL;
+	mportPackageMeta *stale = NULL;
+	char *system_os_release;
+	int ret = MPORT_OK;
+	int i;
+
+	if (mport_pkgmeta_search_master(mport, &installed, "pkg=%Q", pkg->name) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	if (installed == NULL)
+		return MPORT_OK;
+
+	if ((system_os_release = mport_get_osrelease(mport)) == NULL) {
+		mport_pkgmeta_vec_free(installed);
+		RETURN_ERROR(MPORT_ERR_FATAL, "Unable to determine OS release");
+	}
+
+	for (i = 0; installed[i] != NULL; i++) {
+		if (installed[i]->os_release != NULL &&
+		    strcmp(installed[i]->os_release, system_os_release) == 0) {
+			/* installed under the current OS release; not our problem */
+			stale = NULL;
+			break;
+		}
+		if (stale == NULL)
+			stale = installed[i];
+	}
+
+	free(system_os_release);
+
+	if (stale != NULL) {
+		/* mport_pkgmeta_search_master() always fills os_release in, but be
+		 * defensive since this string is only used for messages */
+		const char *stale_os = stale->os_release == NULL ? "unknown" : stale->os_release;
+
+		/* delete_primative stops the package's service before it checks the
+		 * lock, so refuse here rather than leaving a locked package stopped */
+		if (mport_lock_islocked(stale) == MPORT_LOCKED) {
+			mport_pkgmeta_vec_free(installed);
+			RETURN_ERRORX(MPORT_ERR_FATAL,
+			    "%s is installed under OS release %s and is locked.", stale->name,
+			    stale_os);
+		}
+
+		mport_call_msg_cb(mport, "Replacing %s-%s installed under OS release %s.",
+		    stale->name, stale->version, stale_os);
+
+		/* honor the old install's automatic flag, as the update path does */
+		pkg->automatic = stale->automatic;
+		stale->action = MPORT_ACTION_UPGRADE;
+
+		/* delete_primative works by package name, so this removes every
+		 * stale row for pkg, not just the one we matched. */
+		if (mport_delete_primative(mport, stale, 1) != MPORT_OK)
+			ret = mport_err_code();
+	}
+
+	mport_pkgmeta_vec_free(installed);
+
+	return ret;
 }
 
 MPORT_PUBLIC_API int
@@ -405,6 +485,13 @@ mport_install_primative(
 					    check_path);
 				}
 			}
+		}
+
+		if (remove_stale_os_release_copy(mport, pkg) != MPORT_OK) {
+			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name,
+			    pkg->version, mport_err_string());
+			ret = MPORT_ERR_FATAL;
+			break;
 		}
 
 		precheck_flags =
