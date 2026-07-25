@@ -371,7 +371,16 @@ mport_index_get_mirror_list(mportInstance *mport, char ***list_p, int *list_size
 		ret = sqlite3_step(stmt);
 
 		if (ret == SQLITE_ROW) {
-			list[i] = strdup((const char *)sqlite3_column_text(stmt, 0));
+			const char *mirror = (const char *)sqlite3_column_text(stmt, 0);
+
+			/* Skip NULL or empty mirror URLs: they cannot be
+			 * fetched from and would only relocate the crash into
+			 * the URL-parsing consumer.
+			 */
+			if (mirror == NULL || mirror[0] == '\0')
+				continue;
+
+			list[i] = strdup(mirror);
 
 			if (list[i] == NULL) {
 				sqlite3_finalize(stmt);
@@ -381,6 +390,7 @@ mport_index_get_mirror_list(mportInstance *mport, char ***list_p, int *list_size
 			i++;
 		} else if (ret == SQLITE_DONE) {
 			list[i] = NULL;
+			*list_size = i;
 			break;
 		} else {
 			list[i] = NULL;
