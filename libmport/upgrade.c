@@ -103,6 +103,7 @@ mport_upgrade(mportInstance *mport)
 	char *key = NULL;
 	char *msg;
 	char *replace_msg;
+	char *default_target;
 	mportIndexEntry **ieUpdateMe;
 	mportIndexMovedEntry **movedEntries;
 	mportPackageMeta *pack;
@@ -222,6 +223,28 @@ mport_upgrade(mportInstance *mport)
 #endif
 				}
 			} else if (match == 2) {
+				default_target = NULL;
+				if (mport_index_resolve_default_pkgname(
+					mport, pack->name, &default_target) != MPORT_OK) {
+					resultCode = mport_err_code();
+					goto cleanup;
+				}
+				if (default_target != NULL) {
+					free(default_target);
+					default_target = NULL;
+					if (mport_update(mport, pack->name) != MPORT_OK) {
+						mport_call_msg_cb(
+						    mport, "Error updating %s\n", pack->name);
+					} else {
+						updated++;
+#if defined(__MidnightBSD__)
+						ohash_insert(&h, slot, pack->name);
+#endif
+					}
+					total++;
+					continue;
+				}
+
 				ieUpdateMe = NULL;
 				if (mport_index_lookup_pkgname(mport, pack->origin, &ieUpdateMe) !=
 				    MPORT_OK) {
