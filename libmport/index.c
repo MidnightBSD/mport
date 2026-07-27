@@ -46,6 +46,8 @@ static int index_update_last_checked(mportInstance *);
 
 static int lookup_alias(mportInstance *, const char *, char **);
 static int lookup_alias_inverse(mportInstance *, const char *, char **);
+static int compact_default_version(const char *, char *, size_t);
+static int build_default_pkgname(const char *, const char *, const char *, char **);
 
 static int attach_index_db(sqlite3 *db);
 
@@ -216,6 +218,7 @@ MPORT_PUBLIC_API int
 mport_index_check(mportInstance *mport, mportPackageMeta *pack)
 {
 	mportIndexEntry **indexEntries = NULL, **indexEntries_orig = NULL;
+	char *default_pkgname = NULL;
 	int ret = 0;
 	bool used_origin = false;
 
@@ -225,6 +228,15 @@ mport_index_check(mportInstance *mport, mportPackageMeta *pack)
 
 	if (pack == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "pack not defined");
+
+	if (mport_index_resolve_default_pkgname(mport, pack->name, &default_pkgname) != MPORT_OK) {
+		SET_ERRORX(MPORT_ERR_WARN, "Error resolving default package for %s", pack->name);
+		return 0;
+	}
+	if (default_pkgname != NULL) {
+		free(default_pkgname);
+		return 2;
+	}
 
 	if (mport_index_lookup_pkgname(mport, pack->name, &indexEntries_orig) != MPORT_OK) {
 		SET_ERRORX(MPORT_ERR_WARN, "Error Looking up package name %s", pack->name);
@@ -595,6 +607,196 @@ DONE:
 	sqlite3_finalize(stmt);
 
 	return ret;
+}
+
+/*
+ * Return an owned copy of a default version stored in the attached index.
+ * Older indexes do not contain default_versions; treat that as an unavailable
+ * optional feature rather than an index error.
+ */
+MPORT_PUBLIC_API int
+mport_index_get_default_version(
+    /*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *name,
+    /*@out@*/ char **version)
+{
+	sqlite3_stmt *stmt = NULL;
+	const unsigned char *value;
+	int ret = MPORT_OK;
+
+	if (mport == NULL || name == NULL || version == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid default version lookup arguments");
+
+	*version = NULL;
+	MPORT_CHECK_FOR_INDEX(mport, "mport_index_get_default_version()")
+
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT 1 FROM idx.sqlite_master "
+		"WHERE type='table' AND name='default_versions'") != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	if (sqlite3_step(stmt) != SQLITE_ROW) {
+		sqlite3_finalize(stmt);
+		return MPORT_OK;
+	}
+	sqlite3_finalize(stmt);
+	stmt = NULL;
+
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT version FROM idx.default_versions WHERE name=%Q", name) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	switch (sqlite3_step(stmt)) {
+	case SQLITE_ROW:
+		value = sqlite3_column_text(stmt, 0);
+		if (value == NULL || (*version = strdup((const char *)value)) == NULL)
+			ret = SET_ERROR(MPORT_ERR_FATAL, "Invalid default version in index");
+		break;
+	case SQLITE_DONE:
+		break;
+	default:
+		ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		break;
+	}
+
+	sqlite3_finalize(stmt);
+	return ret;
+}
+
+/*
+ * Resolve a package whose name embeds an interpreter version to the package
+ * using the current repository default.  The output remains NULL when the
+ * package is not versioned, the index is old, or the derived package is not
+ * present in the index.
+ */
+int
+mport_index_resolve_default_pkgname(
+    /*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *pkgname,
+    /*@out@*/ char **resolved)
+{
+	mportIndexEntry **entries = NULL;
+	char *candidate = NULL;
+	char *version = NULL;
+	const char *default_name;
+	int ret;
+
+	if (mport == NULL || pkgname == NULL || resolved == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid default package lookup arguments");
+
+	*resolved = NULL;
+	if ((strncmp(pkgname, "python", 6) == 0 && pkgname[6] >= '0' && pkgname[6] <= '9') ||
+	    (strncmp(pkgname, "py", 2) == 0 && pkgname[2] >= '0' && pkgname[2] <= '9')) {
+		default_name = "python";
+	} else if (strncmp(pkgname, "php", 3) == 0 && pkgname[3] >= '0' && pkgname[3] <= '9') {
+		default_name = "php";
+	} else if (strncmp(pkgname, "ruby", 4) == 0 && pkgname[4] >= '0' && pkgname[4] <= '9') {
+		default_name = "ruby";
+	} else {
+		return MPORT_OK;
+	}
+
+	ret = mport_index_get_default_version(mport, default_name, &version);
+	if (ret != MPORT_OK)
+		return ret;
+	if (version == NULL)
+		return MPORT_OK;
+
+	ret = build_default_pkgname(pkgname, default_name, version, &candidate);
+	free(version);
+	if (ret != MPORT_OK)
+		return ret;
+	if (candidate == NULL)
+		return MPORT_OK;
+	if (strcmp(candidate, pkgname) == 0) {
+		mport_index_entry_free_vec(entries);
+		free(candidate);
+		return MPORT_OK;
+	}
+
+	if (mport_index_lookup_pkgname(mport, candidate, &entries) != MPORT_OK) {
+		free(candidate);
+		return mport_err_code();
+	}
+	if (entries != NULL && entries[0] != NULL) {
+		*resolved = candidate;
+		mport_index_entry_free_vec(entries);
+		return MPORT_OK;
+	}
+	mport_index_entry_free_vec(entries);
+	free(candidate);
+	return MPORT_OK;
+}
+
+static int
+compact_default_version(const char *version, char *compact, size_t compact_size)
+{
+	size_t j = 0;
+
+	if (version == NULL || compact == NULL || compact_size == 0)
+		return MPORT_ERR_FATAL;
+
+	for (size_t i = 0; version[i] != '\0'; i++) {
+		if (version[i] == '.')
+			continue;
+		if (version[i] < '0' || version[i] > '9' || j + 1 >= compact_size)
+			return MPORT_ERR_FATAL;
+		compact[j++] = version[i];
+	}
+	if (j == 0)
+		return MPORT_ERR_FATAL;
+	compact[j] = '\0';
+	return MPORT_OK;
+}
+
+static int
+build_default_pkgname(
+    const char *pkgname, const char *default_name, const char *version, char **candidate)
+{
+	char compact[32];
+	const char *rest;
+	const char *prefix;
+	size_t digits;
+
+	*candidate = NULL;
+	if (compact_default_version(version, compact, sizeof(compact)) != MPORT_OK)
+		return MPORT_OK;
+
+	if (strcmp(default_name, "python") == 0 && strncmp(pkgname, "python", 6) == 0) {
+		prefix = "python";
+		rest = pkgname + 6;
+	} else if (strcmp(default_name, "php") == 0 && strncmp(pkgname, "php", 3) == 0) {
+		prefix = "php";
+		rest = pkgname + 3;
+	} else if (strcmp(default_name, "ruby") == 0 && strncmp(pkgname, "ruby", 4) == 0) {
+		prefix = "ruby";
+		rest = pkgname + 4;
+	} else if (strcmp(default_name, "python") == 0 && strncmp(pkgname, "py", 2) == 0) {
+		prefix = "py";
+		rest = pkgname + 2;
+	} else {
+		return MPORT_OK;
+	}
+
+	for (digits = 0; rest[digits] >= '0' && rest[digits] <= '9'; digits++)
+		;
+	/* The encoded framework versions contain at least major and minor
+	 * digits.  Names such as python3 are compatibility metapackages, not
+	 * packages tied to an old default. */
+	if (digits < 2)
+		return MPORT_OK;
+
+	/* Versioned Python, PHP, and Ruby modules use a '-' after the prefix.
+	 * Interpreter packages use the versioned name with no suffix. */
+	if (rest[digits] != '\0' && rest[digits] != '-')
+		return MPORT_OK;
+
+	if (strcmp(prefix, "ruby") == 0 && rest[digits] == '\0') {
+		*candidate = strdup("ruby");
+	} else if (asprintf(candidate, "%s%s%s", prefix, compact, rest + digits) == -1) {
+		*candidate = NULL;
+		return MPORT_ERR_FATAL;
+	}
+
+	return *candidate == NULL ? MPORT_ERR_FATAL : MPORT_OK;
 }
 
 int
