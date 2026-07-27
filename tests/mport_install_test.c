@@ -248,10 +248,53 @@ ATF_TC_CLEANUP(install_same_os_release_is_rejected, tc)
 	cleanup_test_root();
 }
 
+/*
+ * MidnightBSD does not expose arbitrary descriptors through /dev/fd/N.
+ * Verify package installation can retain the verified descriptor instead of
+ * reopening that unavailable path.
+ */
+ATF_TC_WITH_CLEANUP(install_from_verified_fd);
+ATF_TC_HEAD(install_from_verified_fd, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "installs a hash-verified package from its open descriptor");
+}
+ATF_TC_BODY(install_from_verified_fd, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	char *hash;
+	int fd;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkgfile = create_test_package(mport);
+	hash = mport_hash_file(pkgfile);
+	ATF_REQUIRE(hash != NULL);
+	fd = open(pkgfile, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+	ATF_REQUIRE(fd >= 0);
+	ATF_REQUIRE_EQ(1, mport_verify_hash_fd(fd, hash));
+	ATF_REQUIRE_MSG(mport_install_primative_fd(mport, fd, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(0, close(fd));
+	free(hash);
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_EQ(0, access(test_path(PKG_FILE_ABS), F_OK));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(install_from_verified_fd, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, install_replaces_previous_os_release);
 	ATF_TP_ADD_TC(tp, install_same_os_release_is_rejected);
+	ATF_TP_ADD_TC(tp, install_from_verified_fd);
 
 	return atf_no_error();
 }
