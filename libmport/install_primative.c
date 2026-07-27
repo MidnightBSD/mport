@@ -274,9 +274,10 @@ remove_stale_os_release_copy(mportInstance *mport, mportPackageMeta *pkg)
 	return ret;
 }
 
-MPORT_PUBLIC_API int
-mport_install_primative(
-    mportInstance *mport, const char *filename, const char *prefix, mportAutomatic automatic)
+static int
+mport_install_primative_impl(
+    /*@notnull@*/ mportInstance *mport, /*@null@*/ const char *filename, int fd,
+    /*@null@*/ const char *prefix, mportAutomatic automatic)
 {
 	mportBundleRead *bundle = NULL;
 	mportPackageMeta **already_installed = NULL;
@@ -303,7 +304,10 @@ mport_install_primative(
 		if ((bundle = mport_bundle_read_new()) == NULL)
 			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
-		GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_init(bundle, filename));
+		if (fd >= 0)
+			GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_init_fd(bundle, fd));
+		else
+			GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_init(bundle, filename));
 		GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_prep_for_install(mport, bundle));
 		GOTO_CLEANUP_ON_MPORT_ERR(mport_pkgmeta_read_stub(mport, &pkgs));
 
@@ -418,7 +422,10 @@ mport_install_primative(
 		goto cleanup;
 	}
 
-	GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_init(bundle, filename));
+	if (fd >= 0)
+		GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_init_fd(bundle, fd));
+	else
+		GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_init(bundle, filename));
 	GOTO_CLEANUP_ON_MPORT_ERR(mport_bundle_read_prep_for_install(mport, bundle));
 	GOTO_CLEANUP_ON_MPORT_ERR(mport_pkgmeta_read_stub(mport, &pkgs));
 
@@ -540,4 +547,19 @@ cleanup:
 	}
 
 	return ret;
+}
+
+MPORT_PUBLIC_API int
+mport_install_primative(
+    mportInstance *mport, const char *filename, const char *prefix, mportAutomatic automatic)
+{
+	return mport_install_primative_impl(mport, filename, -1, prefix, automatic);
+}
+
+int
+mport_install_primative_fd(
+    /*@notnull@*/ mportInstance *mport, int fd, /*@null@*/ const char *prefix,
+    mportAutomatic automatic)
+{
+	return mport_install_primative_impl(mport, NULL, fd, prefix, automatic);
 }

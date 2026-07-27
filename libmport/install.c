@@ -86,7 +86,6 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
 {
 	mportIndexEntry **e = NULL;
 	char *filename = NULL;
-	char fd_filename[64];
 	char error_path[FILENAME_MAX];
 	int bundle_fd = -1;
 	struct stat bundle_st;
@@ -203,22 +202,14 @@ mport_install_single(mportInstance *mport, const char *pkgname, const char *vers
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Package is not a regular file: %s", error_path);
 	}
 
-	if (snprintf(fd_filename, sizeof(fd_filename), "/dev/fd/%d", bundle_fd) >=
-	    (int)sizeof(fd_filename)) {
-		close(bundle_fd);
-		mport_index_entry_free_vec(e);
-		free(filename);
-		RETURN_ERROR(MPORT_ERR_FATAL, "Package descriptor path is too long.");
-	}
-
-	if (mport_verify_hash(fd_filename, e[e_loc]->hash) == 0) {
+	if (!mport_verify_hash_fd(bundle_fd, e[e_loc]->hash)) {
 		close(bundle_fd);
 		mport_index_entry_free_vec(e);
 		free(filename);
 		RETURN_ERROR(MPORT_ERR_FATAL, "Package failed hash verification.\n");
 	}
 
-	ret = mport_install_primative(mport, fd_filename, prefix, automatic);
+	ret = mport_install_primative_fd(mport, bundle_fd, prefix, automatic);
 
 	close(bundle_fd);
 	free(filename);

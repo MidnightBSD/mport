@@ -81,6 +81,33 @@ mport_bundle_read_init(mportBundleRead *bundle, const char *filename)
 	return (MPORT_OK);
 }
 
+/* libarchive owns a duplicate; the caller retains its descriptor. */
+int
+mport_bundle_read_init_fd(mportBundleRead *bundle, int fd)
+{
+	int archive_fd;
+
+	if (bundle == NULL || fd < 0)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid bundle file descriptor");
+	if ((bundle->filename = strdup("(bundle file descriptor)")) == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't dup bundle filename");
+	if ((bundle->archive = archive_read_new()) == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't initialize archive read");
+	if (archive_read_support_format_tar(bundle->archive) != ARCHIVE_OK ||
+	    archive_read_support_filter_xz(bundle->archive) != ARCHIVE_OK)
+		RETURN_ERROR(MPORT_ERR_FATAL, archive_error_string(bundle->archive));
+	if (lseek(fd, 0, SEEK_SET) == -1)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't rewind bundle file descriptor");
+	if ((archive_fd = dup(fd)) == -1)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't duplicate bundle file descriptor");
+	if (archive_read_open_fd(bundle->archive, archive_fd, 10240) != ARCHIVE_OK) {
+		(void)close(archive_fd);
+		RETURN_ERROR(MPORT_ERR_FATAL, archive_error_string(bundle->archive));
+	}
+
+	return (MPORT_OK);
+}
+
 /*
  * mport_bundle_read_finish(bundle)
  *

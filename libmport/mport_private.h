@@ -108,6 +108,7 @@ bool mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack);
 /* Utils */
 bool mport_starts_with(const char *, const char *);
 char *mport_hash_file(const char *);
+int mport_verify_hash_fd(int, /*@notnull@*/ const char *);
 char *mport_extract_hash_from_file(const char *);
 int mport_copy_file(const char *, const char *);
 int mport_copy_fd(int, int);
@@ -175,6 +176,7 @@ int mport_bundle_write_add_entry(mportBundleWrite *, mportBundleRead *, struct a
 
 mportBundleRead *mport_bundle_read_new(void);
 int mport_bundle_read_init(mportBundleRead *, const char *);
+int mport_bundle_read_init_fd(/*@notnull@*/ mportBundleRead *, int);
 int mport_bundle_read_finish(mportInstance *, mportBundleRead *);
 int mport_bundle_read_prep_for_install(mportInstance *, mportBundleRead *);
 int mport_bundle_read_extract_metafiles(mportBundleRead *, char **);
@@ -185,6 +187,8 @@ int mport_bundle_read_install_pkg(mportInstance *, mportBundleRead *, mportPacka
 int mport_bundle_read_update_pkg(mportInstance *, mportBundleRead *, mportPackageMeta *);
 
 int mport_install_depends(mportInstance *, const char *, const char *, mportAutomatic);
+int mport_install_primative_fd(
+    /*@notnull@*/ mportInstance *, int, /*@null@*/ const char *, mportAutomatic);
 int mport_update_down(mportInstance *, mportPackageMeta *, struct ohash_info *, struct ohash *);
 
 /* version compare functions */

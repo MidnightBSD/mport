@@ -158,6 +158,32 @@ mport_verify_hash(const char *filename, const char *hash)
 	return 0;
 }
 
+int
+mport_verify_hash_fd(int fd, const char *hash)
+{
+	SHA256_CTX ctx;
+	unsigned char buffer[8192], digest[32];
+	char filehash[65];
+	ssize_t len;
+
+	if (fd < 0 || hash == NULL || lseek(fd, 0, SEEK_SET) == -1)
+		return 0;
+	SHA256_Init(&ctx);
+	while ((len = read(fd, buffer, sizeof(buffer))) != 0) {
+		if (len < 0) {
+			if (errno == EINTR)
+				continue;
+			return 0;
+		}
+		SHA256_Update(&ctx, buffer, (size_t)len);
+	}
+	SHA256_Final(digest, &ctx);
+	for (size_t i = 0; i < sizeof(digest); i++)
+		(void)snprintf(filehash + (i * 2), sizeof(filehash) - (i * 2), "%02x", digest[i]);
+
+	return strncmp(filehash, hash, 64) == 0;
+}
+
 char *
 mport_extract_hash_from_file(const char *filename)
 {
