@@ -1275,7 +1275,26 @@ static int
 add(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ const char *filename,
     mportAutomatic automatic)
 {
-	return mport_install_primative(mport, filename, NULL, automatic);
+	struct stat sb;
+	int resultCode;
+
+	/* Report bad package files here; the bundle open path below fails
+	   without emitting a message of its own. */
+	if (stat(filename, &sb) != 0) {
+		warn("%s", filename);
+		return (MPORT_ERR_FATAL);
+	}
+
+	if (!S_ISREG(sb.st_mode)) {
+		warnx("%s: not a regular file", filename);
+		return (MPORT_ERR_FATAL);
+	}
+
+	resultCode = mport_install_primative(mport, filename, NULL, automatic);
+	if (resultCode != MPORT_OK)
+		warnx("%s", mport_err_string());
+
+	return (resultCode);
 }
 
 static bool
