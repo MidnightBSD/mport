@@ -359,6 +359,10 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
+#if defined(__MidnightBSD__)
+			optreset = 1;
+#endif
+			optind = 1;
 			while ((ch2 = getopt(local_argc, local_argv, "A")) != -1) {
 				switch (ch2) {
 				case 'A':
@@ -373,6 +377,7 @@ main(int argc, char *argv[])
 		mport->noIndex = true;
 		mport->offline = true;
 
+		resultCode = MPORT_OK;
 		for (i = 0; i < local_argc; i++) {
 			tempResultCode = add(
 			    mport, local_argv[i], aflag == 1 ? MPORT_AUTOMATIC : MPORT_EXPLICIT);
@@ -488,6 +493,7 @@ main(int argc, char *argv[])
 		if (aflag) {
 			resultCode = mport_download(mport, NULL, true, false, &path);
 		} else {
+			resultCode = MPORT_OK;
 			for (i = 0; i < local_argc; i++) {
 				tempResultCode =
 				    mport_download(mport, local_argv[i], false, dflag == 1, &path);
@@ -597,13 +603,13 @@ main(int argc, char *argv[])
 		}
 	} else if (!strcmp(cmd, "lock")) {
 		if (argc > 1) {
-			lock(mport, argv[1]);
+			resultCode = lock(mport, argv[1]);
 		} else {
 			usage();
 		}
 	} else if (!strcmp(cmd, "unlock")) {
 		if (argc > 1) {
-			unlock(mport, argv[1]);
+			resultCode = unlock(mport, argv[1]);
 		} else {
 			usage();
 		}
