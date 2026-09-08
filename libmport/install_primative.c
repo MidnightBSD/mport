@@ -42,6 +42,7 @@ static /*@null@*/ /*@only@*/ mportPackageMeta **lookup_current_os_installed(
     /*@out@*/ mportPackageMeta **);
 static int remove_stale_os_release_copy(/*@notnull@*/ mportInstance *,
     /*@notnull@*/ mportPackageMeta *);
+static int purge_orphaned_rows(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
 
 #define GOTO_CLEANUP_ON_MPORT_ERR(expr)         \
 	do {                                    \
@@ -274,6 +275,40 @@ remove_stale_os_release_copy(mportInstance *mport, mportPackageMeta *pkg)
 	return ret;
 }
 
+/*
+ * Drop every registry row for a package that has no packages row.  A failed
+ * install or a partially completed delete can leave assets, depends,
+ * categories, conflicts or annotation rows behind; the fresh inserts made by
+ * the install collide with them (annotation has a primary key on pkg,tag).
+ * Only called when --force is set and no packages row exists, so no installed
+ * package is unregistered here.
+ */
+static int
+purge_orphaned_rows(mportInstance *mport, const char *pkg_name)
+{
+	static const char *const tables[] = { "assets", "depends", "categories", "conflicts",
+		"annotation" };
+	size_t i;
+
+	if (mport_db_do(mport->db, "BEGIN TRANSACTION") != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	for (i = 0; i < sizeof(tables) / sizeof(tables[0]); i++) {
+		if (mport_db_do(mport->db, "DELETE FROM %s WHERE pkg=%Q", tables[i], pkg_name) !=
+		    MPORT_OK) {
+			(void)mport_db_do(mport->db, "ROLLBACK");
+			RETURN_CURRENT_ERROR;
+		}
+	}
+
+	if (mport_db_do(mport->db, "COMMIT TRANSACTION") != MPORT_OK) {
+		(void)mport_db_do(mport->db, "ROLLBACK");
+		RETURN_CURRENT_ERROR;
+	}
+
+	return MPORT_OK;
+}
+
 static int
 mport_install_primative_impl(
     /*@notnull@*/ mportInstance *mport, /*@null@*/ const char *filename, int fd,
@@ -452,6 +487,15 @@ mport_install_primative_impl(
 				}
 				mport_pkgmeta_vec_free(already_installed);
 				already_installed = NULL;
+			} else if (mport->force) {
+				/* re-register: clear rows a failed install or delete left
+				 * behind, or the fresh inserts below fail */
+				if (purge_orphaned_rows(mport, pkg->name) != MPORT_OK) {
+					mport_call_msg_cb(mport, "Unable to install %s-%s: %s",
+					    pkg->name, pkg->version, mport_err_string());
+					ret = MPORT_ERR_FATAL;
+					break;
+				}
 			}
 		}
 
