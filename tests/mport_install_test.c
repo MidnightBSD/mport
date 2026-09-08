@@ -24,6 +24,8 @@
 #define PKG_PREFIX "/usr/local"
 #define PKG_FILE_REL "share/testpkg/catalog.mk"
 #define PKG_FILE_ABS PKG_PREFIX "/" PKG_FILE_REL
+#define PKG_DIR_REL "share/testpkg/emptydir"
+#define PKG_DIR_ABS PKG_PREFIX "/" PKG_DIR_REL
 
 static char test_root[PATH_MAX];
 
@@ -101,8 +103,9 @@ create_test_package(mportInstance *mport)
 	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage/usr/local"), 0755));
 	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage/usr/local/share"), 0755));
 	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage/usr/local/share/testpkg"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage" PKG_DIR_ABS), 0755));
 	write_file(test_path("/stage" PKG_FILE_ABS), "catalog\n");
-	write_file(test_path("/plist"), PKG_FILE_REL "\n");
+	write_file(test_path("/plist"), PKG_FILE_REL "\n@dir " PKG_DIR_REL "\n");
 
 	assetlist = mport_assetlist_new();
 	ATF_REQUIRE(assetlist != NULL);
@@ -248,6 +251,158 @@ ATF_TC_CLEANUP(install_same_os_release_is_rejected, tc)
 	cleanup_test_root();
 }
 
+/* Number of rows for the test package in a registry table other than packages. */
+static int
+count_rows(mportInstance *mport, const char *table)
+{
+	int count = -1;
+
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_count(
+		mport->db, &count, "SELECT COUNT(*) FROM %s WHERE pkg=%Q", table, PKG_NAME));
+
+	return count;
+}
+
+/*
+ * Remove the packages and assets rows but leave the rest, as a broken
+ * uninstall or a failed install can. The test package has no depends,
+ * categories or conflicts of its own, so seed a stale row in each of those
+ * tables too; the forced install must clear every one of them. The files stay
+ * on disk.
+ */
+static void
+orphan_registry_rows(mportInstance *mport)
+{
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_db_do(mport->db, "DELETE FROM packages WHERE pkg=%Q", PKG_NAME));
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_db_do(mport->db, "DELETE FROM assets WHERE pkg=%Q", PKG_NAME));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"INSERT INTO depends (pkg, depend_pkgname, depend_pkgversion, depend_port) VALUES (%Q, 'stale-dep', '1.0', 'misc/stale-dep')",
+		PKG_NAME));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "INSERT INTO categories (pkg, category) VALUES (%Q, 'stale')",
+		PKG_NAME));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"INSERT INTO conflicts (pkg, conflict_pkg, conflict_version) VALUES (%Q, 'stale-conflict', '*')",
+		PKG_NAME));
+
+	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
+	ATF_REQUIRE(count_rows(mport, "annotation") > 0);
+	ATF_REQUIRE_EQ(1, count_rows(mport, "depends"));
+	ATF_REQUIRE_EQ(1, count_rows(mport, "categories"));
+	ATF_REQUIRE_EQ(1, count_rows(mport, "conflicts"));
+}
+
+/*
+ * A forced install over files left behind by a bad uninstall must succeed and
+ * re-register the package, even when stale rows for it remain in the registry.
+ */
+ATF_TC_WITH_CLEANUP(force_reinstall_over_orphaned_rows);
+ATF_TC_HEAD(force_reinstall_over_orphaned_rows, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "forced install re-registers a package whose stale rows were left behind");
+}
+ATF_TC_BODY(force_reinstall_over_orphaned_rows, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	int annotations;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkgfile = create_test_package(mport);
+
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	annotations = count_rows(mport, "annotation");
+	orphan_registry_rows(mport);
+	ATF_REQUIRE_EQ(0, access(test_path(PKG_FILE_ABS), F_OK));
+
+	/* without -f the leftover file is reported as a conflict */
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+	ATF_REQUIRE(strstr(mport_err_string(), "use -f to overwrite") != NULL);
+	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
+
+	mport->force = true;
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	/* exactly the rows this package declares: the seeded stale rows are gone
+	 * and nothing was duplicated */
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+	ATF_REQUIRE(count_rows(mport, "assets") > 0);
+	ATF_REQUIRE_EQ(annotations, count_rows(mport, "annotation"));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "depends"));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "categories"));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "conflicts"));
+	ATF_REQUIRE_EQ(0, access(test_path(PKG_FILE_ABS), F_OK));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(force_reinstall_over_orphaned_rows, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * An install that fails while deploying assets must not leave a packages row
+ * behind, and the registry must stay usable for the next attempt.
+ */
+ATF_TC_WITH_CLEANUP(failed_install_registers_nothing);
+ATF_TC_HEAD(failed_install_registers_nothing, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "a failed install rolls back every registry row it added");
+}
+ATF_TC_BODY(failed_install_registers_nothing, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkgfile = create_test_package(mport);
+
+	/* a symlink where the package expects a directory makes the asset
+	 * loop fail after the packages row has been written */
+	ATF_REQUIRE_EQ(0, mkdir(test_path(PKG_PREFIX "/share"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path(PKG_PREFIX "/share/testpkg"), 0755));
+	ATF_REQUIRE_EQ(0, symlink("catalog.mk", test_path(PKG_DIR_ABS)));
+
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "assets"));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "annotation"));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "depends"));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "categories"));
+
+	/* the transaction was rolled back, so a corrected install goes through */
+	ATF_REQUIRE_EQ(0, unlink(test_path(PKG_DIR_ABS)));
+	mport->force = true;
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_EQ(0, access(test_path(PKG_FILE_ABS), F_OK));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(failed_install_registers_nothing, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 /*
  * MidnightBSD does not expose arbitrary descriptors through /dev/fd/N.
  * Verify package installation can retain the verified descriptor instead of
@@ -295,6 +450,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, install_replaces_previous_os_release);
 	ATF_TP_ADD_TC(tp, install_same_os_release_is_rejected);
 	ATF_TP_ADD_TC(tp, install_from_verified_fd);
+	ATF_TP_ADD_TC(tp, force_reinstall_over_orphaned_rows);
+	ATF_TP_ADD_TC(tp, failed_install_registers_nothing);
 
 	return atf_no_error();
 }
