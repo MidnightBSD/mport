@@ -264,8 +264,13 @@ count_rows(mportInstance *mport, const char *table)
 	return count;
 }
 
-/* Remove the packages and assets rows but leave the rest, as a broken
- * uninstall or a failed install can. The files stay on disk. */
+/*
+ * Remove the packages and assets rows but leave the rest, as a broken
+ * uninstall or a failed install can. The test package has no depends,
+ * categories or conflicts of its own, so seed a stale row in each of those
+ * tables too; the forced install must clear every one of them. The files stay
+ * on disk.
+ */
 static void
 orphan_registry_rows(mportInstance *mport)
 {
@@ -273,8 +278,23 @@ orphan_registry_rows(mportInstance *mport)
 	    MPORT_OK, mport_db_do(mport->db, "DELETE FROM packages WHERE pkg=%Q", PKG_NAME));
 	ATF_REQUIRE_EQ(
 	    MPORT_OK, mport_db_do(mport->db, "DELETE FROM assets WHERE pkg=%Q", PKG_NAME));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"INSERT INTO depends (pkg, depend_pkgname, depend_pkgversion, depend_port) VALUES (%Q, 'stale-dep', '1.0', 'misc/stale-dep')",
+		PKG_NAME));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "INSERT INTO categories (pkg, category) VALUES (%Q, 'stale')",
+		PKG_NAME));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"INSERT INTO conflicts (pkg, conflict_pkg, conflict_version) VALUES (%Q, 'stale-conflict', '*')",
+		PKG_NAME));
+
 	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
 	ATF_REQUIRE(count_rows(mport, "annotation") > 0);
+	ATF_REQUIRE_EQ(1, count_rows(mport, "depends"));
+	ATF_REQUIRE_EQ(1, count_rows(mport, "categories"));
+	ATF_REQUIRE_EQ(1, count_rows(mport, "conflicts"));
 }
 
 /*
@@ -314,9 +334,14 @@ ATF_TC_BODY(force_reinstall_over_orphaned_rows, tc)
 	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
 	    "%s", mport_err_string());
 
+	/* exactly the rows this package declares: the seeded stale rows are gone
+	 * and nothing was duplicated */
 	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
 	ATF_REQUIRE(count_rows(mport, "assets") > 0);
 	ATF_REQUIRE_EQ(annotations, count_rows(mport, "annotation"));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "depends"));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "categories"));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "conflicts"));
 	ATF_REQUIRE_EQ(0, access(test_path(PKG_FILE_ABS), F_OK));
 
 	mport_instance_free(mport);
