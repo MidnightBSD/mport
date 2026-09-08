@@ -419,37 +419,49 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	if (run_pkg_deinstall(mport, pack, "POST-DEINSTALL") != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	if (mport_db_do(mport->db, "BEGIN TRANSACTION") != MPORT_OK)
-		RETURN_CURRENT_ERROR;
-
-	if (mport_db_do(mport->db, "DELETE FROM assets WHERE pkg=%Q", pack->name) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
-
-	if (mport_db_do(mport->db, "DELETE FROM depends WHERE pkg=%Q", pack->name) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
-
-	if (mport_db_do(mport->db, "DELETE FROM packages WHERE pkg=%Q", pack->name) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
-
-	if (mport_db_do(mport->db, "DELETE FROM categories WHERE pkg=%Q", pack->name) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
-
-	if (mport_db_do(mport->db, "DELETE FROM conflicts WHERE pkg=%Q", pack->name) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
-
-	if (mport_db_do(mport->db, "DELETE FROM annotation WHERE pkg=%Q", pack->name) != MPORT_OK)
-		RETURN_CURRENT_ERROR;
-
+	/* The message is read from the infra directory, so show it before that
+	 * directory goes away, and keep it out of the transaction. */
 	if (mport_pkg_message_display(mport, pack) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	if (delete_pkg_infra(mport, pack) != MPORT_OK)
+	/*
+	 * Unregister the package atomically. IMMEDIATE takes the write lock up
+	 * front so another mport process cannot make a later statement fail
+	 * with SQLITE_BUSY halfway through. Any failure rolls back: a partly
+	 * deleted package left in an open transaction would be committed by
+	 * the next package processed in this run.
+	 */
+	if (mport_db_do(mport->db, "BEGIN IMMEDIATE TRANSACTION") != MPORT_OK)
 		RETURN_CURRENT_ERROR;
+
+	if (mport_db_do(mport->db, "DELETE FROM assets WHERE pkg=%Q", pack->name) != MPORT_OK)
+		goto rollback;
+
+	if (mport_db_do(mport->db, "DELETE FROM depends WHERE pkg=%Q", pack->name) != MPORT_OK)
+		goto rollback;
+
+	if (mport_db_do(mport->db, "DELETE FROM packages WHERE pkg=%Q", pack->name) != MPORT_OK)
+		goto rollback;
+
+	if (mport_db_do(mport->db, "DELETE FROM categories WHERE pkg=%Q", pack->name) != MPORT_OK)
+		goto rollback;
+
+	if (mport_db_do(mport->db, "DELETE FROM conflicts WHERE pkg=%Q", pack->name) != MPORT_OK)
+		goto rollback;
+
+	if (mport_db_do(mport->db, "DELETE FROM annotation WHERE pkg=%Q", pack->name) != MPORT_OK)
+		goto rollback;
 
 	if (mport_db_do(mport->db, "COMMIT TRANSACTION") != MPORT_OK)
-		RETURN_CURRENT_ERROR;
+		goto rollback;
 
 	(mport->progress_step_cb)(++current, total, "DB Updated");
+
+	/* only bookkeeping files remain; the package is already unregistered */
+	if (delete_pkg_infra(mport, pack) != MPORT_OK) {
+		(mport->progress_free_cb)();
+		RETURN_CURRENT_ERROR;
+	}
 
 	(mport->progress_free_cb)();
 
@@ -457,6 +469,12 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	syslog(LOG_NOTICE, "%s-%s deinstalled", pack->name, pack->version);
 
 	return (MPORT_OK);
+
+rollback:
+	/* sqlite3_exec directly so the rollback cannot clobber the error */
+	(void)sqlite3_exec(mport->db, "ROLLBACK", NULL, NULL, NULL);
+	(mport->progress_free_cb)();
+	RETURN_CURRENT_ERROR;
 }
 
 static void
