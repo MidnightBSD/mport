@@ -266,7 +266,7 @@ mport_recompute_checksums(mportInstance *mport, mportPackageMeta *pack)
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (mport_db_do(mport->db, "BEGIN TRANSACTION") != MPORT_OK) {
+	if (mport_db_do(mport->db, "BEGIN IMMEDIATE TRANSACTION") != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		sqlite3_finalize(update_stmt);
 		RETURN_CURRENT_ERROR;

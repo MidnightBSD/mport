@@ -404,6 +404,69 @@ ATF_TC_CLEANUP(failed_install_registers_nothing, tc)
 }
 
 /*
+ * A delete that fails partway through unregistering the package must roll
+ * back, leaving the package fully registered and the connection free for the
+ * next package in the same run.
+ */
+ATF_TC_WITH_CLEANUP(failed_delete_rolls_back);
+ATF_TC_HEAD(failed_delete_rolls_back, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "a delete that fails inside its transaction leaves the registry intact");
+}
+ATF_TC_BODY(failed_delete_rolls_back, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta **installed = NULL;
+	const char *pkgfile;
+	int assets;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkgfile = create_test_package(mport);
+
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	assets = count_rows(mport, "assets");
+	ATF_REQUIRE(assets > 0);
+
+	/* annotation is the last table the delete touches, so every other
+	 * table has already been cleared when this fires */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"CREATE TRIGGER fail_delete BEFORE DELETE ON annotation BEGIN SELECT RAISE(ABORT, 'forced failure'); END"));
+
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_pkgmeta_search_master(mport, &installed, "pkg=%Q", PKG_NAME));
+	ATF_REQUIRE(installed != NULL && installed[0] != NULL);
+	ATF_REQUIRE(mport_delete_primative(mport, installed[0], 1) != MPORT_OK);
+	ATF_REQUIRE(strstr(mport_err_string(), "forced failure") != NULL);
+
+	/* nothing was unregistered */
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_EQ(assets, count_rows(mport, "assets"));
+	ATF_REQUIRE(count_rows(mport, "annotation") > 0);
+
+	/* the transaction was rolled back, so the next delete can begin one */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_db_do(mport->db, "DROP TRIGGER fail_delete"));
+	ATF_REQUIRE_MSG(
+	    mport_delete_primative(mport, installed[0], 1) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "assets"));
+	ATF_REQUIRE_EQ(0, count_rows(mport, "annotation"));
+
+	mport_pkgmeta_vec_free(installed);
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(failed_delete_rolls_back, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
  * MidnightBSD does not expose arbitrary descriptors through /dev/fd/N.
  * Verify package installation can retain the verified descriptor instead of
  * reopening that unavailable path.
@@ -452,6 +515,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, install_from_verified_fd);
 	ATF_TP_ADD_TC(tp, force_reinstall_over_orphaned_rows);
 	ATF_TP_ADD_TC(tp, failed_install_registers_nothing);
+	ATF_TP_ADD_TC(tp, failed_delete_rolls_back);
 
 	return atf_no_error();
 }

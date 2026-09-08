@@ -290,7 +290,7 @@ purge_orphaned_rows(mportInstance *mport, const char *pkg_name)
 		"annotation" };
 	size_t i;
 
-	if (mport_db_do(mport->db, "BEGIN TRANSACTION") != MPORT_OK)
+	if (mport_db_do(mport->db, "BEGIN IMMEDIATE TRANSACTION") != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	for (i = 0; i < sizeof(tables) / sizeof(tables[0]); i++) {
