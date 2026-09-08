@@ -472,6 +472,68 @@ ATF_TC_CLEANUP(failed_delete_rolls_back, tc)
 }
 
 /*
+ * A schema upgrade that fails part way must leave the registry at the version
+ * it started from with none of the earlier steps applied, and must leave the
+ * connection usable so a retry can succeed.
+ */
+ATF_TC_WITH_CLEANUP(failed_schema_upgrade_rolls_back);
+ATF_TC_HEAD(failed_schema_upgrade_rolls_back, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "a failed schema upgrade rolls back every step");
+}
+ATF_TC_BODY(failed_schema_upgrade_rolls_back, tc)
+{
+	mportInstance *mport;
+	int settings = -1;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	ATF_REQUIRE_EQ(MPORT_MASTER_VERSION, mport_get_database_version(mport->db));
+
+	/* pretend the registry is at schema 11 and lacks the rows step 11to12 adds */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "DELETE FROM settings WHERE name IN (%Q, %Q)",
+		MPORT_SETTING_HANDLE_RC_SCRIPTS, MPORT_SETTING_REPO_AUTOUPDATE));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_db_do(mport->db, "PRAGMA user_version=11"));
+	ATF_REQUIRE_EQ(11, mport_get_database_version(mport->db));
+
+	/* step 12to13 creates this table, so its presence makes that step fail
+	 * after 11to12 has already run */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "CREATE TABLE temp_settings (rowid int, name text, val text)"));
+
+	ATF_REQUIRE(mport_upgrade_master_schema(mport->db, 11) != MPORT_OK);
+
+	/* version and the rows added by the earlier step are both rolled back */
+	ATF_REQUIRE_EQ(11, mport_get_database_version(mport->db));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_count(mport->db, &settings,
+		"SELECT COUNT(*) FROM settings WHERE name IN (%Q, %Q)",
+		MPORT_SETTING_HANDLE_RC_SCRIPTS, MPORT_SETTING_REPO_AUTOUPDATE));
+	ATF_REQUIRE_EQ(0, settings);
+
+	/* no transaction is left open, so a retry goes through */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_db_do(mport->db, "DROP TABLE temp_settings"));
+	ATF_REQUIRE_MSG(
+	    mport_upgrade_master_schema(mport->db, 11) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(MPORT_MASTER_VERSION, mport_get_database_version(mport->db));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_count(mport->db, &settings,
+		"SELECT COUNT(*) FROM settings WHERE name IN (%Q, %Q)",
+		MPORT_SETTING_HANDLE_RC_SCRIPTS, MPORT_SETTING_REPO_AUTOUPDATE));
+	ATF_REQUIRE_EQ(2, settings);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(failed_schema_upgrade_rolls_back, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
  * MidnightBSD does not expose arbitrary descriptors through /dev/fd/N.
  * Verify package installation can retain the verified descriptor instead of
  * reopening that unavailable path.
@@ -522,6 +584,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, force_reinstall_over_orphaned_rows);
 	ATF_TP_ADD_TC(tp, failed_install_registers_nothing);
 	ATF_TP_ADD_TC(tp, failed_delete_rolls_back);
+	ATF_TP_ADD_TC(tp, failed_schema_upgrade_rolls_back);
 
 	return atf_no_error();
 }
