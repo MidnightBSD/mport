@@ -171,6 +171,7 @@ count_installed(mportInstance *mport, /*@out@*/ char *os_release, size_t os_rele
 ATF_TC_WITH_CLEANUP(install_replaces_previous_os_release);
 ATF_TC_HEAD(install_replaces_previous_os_release, tc)
 {
+	atf_tc_set_md_var(tc, "require.user", "root");
 	atf_tc_set_md_var(
 	    tc, "descr", "installing over a copy registered under an older os_release replaces it");
 }
@@ -220,6 +221,7 @@ ATF_TC_CLEANUP(install_replaces_previous_os_release, tc)
 ATF_TC_WITH_CLEANUP(install_same_os_release_is_rejected);
 ATF_TC_HEAD(install_same_os_release_is_rejected, tc)
 {
+	atf_tc_set_md_var(tc, "require.user", "root");
 	atf_tc_set_md_var(
 	    tc, "descr", "a package installed under the current os_release is left alone");
 }
@@ -304,6 +306,7 @@ orphan_registry_rows(mportInstance *mport)
 ATF_TC_WITH_CLEANUP(force_reinstall_over_orphaned_rows);
 ATF_TC_HEAD(force_reinstall_over_orphaned_rows, tc)
 {
+	atf_tc_set_md_var(tc, "require.user", "root");
 	atf_tc_set_md_var(
 	    tc, "descr", "forced install re-registers a package whose stale rows were left behind");
 }
@@ -360,6 +363,7 @@ ATF_TC_CLEANUP(force_reinstall_over_orphaned_rows, tc)
 ATF_TC_WITH_CLEANUP(failed_install_registers_nothing);
 ATF_TC_HEAD(failed_install_registers_nothing, tc)
 {
+	atf_tc_set_md_var(tc, "require.user", "root");
 	atf_tc_set_md_var(tc, "descr", "a failed install rolls back every registry row it added");
 }
 ATF_TC_BODY(failed_install_registers_nothing, tc)
@@ -411,6 +415,7 @@ ATF_TC_CLEANUP(failed_install_registers_nothing, tc)
 ATF_TC_WITH_CLEANUP(failed_delete_rolls_back);
 ATF_TC_HEAD(failed_delete_rolls_back, tc)
 {
+	atf_tc_set_md_var(tc, "require.user", "root");
 	atf_tc_set_md_var(
 	    tc, "descr", "a delete that fails inside its transaction leaves the registry intact");
 }
@@ -474,6 +479,7 @@ ATF_TC_CLEANUP(failed_delete_rolls_back, tc)
 ATF_TC_WITH_CLEANUP(install_from_verified_fd);
 ATF_TC_HEAD(install_from_verified_fd, tc)
 {
+	atf_tc_set_md_var(tc, "require.user", "root");
 	atf_tc_set_md_var(tc, "descr", "installs a hash-verified package from its open descriptor");
 }
 ATF_TC_BODY(install_from_verified_fd, tc)
