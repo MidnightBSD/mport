@@ -95,11 +95,22 @@ mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPac
 	if ((error_code = create_stub_db(mport, &db, tmpdir)) != MPORT_OK)
 		goto CLEANUP;
 
+	/*
+	 * The stub database is rebuilt from scratch on every run and discarded
+	 * on failure, so batch every insert into one transaction rather than
+	 * paying an autocommit journal sync per asset row.
+	 */
+	if ((error_code = mport_db_do(db, "BEGIN TRANSACTION")) != MPORT_OK)
+		goto DBFAIL;
+
 	if ((error_code = insert_assetlist(db, assetlist, pack, extra)) != MPORT_OK)
-		goto CLEANUP;
+		goto DBFAIL;
 
 	if ((error_code = insert_meta(mport, db, pack, extra)) != MPORT_OK)
-		goto CLEANUP;
+		goto DBFAIL;
+
+	if ((error_code = mport_db_do(db, "COMMIT TRANSACTION")) != MPORT_OK)
+		goto DBFAIL;
 
 	if (sqlite3_close(db) != SQLITE_OK) {
 		error_code = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
@@ -110,6 +121,15 @@ mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPac
 	    assetlist, pack, extra, tmpdir); /* cleanup will run next which is the desired action */
 
 CLEANUP:
+	clean_up(tmpdir);
+
+	return error_code;
+
+DBFAIL:
+	/* sqlite3_exec directly so the rollback cannot clobber the error; a no-op if
+	 * the transaction never began or was already committed */
+	(void)sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
+	(void)sqlite3_close(db);
 	clean_up(tmpdir);
 
 	return error_code;
