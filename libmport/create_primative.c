@@ -52,6 +52,7 @@ static int insert_assetlist(sqlite3 *, mportAssetList *, mportPackageMeta *, mpo
 static int insert_meta(mportInstance *, sqlite3 *, mportPackageMeta *, mportCreateExtras *);
 
 static int insert_depends(sqlite3 *, mportPackageMeta *, mportCreateExtras *);
+static int insert_shlibs(sqlite3 *, mportPackageMeta *);
 
 static int insert_conflicts(sqlite3 *, mportPackageMeta *, mportCreateExtras *);
 
@@ -175,15 +176,21 @@ insert_assetlist(
 	char hash[65];
 	char file[FILENAME_MAX];
 	char cwd[FILENAME_MAX];
+	char installed[FILENAME_MAX];
 	struct stat st;
-	int shlibs_provided = 0;
+	mportShlibScan *scan = NULL;
 	int error_code = MPORT_OK;
 
 	strlcpy(cwd, extra->sourcedir, FILENAME_MAX);
 	strlcat(cwd, pack->prefix, FILENAME_MAX);
 
-	if (mport_db_prepare(db, &stmnt, sql) != MPORT_OK)
+	if ((scan = mport_shlib_scan_new()) == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+
+	if (mport_db_prepare(db, &stmnt, sql) != MPORT_OK) {
+		mport_shlib_scan_free(scan);
 		RETURN_CURRENT_ERROR;
+	}
 
 	/* STAILQ_FOREACH keeps the iterator non-null in the body; cppcheck can't
 	 * model the macro. */
@@ -280,11 +287,19 @@ insert_assetlist(
 				}
 
 				pack->flatsize += st.st_size;
-
-				if (mport_elf_is_shared_library(file))
-					shlibs_provided++;
 			} else {
 				sqlite3_bind_null(stmnt, 4);
+			}
+
+			/*
+			 * Where the file lands once installed: the staged path with
+			 * the stage directory removed.  The provide-path filter in
+			 * the scan compares its directory with SHLIB_PROVIDE_PATHS_*.
+			 */
+			(void)strlcpy(installed, file + strlen(extra->sourcedir), sizeof(installed));
+			if (mport_shlib_scan_file(scan, file, installed) != MPORT_OK) {
+				error_code = mport_err_code();
+				goto done;
 			}
 		} else {
 			if (sqlite3_bind_null(stmnt, 4) != SQLITE_OK) {
@@ -304,20 +319,52 @@ insert_assetlist(
 	}
 
 	/*
-	 * A package that ships no shared library cannot break anything else
-	 * through a library change, which is what no_provide_shlib records.
-	 * The caller may already have set it (mport.create -S, for ports that
-	 * bundle private libraries) and that stands; the scan only ever adds
-	 * the "provides none" fact.
+	 * Settle what the package provides and requires.  no_provide_shlib is
+	 * set when it provides nothing; a value the caller already set
+	 * (mport.create -S, for ports that bundle private libraries) stands.
 	 */
-	if (shlibs_provided == 0)
-		pack->no_provide_shlib = 1;
+	error_code = mport_shlib_scan_finish(scan, pack);
 	/* cppcheck-suppress-end nullPointer */
 
 done:
+	mport_shlib_scan_free(scan);
 	sqlite3_finalize(stmnt);
 
 	return error_code;
+}
+
+/* the lists settled by the asset walk, one row per soname */
+static int
+insert_shlibs(sqlite3 *db, mportPackageMeta *pack)
+{
+	static const char *const sql[] = {
+		"INSERT INTO shlibs_provided (pkg, name) VALUES (?,?)",
+		"INSERT INTO shlibs_required (pkg, name) VALUES (?,?)",
+	};
+	stringlist_t *lists[] = { &pack->shlibs_provided, &pack->shlibs_required };
+
+	for (size_t i = 0; i < 2; i++) {
+		sqlite3_stmt *stmnt = NULL;
+
+		if (tll_length(*lists[i]) == 0)
+			continue;
+		if (mport_db_prepare(db, &stmnt, sql[i]) != MPORT_OK)
+			RETURN_CURRENT_ERROR;
+		tll_foreach(*lists[i], it) {
+			if (sqlite3_bind_text(stmnt, 1, pack->name, -1, SQLITE_STATIC) != SQLITE_OK ||
+			    sqlite3_bind_text(stmnt, 2, it->item, -1, SQLITE_STATIC) != SQLITE_OK ||
+			    sqlite3_step(stmnt) != SQLITE_DONE) {
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
+				sqlite3_finalize(stmnt);
+				RETURN_CURRENT_ERROR;
+			}
+			sqlite3_clear_bindings(stmnt);
+			sqlite3_reset(stmnt);
+		}
+		sqlite3_finalize(stmnt);
+	}
+
+	return MPORT_OK;
 }
 
 static int
@@ -417,6 +464,8 @@ done:
 		return error_code;
 
 	if (insert_depends(db, pack, extra) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+	if (insert_shlibs(db, pack) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 	if (insert_conflicts(db, pack, extra) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
