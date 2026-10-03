@@ -107,6 +107,8 @@ static int lock(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
 static int unlock(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
 
 static int which(/*@notnull@*/ mportInstance *, /*@null@*/ const char *, bool);
+static int info_shlibs(/*@notnull@*/ mportInstance *, /*@null@*/ const char *, int, int);
+static int shlib(/*@notnull@*/ mportInstance *, /*@null@*/ const char *, bool, bool);
 
 static int audit(/*@notnull@*/ mportInstance *, bool);
 
@@ -646,12 +648,20 @@ main(int argc, char *argv[])
 		int local_argc = argc;
 		char *const *local_argv = argv;
 		int eflag = 0;
+		int bflag = 0;
+		int Bflag = 0;
 
 		if (local_argc > 1) {
 			int ch2;
 			reset_getopt();
-			while ((ch2 = getopt(local_argc, local_argv, "e")) != -1) {
+			while ((ch2 = getopt(local_argc, local_argv, "Bbe")) != -1) {
 				switch (ch2) {
+				case 'B':
+					Bflag = 1;
+					break;
+				case 'b':
+					bflag = 1;
+					break;
 				case 'e':
 					eflag = 1;
 					break;
@@ -676,10 +686,44 @@ main(int argc, char *argv[])
 			} else {
 				resultCode = 1;
 			}
+		} else if (bflag || Bflag) {
+			resultCode = info_shlibs(mport, local_argv[0], bflag, Bflag);
 		} else {
 			loadIndex(mport);
 			resultCode = info(mport, local_argv[0]);
 		}
+	} else if (!strcmp(cmd, "shlib")) {
+		int local_argc = argc;
+		char *const *local_argv = argv;
+		int Pflag = 0;
+		int Rflag = 0;
+
+		if (local_argc > 1) {
+			int ch2;
+			reset_getopt();
+			while ((ch2 = getopt(local_argc, local_argv, "PRq")) != -1) {
+				switch (ch2) {
+				case 'P':
+					Pflag = 1;
+					break;
+				case 'R':
+					Rflag = 1;
+					break;
+				case 'q':
+					mport->verbosity = MPORT_VQUIET;
+					break;
+				}
+			}
+			local_argc -= optind;
+			local_argv += optind;
+		}
+
+		if (local_argc < 1 || (Pflag && Rflag)) {
+			mport_instance_free(mport);
+			usage();
+		}
+
+		resultCode = shlib(mport, local_argv[0], Pflag || !Rflag, Rflag || !Pflag);
 	} else if (!strcmp(cmd, "index")) {
 		resultCode = mport_index_get(mport);
 		if (resultCode != MPORT_OK) {
@@ -826,6 +870,18 @@ main(int argc, char *argv[])
 				    nmissing == 1 ? "y" : "ies");
 				resultCode = MPORT_ERR_WARN;
 			}
+
+			int nlibs = mport_check_missing_shlibs(mport);
+			if (nlibs < 0) {
+				warnx("%s", mport_err_string());
+				resultCode = mport_err_code();
+			} else if (nlibs == 0) {
+				printf("All required shared libraries are provided.\n");
+			} else {
+				printf("%d missing shared librar%s found.\n", nlibs,
+				    nlibs == 1 ? "y" : "ies");
+				resultCode = MPORT_ERR_WARN;
+			}
 		}
 
 		if (rflag) {
@@ -951,14 +1007,15 @@ usage(void)
 	    "    autoremove                  Remove automatically installed packages\n"
 	    "    clean                       Clean package cache\n"
 	    "    verify [-d] [-r] [package]       Verify installed packages\n"
-	    "      -d                            Check for missing dependencies\n"
+	    "      -d                            Check for missing dependencies and shared libraries\n"
 	    "    deleteall                   Remove all installed packages\n\n"
 	    "  Information:\n"
 	    "    search <query>              Search for packages\n"
 	    "    query [-aCgix] [-e expr] <format> [pattern ...]\n"
-	    "    info [-e] <package>         Display package information\n"
+	    "    info [-bBe] <package>       Display package information\n"
 	    "    list [updates|prime]        List installed packages\n"
 	    "    which [-qo] <file>          Find which package provides a file\n"
+	    "    shlib [-q] [-P|-R] <library>  Show which packages provide or require a library\n"
 	    "    stats                       Show package statistics\n\n"
 	    "  Index and Repository:\n"
 	    "    index                       Update package index\n"
@@ -1258,6 +1315,113 @@ info(/*@notnull@*/ mportInstance *mport, /*@null@*/ const char *packageName)
 	free(out);
 
 	return (0);
+}
+
+/* mport info -b / -B: the registered shared library lists of a package */
+static int
+info_shlibs(
+    /*@notnull@*/ mportInstance *mport, /*@null@*/ const char *packageName, int provided,
+    int required)
+{
+	mportPackageMeta **packs = NULL;
+	stringlist_t prov = tll_init();
+	stringlist_t req = tll_init();
+
+	if (packageName == NULL) {
+		warnx("%s", "Specify package name");
+		return (1);
+	}
+
+	if (mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", packageName) != MPORT_OK) {
+		warnx("%s", mport_err_string());
+		return (1);
+	}
+	if (packs == NULL || packs[0] == NULL) {
+		warnx("%s is not installed", packageName);
+		mport_pkgmeta_vec_free(packs);
+		return (1);
+	}
+
+	if (mport_shlibs_get(mport, packs[0]->name, provided ? &prov : NULL,
+		required ? &req : NULL) != MPORT_OK) {
+		warnx("%s", mport_err_string());
+		mport_pkgmeta_vec_free(packs);
+		return (1);
+	}
+
+	mport_drop_privileges();
+
+	if (mport->verbosity != MPORT_VQUIET)
+		printf("%s-%s:\n", packs[0]->name, packs[0]->version);
+	if (provided) {
+		if (mport->verbosity != MPORT_VQUIET)
+			printf("Provided shared libraries:\n");
+		tll_foreach(prov, it)
+			printf("%s%s\n", mport->verbosity != MPORT_VQUIET ? "\t" : "", it->item);
+	}
+	if (required) {
+		if (mport->verbosity != MPORT_VQUIET)
+			printf("Required shared libraries:\n");
+		tll_foreach(req, it)
+			printf("%s%s\n", mport->verbosity != MPORT_VQUIET ? "\t" : "", it->item);
+	}
+
+	tll_free_and_free(prov, free);
+	tll_free_and_free(req, free);
+	mport_pkgmeta_vec_free(packs);
+
+	return (0);
+}
+
+/* mport shlib: who provides or requires a library */
+static int
+shlib(/*@notnull@*/ mportInstance *mport, /*@null@*/ const char *library, bool providers,
+    bool requirers)
+{
+	mportPackageMeta **packs = NULL;
+	int ret = 0;
+
+	if (library == NULL) {
+		warnx("%s", "Specify a library name");
+		return (1);
+	}
+
+	mport_drop_privileges();
+
+	if (providers) {
+		if (mport_shlib_providers(mport, library, &packs) != MPORT_OK) {
+			warnx("%s", mport_err_string());
+			return (1);
+		}
+		if (mport->verbosity != MPORT_VQUIET)
+			printf("%s is provided by:\n", library);
+		for (int i = 0; packs != NULL && packs[i] != NULL; i++)
+			printf("%s%s-%s\n", mport->verbosity != MPORT_VQUIET ? "\t" : "",
+			    packs[i]->name, packs[i]->version);
+		if (packs == NULL && mport->verbosity != MPORT_VQUIET)
+			printf("\t%s\n",
+			    mport_shlib_in_base(library) ? "the base system" : "no installed package");
+		mport_pkgmeta_vec_free(packs);
+		packs = NULL;
+	}
+
+	if (requirers) {
+		if (mport_shlib_requirers(mport, library, &packs) != MPORT_OK) {
+			warnx("%s", mport_err_string());
+			return (1);
+		}
+		if (mport->verbosity != MPORT_VQUIET)
+			printf("%s is required by:\n", library);
+		for (int i = 0; packs != NULL && packs[i] != NULL; i++)
+			printf("%s%s-%s\n", mport->verbosity != MPORT_VQUIET ? "\t" : "",
+			    packs[i]->name, packs[i]->version);
+		if (packs == NULL && mport->verbosity != MPORT_VQUIET)
+			printf("\tno installed package\n");
+		mport_pkgmeta_vec_free(packs);
+		packs = NULL;
+	}
+
+	return (ret);
 }
 
 static int

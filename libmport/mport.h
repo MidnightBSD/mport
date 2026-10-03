@@ -403,6 +403,13 @@ int mport_verify_package(mportInstance *, mportPackageMeta *);
 int mport_recompute_checksums(mportInstance *, mportPackageMeta *);
 int mport_check_missing_depends(mportInstance *);
 
+/* shared library registry (shlib.c) */
+int mport_shlibs_get(mportInstance *, const char *, stringlist_t *, stringlist_t *);
+int mport_shlib_providers(mportInstance *, const char *, mportPackageMeta ***);
+int mport_shlib_requirers(mportInstance *, const char *, mportPackageMeta ***);
+bool mport_shlib_in_base(const char *);
+int mport_check_missing_shlibs(mportInstance *);
+
 /* version comparing */
 int mport_version_cmp(const char *, const char *);
 

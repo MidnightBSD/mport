@@ -127,6 +127,9 @@
 .Pp
 .Nm
 .Cm info
+.Op Fl e
+.Op Fl b
+.Op Fl B
 .Ar package
 .Pp
 .Nm
@@ -189,6 +192,7 @@
 .Pp
 .Nm
 .Cm verify
+.Op Fl d
 .Op Fl r
 .Op Ar package ...
 .Pp
@@ -197,6 +201,12 @@
 .Fl t
 .Ar version1
 .Ar version2
+.Pp
+.Nm
+.Cm shlib
+.Op Fl q
+.Op Fl P | Fl R
+.Ar library
 .Pp
 .Nm
 .Cm which
@@ -292,10 +302,15 @@ alone, and
 .Fl f
 never applies to them.
 A dependency installed for a previous release is also left alone when it
-provides no shared libraries, since nothing links against it; see
-.Fl S
-in
+provides no shared libraries, since nothing links against it, or when every
+shared library it provides is also provided by a package built for the
+running release, since the run-time linker finds the current copy; see
 .Xr mport.create 1 .
+.Pp
+After the dependency check, a warning names each shared library the package
+needs that no installed package provides and the base system does not ship.
+It is a warning rather than a refusal because packages registered before
+shared libraries were recorded have no provided list.
 With
 .Fl l ,
 only the named package files are installed and no dependency package files
@@ -370,8 +385,20 @@ Import package metadata or a package list from
 .It Cm index
 Refresh the package index immediately instead of waiting for the automatic
 update interval.
-.It Cm info Ar package
+.It Cm info Oo Fl e Oc Oo Fl b Oc Oo Fl B Oc Ar package
 Display detailed information about an installed package or an indexed package.
+With
+.Fl e ,
+exit with status 0 if the package is installed and 1 otherwise, printing
+nothing.
+With
+.Fl b ,
+list the shared libraries the installed package provides; with
+.Fl B ,
+the shared libraries it requires.
+Both lists are recorded when the package is built; see
+.Xr mport.create 1 .
+A package built before that was recorded has empty lists.
 .It Cm install Op Fl A Op Fl M Op Fl y Ar package ...
 Fetch and install one or more packages from the configured repository.
 With
@@ -560,12 +587,19 @@ Upgrade all installed packages to the newest available versions.
 Packages that are still registered for an older MidnightBSD release are
 updated first, lowest-level dependencies before the packages that use them,
 so that nothing is upgraded against libraries from the previous release.
+A package that links against a shared library another package provides is
+ordered after that package whether or not the port declared the dependency.
 A package from an older release for which the repository has no package is
 reported and left in place.
 The remaining packages are then upgraded in dependency order.
-.It Cm verify Op Fl r Op Ar package ...
+.It Cm verify Oo Fl d Oc Oo Fl r Oc Op Ar package ...
 Verify that installed package files have not been deleted or modified.
 If package names are provided, verify only those packages.
+With
+.Fl d ,
+report installed packages whose recorded dependencies are not installed,
+and recorded shared library requirements that no installed package provides
+and the base system does not ship.
 With
 .Fl r ,
 recompute and store checksums for the named packages.
@@ -582,6 +616,29 @@ if they are equal, or
 if
 .Ar version1
 is newer.
+.It Cm shlib Oo Fl q Oc Oo Fl P | Fl R Oc Ar library
+Show which installed packages provide
+.Ar library
+and which require it, by the shared library records made when each package
+was built.
+.Ar library
+is a soname such as
+.Dq libfoo.so.1 ,
+optionally with a path, which is ignored, and optionally with the
+.Dq :32
+or
+.Dq :Linux
+suffix used for compatibility objects.
+With
+.Fl P ,
+show only providers; with
+.Fl R ,
+only packages that require it.
+With
+.Fl q ,
+print only package names and versions.
+A library the base system ships is reported as such when nothing provides
+it.
 .It Cm which Op Fl q Op Fl o Ar path
 Show which installed package owns
 .Ar path .
