@@ -297,6 +297,8 @@ mport_generate_stub_schema(mportInstance *mport, sqlite3 *db)
 	RUN_SQL(db,
 	    "CREATE TABLE depends (pkg text NOT NULL, depend_pkgname text NOT NULL, depend_pkgversion text, depend_port text NOT NULL)");
 	RUN_SQL(db, "CREATE TABLE categories (pkg text NOT NULL, category text NOT NULL)");
+	RUN_SQL(db, "CREATE TABLE shlibs_provided (pkg text NOT NULL, name text NOT NULL)");
+	RUN_SQL(db, "CREATE TABLE shlibs_required (pkg text NOT NULL, name text NOT NULL)");
 
 	return (MPORT_OK);
 }

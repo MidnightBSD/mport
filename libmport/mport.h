@@ -239,6 +239,8 @@ typedef struct {
 	stringlist_t lua_scripts[MPORT_NUM_LUA_SCRIPTS]; // not populated from package table
 	stringlist_t conflicts; // not populated from package table
 	// TODO: conflicts should be a structure
+	stringlist_t shlibs_provided; // sonames this package installs for others
+	stringlist_t shlibs_required; // sonames its objects need from elsewhere
 } __attribute__((aligned(16))) mportPackageMeta;
 
 int mport_asset_get_assetlist(mportInstance *, mportPackageMeta *, mportAssetList **);

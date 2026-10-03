@@ -1,0 +1,774 @@
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2026 Lucas Holt
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
+ * Shared library analysis at package creation.
+ *
+ * Every regular file staged for the package is read as ELF.  An object with
+ * DT_SONAME provides that library; every DT_NEEDED is a library the package
+ * requires.  The rules follow FreeBSD pkg(8) so the same port knobs behave
+ * the same way:
+ *
+ *   SHLIB_PROVIDE_PATHS_NATIVE, _COMPAT_32, _COMPAT_LINUX, _COMPAT_LINUX_32
+ *       Comma separated directories.  A library counts as provided only
+ *       when the directory it is installed into is one of them (chosen by
+ *       the object's OS and word size).  An unset or empty list disables
+ *       the filter.  Libraries elsewhere are private to the package and
+ *       still cancel the package's own requirements.
+ *   SHLIB_PROVIDE_IGNORE_GLOB, SHLIB_PROVIDE_IGNORE_REGEX
+ *   SHLIB_REQUIRE_IGNORE_GLOB, SHLIB_REQUIRE_IGNORE_REGEX
+ *       Comma separated patterns dropped from the respective list.
+ *
+ * Names carry the same suffixes pkg uses for non-native objects: ":32",
+ * ":Linux" and ":Linux:32".  The ports framework exports these variables
+ * in PKG_ENV when it runs mport.create(1).
+ */
+
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <fnmatch.h>
+#include <gelf.h>
+#include <libelf.h>
+#include <regex.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "mport.h"
+#include "mport_private.h"
+
+/* a compiled SHLIB_*_IGNORE_REGEX pattern */
+struct shlib_regex {
+	regex_t re;
+	struct shlib_regex *next;
+};
+
+struct mport_shlib_scan {
+	stringlist_t paths[MPORT_SHLIB_NFLAGS];
+	stringlist_t provide_ignore_glob;
+	stringlist_t require_ignore_glob;
+	/*@null@*/ struct shlib_regex *provide_ignore_regex;
+	/*@null@*/ struct shlib_regex *require_ignore_regex;
+
+	stringlist_t provided; /* regular files in a provide path */
+	stringlist_t maybe_provided; /* symlinks in a provide path */
+	stringlist_t internal; /* sonames found outside the provide paths */
+	stringlist_t required; /* every DT_NEEDED seen */
+	stringlist_t basenames; /* of every regular file, for the self-check */
+};
+
+/* comma separated, surrounding blanks dropped; a pattern cannot contain a comma */
+static int
+split_env_list(const char *name, stringlist_t *out)
+{
+	const char *value = getenv(name);
+	char *copy, *tok, *save;
+	char *item;
+	size_t len;
+
+	if (value == NULL || value[0] == '\0')
+		return MPORT_OK;
+	if ((copy = strdup(value)) == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+	for (tok = strtok_r(copy, ",", &save); tok != NULL; tok = strtok_r(NULL, ",", &save)) {
+		while (*tok == ' ' || *tok == '\t')
+			tok++;
+		len = strlen(tok);
+		while (len > 0 && (tok[len - 1] == ' ' || tok[len - 1] == '\t'))
+			tok[--len] = '\0';
+		if (len == 0)
+			continue;
+		item = strdup(tok);
+		if (item == NULL) {
+			free(copy);
+			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+		}
+		tll_push_back(*out, item);
+	}
+	free(copy);
+	return MPORT_OK;
+}
+
+/* compile every pattern in an environment list; a bad one is an error */
+static int
+compile_env_regexes(const char *name, /*@out@*/ struct shlib_regex **head)
+{
+	stringlist_t patterns = tll_init();
+	int ret;
+
+	*head = NULL;
+	if ((ret = split_env_list(name, &patterns)) != MPORT_OK)
+		return ret;
+
+	tll_foreach(patterns, it)
+	{
+		struct shlib_regex *node = calloc(1, sizeof(*node));
+		int rc;
+
+		if (node == NULL) {
+			tll_free_and_free(patterns, free);
+			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+		}
+		rc = regcomp(&node->re, it->item, REG_EXTENDED | REG_NOSUB);
+		if (rc != 0) {
+			char msg[128];
+
+			(void)regerror(rc, &node->re, msg, sizeof(msg));
+			free(node);
+			ret = SET_ERRORX(
+			    MPORT_ERR_FATAL, "%s: bad pattern '%s': %s", name, it->item, msg);
+			tll_free_and_free(patterns, free);
+			return ret;
+		}
+		node->next = *head;
+		*head = node;
+	}
+	tll_free_and_free(patterns, free);
+	return MPORT_OK;
+}
+
+static void
+free_regexes(/*@null@*/ /*@only@*/ struct shlib_regex *head)
+{
+	while (head != NULL) {
+		struct shlib_regex *next = head->next;
+
+		regfree(&head->re);
+		free(head);
+		head = next;
+	}
+}
+
+static bool
+list_contains(const stringlist_t *list, const char *s)
+{
+	tll_foreach(*list, it)
+	{
+		if (strcmp(it->item, s) == 0)
+			return true;
+	}
+	return false;
+}
+
+static void
+list_add_unique(stringlist_t *list, char *s)
+{
+	if (s == NULL)
+		return;
+	if (list_contains(list, s)) {
+		free(s);
+		return;
+	}
+	tll_push_back(*list, s);
+}
+
+static int
+cmp_str(const char *a, const char *b)
+{
+	return strcmp(a, b);
+}
+
+/* pattern lists: fnmatch(3) globs and the compiled extended regexps */
+static bool
+matches_ignore(const char *name, const stringlist_t *globs, const struct shlib_regex *regexps)
+{
+	tll_foreach(*globs, it)
+	{
+		if (fnmatch(it->item, name, 0) == 0)
+			return true;
+	}
+	for (; regexps != NULL; regexps = regexps->next) {
+		if (regexec(&regexps->re, name, 0, NULL, 0) == 0)
+			return true;
+	}
+	return false;
+}
+
+/*
+ * Lexically normalise an installed path: leading slash, no empty or "."
+ * components, ".." folded.  The plist can spell a path as lib/../lib/x or
+ * with doubled slashes, and the provide-path filter compares directories.
+ */
+static int
+normalise_path(const char *in, char *out, size_t outlen)
+{
+	const char *p = in;
+	size_t len = 0;
+
+	if (outlen < 2)
+		return -1;
+	out[len++] = '/';
+	out[len] = '\0';
+
+	while (*p != '\0') {
+		const char *end;
+		size_t clen;
+
+		while (*p == '/')
+			p++;
+		if (*p == '\0')
+			break;
+		end = strchr(p, '/');
+		clen = (end == NULL) ? strlen(p) : (size_t)(end - p);
+
+		if (clen == 1 && p[0] == '.') {
+			/* nothing */
+		} else if (clen == 2 && p[0] == '.' && p[1] == '.') {
+			while (len > 1 && out[len - 1] != '/')
+				len--;
+			if (len > 1)
+				len--;
+			out[len] = '\0';
+		} else {
+			if (len > 1) {
+				if (len + 1 >= outlen)
+					return -1;
+				out[len++] = '/';
+			}
+			if (len + clen >= outlen)
+				return -1;
+			memcpy(out + len, p, clen);
+			len += clen;
+			out[len] = '\0';
+		}
+		p += clen;
+	}
+	return 0;
+}
+
+/* strip a trailing slash so "/usr/local/lib/" and "/usr/local/lib" agree */
+static bool
+dir_paths_equal(const char *a, const char *b)
+{
+	size_t la = strlen(a), lb = strlen(b);
+
+	while (la > 1 && a[la - 1] == '/')
+		la--;
+	while (lb > 1 && b[lb - 1] == '/')
+		lb--;
+	return la == lb && strncmp(a, b, la) == 0;
+}
+
+/* whether the directory holding installed_path is one of the listed paths */
+static bool
+in_provide_paths(const stringlist_t *paths, const char *installed_path)
+{
+	char dir[PATH_MAX];
+	const char *slash;
+	size_t len;
+
+	if (tll_length(*paths) == 0)
+		return true; /* unset: no filtering, as pkg does */
+
+	slash = strrchr(installed_path, '/');
+	if (slash == NULL)
+		return false;
+	len = (slash == installed_path) ? 1 : (size_t)(slash - installed_path);
+	if (len >= sizeof(dir))
+		return false;
+	memcpy(dir, installed_path, len);
+	dir[len] = '\0';
+
+	tll_foreach(*paths, it)
+	{
+		if (dir_paths_equal(dir, it->item))
+			return true;
+	}
+	return false;
+}
+
+/*@null@*/ /*@only@*/ char *
+mport_shlib_name_with_flags(const char *name, int flags)
+{
+	const char *os = (flags & MPORT_SHLIB_LINUX) ? ":Linux" : "";
+	const char *arch = (flags & MPORT_SHLIB_COMPAT_32) ? ":32" : "";
+	char *out;
+
+	if (asprintf(&out, "%s%s%s", name, os, arch) == -1)
+		return NULL;
+	return out;
+}
+
+/*
+ * Read one file.  On return *provided holds the soname (caller frees) or
+ * NULL, *flags the object's class, and required gains every DT_NEEDED.
+ * Non-ELF files, static objects and objects for an architecture this host
+ * cannot run are silently skipped.  Only libelf failures return an error.
+ */
+/*
+ * The OS an object was built for, from its ABI note when it has one: a
+ * FreeBSD or MidnightBSD NT_FREEBSD_ABI_TAG is native, a GNU NT_GNU_ABI_TAG
+ * is Linux.  Returns -1 when no note says.
+ */
+static int
+elf_os_from_notes(Elf *elf)
+{
+	Elf_Scn *scn = NULL;
+
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
+		GElf_Shdr shdr;
+		Elf_Data *data;
+		size_t off = 0;
+
+		if (gelf_getshdr(scn, &shdr) != &shdr || shdr.sh_type != SHT_NOTE)
+			continue;
+		if ((data = elf_getdata(scn, NULL)) == NULL || data->d_buf == NULL)
+			continue;
+
+		/* Elf_Note is the same three words in both classes; name and
+		 * descriptor are each padded to four bytes */
+		while (off + sizeof(Elf_Note) <= data->d_size) {
+			const Elf_Note *note = (const Elf_Note *)((const char *)data->d_buf + off);
+			const char *owner = (const char *)(note + 1);
+			size_t namesz = note->n_namesz;
+			size_t descsz = note->n_descsz;
+			size_t name_pad = (namesz + 3) & ~(size_t)3;
+			size_t desc_pad = (descsz + 3) & ~(size_t)3;
+
+			if (off + sizeof(Elf_Note) + name_pad + desc_pad > data->d_size ||
+			    namesz == 0)
+				break;
+			if (owner[namesz - 1] == '\0') {
+				if (note->n_type == NT_FREEBSD_ABI_TAG &&
+				    (strcmp(owner, "FreeBSD") == 0 ||
+					strcmp(owner, "MidnightBSD") == 0))
+					return MPORT_SHLIB_NATIVE;
+				if (note->n_type == NT_GNU_ABI_TAG && strcmp(owner, "GNU") == 0)
+					return MPORT_SHLIB_LINUX;
+			}
+			off += sizeof(Elf_Note) + name_pad + desc_pad;
+		}
+	}
+	return -1;
+}
+
+int
+mport_shlib_analyse_elf(
+    const char *path, /*@out@*/ char **provided, /*@out@*/ int *flags, stringlist_t *required)
+{
+	int fd;
+	Elf *elf;
+	GElf_Ehdr ehdr;
+	Elf_Scn *scn = NULL;
+	Elf_Scn *dynamic = NULL;
+	size_t sh_link = 0;
+	size_t numdyn = 0;
+	Elf_Data *data;
+	struct stat sb;
+	size_t i;
+	int os;
+	int ret = MPORT_OK;
+
+	*provided = NULL;
+	*flags = MPORT_SHLIB_NATIVE;
+
+	if (elf_version(EV_CURRENT) == EV_NONE)
+		RETURN_ERRORX(
+		    MPORT_ERR_FATAL, "ELF library initialization failed: %s", elf_errmsg(-1));
+
+	/* regular files only; the caller resolves symlinks inside the stage */
+	if ((fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)) < 0)
+		return MPORT_OK;
+	if (fstat(fd, &sb) != 0 || !S_ISREG(sb.st_mode) || sb.st_size == 0) {
+		close(fd);
+		return MPORT_OK;
+	}
+
+	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
+		close(fd);
+		return MPORT_OK;
+	}
+
+	if (elf_kind(elf) != ELF_K_ELF || gelf_getehdr(elf, &ehdr) == NULL ||
+	    (ehdr.e_type != ET_DYN && ehdr.e_type != ET_EXEC))
+		goto out;
+
+	/*
+	 * OS: the ABI note first, then the header's OSABI (the MidnightBSD
+	 * toolchain tags every object ELFOSABI_FREEBSD), and otherwise Linux,
+	 * the same fallback the kernel's image activator applies.  Class: a
+	 * 32-bit object on a 64-bit host is a compat32 object; a 64-bit object
+	 * on a 32-bit host cannot run here and is skipped.
+	 */
+	os = elf_os_from_notes(elf);
+	if (os == MPORT_SHLIB_LINUX || (os < 0 && ehdr.e_ident[EI_OSABI] != ELFOSABI_FREEBSD))
+		*flags |= MPORT_SHLIB_LINUX;
+#if defined(__LP64__)
+	if (ehdr.e_ident[EI_CLASS] == ELFCLASS32)
+		*flags |= MPORT_SHLIB_COMPAT_32;
+#else
+	if (ehdr.e_ident[EI_CLASS] == ELFCLASS64)
+		goto out;
+#endif
+
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
+		GElf_Shdr shdr;
+
+		if (gelf_getshdr(scn, &shdr) != &shdr)
+			continue;
+		if (shdr.sh_type == SHT_DYNAMIC) {
+			if (shdr.sh_entsize == 0)
+				goto out;
+			dynamic = scn;
+			sh_link = shdr.sh_link;
+			numdyn = shdr.sh_size / shdr.sh_entsize;
+			break;
+		}
+	}
+	if (dynamic == NULL || (data = elf_getdata(dynamic, NULL)) == NULL)
+		goto out; /* statically linked */
+
+	for (i = 0; i < numdyn; i++) {
+		GElf_Dyn dyn;
+		const char *name;
+		char *named;
+
+		if (gelf_getdyn(data, (int)i, &dyn) != &dyn)
+			break;
+		if (dyn.d_tag == DT_NULL)
+			break;
+		if (dyn.d_tag != DT_SONAME && dyn.d_tag != DT_NEEDED)
+			continue;
+
+		name = elf_strptr(elf, sh_link, dyn.d_un.d_val);
+		if (name == NULL || strncmp(name, "lib", 3) != 0)
+			continue; /* pkg ignores anything not named lib*; so do we */
+
+		if (dyn.d_tag == DT_SONAME) {
+			if (*provided != NULL) {
+				free(*provided);
+				*provided = NULL;
+				ret = SET_ERRORX(MPORT_ERR_FATAL,
+				    "malformed ELF file %s has multiple DT_SONAME entries", path);
+				goto out;
+			}
+			if ((*provided = strdup(name)) == NULL) {
+				ret = SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+				goto out;
+			}
+		} else if (name[0] != '/') {
+			/* a few builds record a full path; pkg skips those too */
+			named = mport_shlib_name_with_flags(name, *flags);
+			if (named == NULL) {
+				free(*provided);
+				*provided = NULL;
+				ret = SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+				goto out;
+			}
+			list_add_unique(required, named);
+		}
+	}
+
+out:
+	elf_end(elf);
+	close(fd);
+	return ret;
+}
+
+/* NULL with the mport error set: out of memory or a bad ignore pattern */
+/*@null@*/ /*@only@*/ mportShlibScan *
+mport_shlib_scan_new(void)
+{
+	mportShlibScan *scan = calloc(1, sizeof(*scan));
+	stringlist_t empty = tll_init();
+	int i;
+
+	if (scan == NULL) {
+		SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+		return NULL;
+	}
+	for (i = 0; i < MPORT_SHLIB_NFLAGS; i++)
+		scan->paths[i] = empty;
+	scan->provide_ignore_glob = empty;
+	scan->require_ignore_glob = empty;
+	scan->provided = empty;
+	scan->maybe_provided = empty;
+	scan->internal = empty;
+	scan->required = empty;
+	scan->basenames = empty;
+
+	if (split_env_list("SHLIB_PROVIDE_PATHS_NATIVE", &scan->paths[MPORT_SHLIB_NATIVE]) !=
+		MPORT_OK ||
+	    split_env_list("SHLIB_PROVIDE_PATHS_COMPAT_32", &scan->paths[MPORT_SHLIB_COMPAT_32]) !=
+		MPORT_OK ||
+	    split_env_list("SHLIB_PROVIDE_PATHS_COMPAT_LINUX", &scan->paths[MPORT_SHLIB_LINUX]) !=
+		MPORT_OK ||
+	    split_env_list("SHLIB_PROVIDE_PATHS_COMPAT_LINUX_32",
+		&scan->paths[MPORT_SHLIB_LINUX | MPORT_SHLIB_COMPAT_32]) != MPORT_OK ||
+	    split_env_list("SHLIB_PROVIDE_IGNORE_GLOB", &scan->provide_ignore_glob) != MPORT_OK ||
+	    split_env_list("SHLIB_REQUIRE_IGNORE_GLOB", &scan->require_ignore_glob) != MPORT_OK ||
+	    compile_env_regexes("SHLIB_PROVIDE_IGNORE_REGEX", &scan->provide_ignore_regex) !=
+		MPORT_OK ||
+	    compile_env_regexes("SHLIB_REQUIRE_IGNORE_REGEX", &scan->require_ignore_regex) !=
+		MPORT_OK) {
+		mport_shlib_scan_free(scan);
+		return NULL;
+	}
+
+	return scan;
+}
+
+void
+mport_shlib_scan_free(/*@null@*/ /*@only@*/ mportShlibScan *scan)
+{
+	int i;
+
+	if (scan == NULL)
+		return;
+	for (i = 0; i < MPORT_SHLIB_NFLAGS; i++)
+		tll_free_and_free(scan->paths[i], free);
+	tll_free_and_free(scan->provide_ignore_glob, free);
+	tll_free_and_free(scan->require_ignore_glob, free);
+	free_regexes(scan->provide_ignore_regex);
+	free_regexes(scan->require_ignore_regex);
+	tll_free_and_free(scan->provided, free);
+	tll_free_and_free(scan->maybe_provided, free);
+	tll_free_and_free(scan->internal, free);
+	tll_free_and_free(scan->required, free);
+	tll_free_and_free(scan->basenames, free);
+	free(scan);
+}
+
+/*
+ * Record one staged file.  staged_path is where the file is now,
+ * installed_path where the package puts it (absolute, used for the
+ * provide-path filter).
+ */
+/*
+ * Where a staged symlink points, as a path inside the stage: an absolute
+ * target is taken relative to the stage root (the package installs it
+ * relative to the system root), a relative one relative to the link.  A
+ * target that leaves the stage, or does not exist in it, yields -1: the
+ * build host's own libraries must never be read in its place.
+ */
+static int
+resolve_staged_link(const char *staged_path, const char *installed_path, char *out, size_t outlen)
+{
+	char target[PATH_MAX];
+	char candidate[PATH_MAX];
+	char root_path[PATH_MAX];
+	char root_real[PATH_MAX];
+	char cand_real[PATH_MAX];
+	size_t staged_len = strlen(staged_path);
+	size_t inst_len = strlen(installed_path);
+	size_t root_len;
+	ssize_t n;
+
+	/* the stage root is the staged path less the installed path */
+	if (staged_len <= inst_len ||
+	    strcmp(staged_path + staged_len - inst_len, installed_path) != 0)
+		return -1;
+	root_len = staged_len - inst_len;
+
+	n = readlink(staged_path, target, sizeof(target) - 1);
+	if (n < 0)
+		return -1;
+	target[n] = '\0';
+
+	if (target[0] == '/') {
+		if (snprintf(candidate, sizeof(candidate), "%.*s%s", (int)root_len, staged_path,
+			target) >= (int)sizeof(candidate))
+			return -1;
+	} else {
+		const char *slash = strrchr(staged_path, '/');
+		int dirlen = (slash == NULL) ? 0 : (int)(slash - staged_path);
+
+		if (snprintf(candidate, sizeof(candidate), "%.*s/%s", dirlen, staged_path,
+			target) >= (int)sizeof(candidate))
+			return -1;
+	}
+
+	if (snprintf(root_path, sizeof(root_path), "%.*s", (int)root_len, staged_path) >=
+	    (int)sizeof(root_path))
+		return -1;
+	if (realpath(root_path, root_real) == NULL || realpath(candidate, cand_real) == NULL)
+		return -1;
+	root_len = strlen(root_real);
+	while (root_len > 1 && root_real[root_len - 1] == '/')
+		root_len--;
+	if (strncmp(cand_real, root_real, root_len) != 0 || cand_real[root_len] != '/')
+		return -1;
+
+	if (strlcpy(out, cand_real, outlen) >= outlen)
+		return -1;
+	return 0;
+}
+
+int
+mport_shlib_scan_file(mportShlibScan *scan, const char *staged_path, const char *installed_raw)
+{
+	char *provided = NULL;
+	char *named;
+	int flags = MPORT_SHLIB_NATIVE;
+	struct stat sb;
+	const char *base;
+	const char *object = staged_path;
+	char installed_path[PATH_MAX];
+	char resolved[PATH_MAX];
+
+	if (scan == NULL)
+		return MPORT_OK;
+
+	if (normalise_path(installed_raw, installed_path, sizeof(installed_path)) != 0)
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Path too long: %s", installed_raw);
+
+	if (lstat(staged_path, &sb) != 0)
+		return MPORT_OK;
+
+	if (S_ISREG(sb.st_mode)) {
+		char *copy;
+
+		base = strrchr(installed_path, '/');
+		base = (base == NULL) ? installed_path : base + 1;
+		if ((copy = strdup(base)) == NULL)
+			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+		list_add_unique(&scan->basenames, copy);
+	} else if (S_ISLNK(sb.st_mode)) {
+		if (resolve_staged_link(staged_path, installed_path, resolved, sizeof(resolved)) !=
+		    0)
+			return MPORT_OK; /* leaves the stage, or dangling: not ours to read */
+		object = resolved;
+	} else {
+		return MPORT_OK;
+	}
+
+	if (mport_shlib_analyse_elf(object, &provided, &flags, &scan->required) != MPORT_OK)
+		return mport_err_code();
+
+	if (provided == NULL)
+		return MPORT_OK;
+
+	named = mport_shlib_name_with_flags(provided, flags);
+	free(provided);
+	if (named == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+
+	if (in_provide_paths(&scan->paths[flags & (MPORT_SHLIB_NFLAGS - 1)], installed_path)) {
+		if (S_ISREG(sb.st_mode))
+			list_add_unique(&scan->provided, named);
+		else
+			list_add_unique(&scan->maybe_provided, named);
+	} else {
+		list_add_unique(&scan->internal, named);
+	}
+
+	return MPORT_OK;
+}
+
+/*
+ * Settle the lists and hand them to the package: provided sonames the
+ * package exports, required sonames it needs from elsewhere.  Both are
+ * sorted and unique.  no_provide_shlib is set when the package exports
+ * nothing; a value the caller already set stands.
+ */
+int
+mport_shlib_scan_finish(mportShlibScan *scan, mportPackageMeta *pack)
+{
+	if (scan == NULL || pack == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid shared library scan");
+
+	/*
+	 * A symlink in a provide path whose target is a private copy of the
+	 * same soname (libfoo.so.1 -> ../private/libfoo.so.1.2) exports that
+	 * soname after all.
+	 */
+	tll_foreach(scan->maybe_provided, mp)
+	{
+		tll_foreach(scan->internal, in)
+		{
+			if (strcmp(mp->item, in->item) == 0) {
+				char *copy = strdup(mp->item);
+
+				if (copy == NULL)
+					RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+				list_add_unique(&scan->provided, copy);
+				tll_remove_and_free(scan->internal, in, free);
+				break;
+			}
+		}
+	}
+
+	/* requirements the package meets itself are not requirements */
+	tll_foreach(scan->required, it)
+	{
+		const char *s = it->item;
+		const char *colon = strchr(s, ':');
+		size_t plain_len = (colon == NULL) ? strlen(s) : (size_t)(colon - s);
+		bool self = list_contains(&scan->provided, s) ||
+		    list_contains(&scan->internal, s) || list_contains(&scan->maybe_provided, s);
+
+		if (!self) {
+			tll_foreach(scan->basenames, bn)
+			{
+				if (strlen(bn->item) == plain_len &&
+				    strncmp(bn->item, s, plain_len) == 0) {
+					self = true;
+					break;
+				}
+			}
+		}
+		if (self ||
+		    matches_ignore(s, &scan->require_ignore_glob, scan->require_ignore_regex)) {
+			tll_remove_and_free(scan->required, it, free);
+			continue;
+		}
+	}
+
+	tll_foreach(scan->provided, it)
+	{
+		if (matches_ignore(
+			it->item, &scan->provide_ignore_glob, scan->provide_ignore_regex))
+			tll_remove_and_free(scan->provided, it, free);
+	}
+
+	tll_free_and_free(pack->shlibs_provided, free);
+	tll_free_and_free(pack->shlibs_required, free);
+	tll_foreach(scan->provided, it)
+	{
+		char *copy = strdup(it->item);
+
+		if (copy == NULL)
+			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+		tll_push_back(pack->shlibs_provided, copy);
+	}
+	tll_foreach(scan->required, it)
+	{
+		char *copy = strdup(it->item);
+
+		if (copy == NULL)
+			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+		tll_push_back(pack->shlibs_required, copy);
+	}
+	tll_sort(pack->shlibs_provided, cmp_str);
+	tll_sort(pack->shlibs_required, cmp_str);
+
+	if (tll_length(pack->shlibs_provided) == 0)
+		pack->no_provide_shlib = 1;
+
+	return MPORT_OK;
+}

@@ -69,6 +69,11 @@ mport_pkgmeta_new(void)
 	stringlist_t cf = tll_init();
 	pack->conflicts = cf;
 
+	stringlist_t sp = tll_init();
+	pack->shlibs_provided = sp;
+	stringlist_t sr = tll_init();
+	pack->shlibs_required = sr;
+
 	return pack;
 }
 
@@ -129,6 +134,8 @@ mport_pkgmeta_free(mportPackageMeta *pack)
 		tll_free_and_free(pack->lua_scripts[i], free);
 
 	tll_free_and_free(pack->conflicts, free);
+	tll_free_and_free(pack->shlibs_provided, free);
+	tll_free_and_free(pack->shlibs_required, free);
 
 	free(pack);
 }
