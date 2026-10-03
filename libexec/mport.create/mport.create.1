@@ -135,6 +135,24 @@ Directory containing the Lua hook scripts
 .Pa pkg-pre-deinstall.lua ,
 and
 .Pa pkg-post-deinstall.lua .
+Each script runs with these globals set:
+.Bl -tag -width ".Va pkg_shlibs_provided" -compact
+.It Va pkg_name
+The package name.
+.It Va pkg_prefix
+The installation prefix.
+.It Va pkg_rootdir
+The root the package is installed under.
+.It Va pkg_upgrade
+True when the package replaces an installed version.
+.It Va pkg_shlibs_provided
+Array of the shared library sonames the package provides; see
+.Sx SHARED LIBRARIES .
+.It Va pkg_shlibs_required
+Array of the sonames it requires from other packages.
+.El
+Both arrays are empty for a package built before shared libraries were
+recorded.
 .It Fl x Ar deprecated-message
 Deprecation message to record in the package metadata.
 .El
@@ -208,6 +226,17 @@ Patterns; a required library matching one is dropped.
 .It Ev SHLIB_REQUIRE_IGNORE_REGEX
 Extended regular expressions with the same effect.
 .El
+.Pp
+The plist keyword
+.Cm @ldconfig
+and the provided list are expected to agree.
+A warning is printed when the keyword is present but no native shared
+library was found under
+.Ev SHLIB_PROVIDE_PATHS_NATIVE ,
+and when native shared libraries are provided but the plist has no
+.Cm @ldconfig ,
+since the run-time linker will not find them until ldconfig runs.
+Neither stops the package from being created.
 .Sh EXAMPLES
 Create a package bundle from a fake destdir:
 .Dl $ mport.create -n hello -v 1.0 -o hello-1.0.mport -s work/stage -p pkg-plist -P /usr/local -O misc/hello -t misc

@@ -53,6 +53,7 @@ static int insert_meta(mportInstance *, sqlite3 *, mportPackageMeta *, mportCrea
 
 static int insert_depends(sqlite3 *, mportPackageMeta *, mportCreateExtras *);
 static int insert_shlibs(sqlite3 *, mportPackageMeta *);
+static void warn_ldconfig_mismatch(mportInstance *, mportAssetList *, mportPackageMeta *);
 
 static int insert_conflicts(sqlite3 *, mportPackageMeta *, mportCreateExtras *);
 
@@ -106,6 +107,7 @@ mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPac
 
 	if ((error_code = insert_assetlist(db, assetlist, pack, extra)) != MPORT_OK)
 		goto DBFAIL;
+	warn_ldconfig_mismatch(mport, assetlist, pack);
 
 	if ((error_code = insert_meta(mport, db, pack, extra)) != MPORT_OK)
 		goto DBFAIL;
@@ -332,6 +334,41 @@ done:
 	sqlite3_finalize(stmnt);
 
 	return error_code;
+}
+
+/*
+ * @ldconfig in the plist and the scan's provided list should agree: the
+ * keyword with nothing provided under SHLIB_PROVIDE_PATHS_NATIVE usually
+ * means the port sets USE_LDCONFIG for a library that went elsewhere, and
+ * native libraries provided without the keyword will not be found by the
+ * run-time linker until ldconfig runs.  Either is a porting mistake worth a
+ * word; neither stops the package.
+ */
+static void
+warn_ldconfig_mismatch(mportInstance *mport, mportAssetList *assetlist, mportPackageMeta *pack)
+{
+	mportAssetListEntry *e;
+	bool has_ldconfig = false;
+	bool provides_native = false;
+	const char *paths = getenv("SHLIB_PROVIDE_PATHS_NATIVE");
+
+	STAILQ_FOREACH (e, assetlist, next) {
+		if (e->type == ASSET_LDCONFIG)
+			has_ldconfig = true;
+	}
+	tll_foreach(pack->shlibs_provided, it) {
+		if (strchr(it->item, ':') == NULL)
+			provides_native = true;
+	}
+
+	if (has_ldconfig && !provides_native && paths != NULL && paths[0] != '\0')
+		mport_call_msg_cb(mport,
+		    "Warning: %s: plist has @ldconfig but no shared library was found under %s",
+		    pack->name, paths);
+	else if (!has_ldconfig && provides_native)
+		mport_call_msg_cb(mport,
+		    "Warning: %s: provides shared libraries but the plist has no @ldconfig (USE_LDCONFIG)",
+		    pack->name);
 }
 
 /* the lists settled by the asset walk, one row per soname */

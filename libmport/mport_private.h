@@ -211,6 +211,7 @@ int mport_shlib_scan_finish(/*@null@*/ mportShlibScan *, /*@null@*/ mportPackage
 int mport_shlibs_register(mportInstance *, mportPackageMeta *);
 int mport_shlibs_superseded(mportInstance *, const char *, const char *);
 int mport_shlibs_warn_missing(mportInstance *, mportPackageMeta *);
+int mport_shlibs_load(mportInstance *, mportPackageMeta *);
 int mport_upgrade_master_schema_14to15(sqlite3 *);
 int mport_shlib_analyse_elf(/*@notnull@*/ const char *, /*@out@*/ char **, /*@out@*/ int *,
     /*@notnull@*/ stringlist_t *);

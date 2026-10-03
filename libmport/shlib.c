@@ -1063,3 +1063,51 @@ mport_shlibs_warn_missing(mportInstance *mport, mportPackageMeta *pkg)
 
 	return missing;
 }
+
+/* whether a package file's stub database is attached to this connection */
+static bool
+stub_attached(mportInstance *mport)
+{
+	sqlite3_stmt *stmt = NULL;
+	bool attached;
+
+	attached = sqlite3_prepare_v2(mport->db, "SELECT 1 FROM stub.sqlite_master LIMIT 1", -1,
+			&stmt, NULL) == SQLITE_OK;
+	sqlite3_finalize(stmt);
+	return attached;
+}
+
+/*
+ * Fill pkg->shlibs_provided and pkg->shlibs_required if they are empty:
+ * from the package file being installed when its stub is attached and
+ * carries rows for the package, otherwise from the registry.  Used before
+ * handing the lists to package scripts, which run both ways.
+ */
+int
+mport_shlibs_load(mportInstance *mport, mportPackageMeta *pkg)
+{
+	int count = 0;
+
+	if (mport == NULL || pkg == NULL || pkg->name == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid arguments");
+	if (tll_length(pkg->shlibs_provided) > 0 || tll_length(pkg->shlibs_required) > 0)
+		return MPORT_OK;
+
+	if (stub_attached(mport) && stub_has_table(mport, "shlibs_provided") &&
+	    stub_has_table(mport, "shlibs_required")) {
+		if (mport_db_count(mport->db, &count,
+			"SELECT count(*) FROM stub.shlibs_provided WHERE pkg=%Q "
+			"UNION ALL SELECT count(*) FROM stub.shlibs_required WHERE pkg=%Q",
+			pkg->name, pkg->name) == MPORT_OK &&
+		    count > 0) {
+			if (load_names(mport, "stub.shlibs_provided", pkg->name,
+				&pkg->shlibs_provided) != MPORT_OK ||
+			    load_names(mport, "stub.shlibs_required", pkg->name,
+				&pkg->shlibs_required) != MPORT_OK)
+				RETURN_CURRENT_ERROR;
+			return MPORT_OK;
+		}
+	}
+
+	return mport_shlibs_get(mport, pkg->name, &pkg->shlibs_provided, &pkg->shlibs_required);
+}
