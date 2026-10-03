@@ -363,6 +363,7 @@ mport_install_primative_impl(
 	mportBundleRead *bundle = NULL;
 	mportPackageMeta **already_installed = NULL;
 	mportPackageMeta *current_installed = NULL;
+	bool replace_current = false;
 	mportPackageMeta **pkgs = NULL;
 	mportPackageMeta *pkg = NULL;
 	int i;
@@ -413,16 +414,19 @@ mport_install_primative_impl(
 			    mport_version_cmp(current_installed->version, pkgs[0]->version);
 
 			if (mport->force || version_cmp < 0) {
+				/*
+				 * The installed copy is replaced, but not here: it is
+				 * deleted only once the replacement has passed its
+				 * prechecks, so a replacement that cannot go in leaves
+				 * the installed copy alone.  already_installed stays
+				 * alive until then.
+				 */
 				automatic = current_installed->automatic;
+				replace_current = true;
 				if (version_cmp < 0) {
 					mport_call_msg_cb(mport, "Updating %s from %s to %s.",
 					    pkgs[0]->name, current_installed->version,
 					    pkgs[0]->version);
-				}
-				if (mport_delete_primative(mport, current_installed, 1) !=
-				    MPORT_OK) {
-					ret = mport_err_code();
-					goto cleanup;
 				}
 			} else {
 				mport_call_msg_cb(mport, "%s-%s: already installed.", pkgs[0]->name,
@@ -430,9 +434,6 @@ mport_install_primative_impl(
 				ret = MPORT_OK;
 				goto cleanup;
 			}
-
-			mport_pkgmeta_vec_free(already_installed);
-			already_installed = NULL;
 		}
 
 		if (mport_check_preconditions(mport, pkgs[0], MPORT_PRECHECK_CONFLICTS) !=
@@ -548,15 +549,17 @@ mport_install_primative_impl(
 			break; /* do not keep going if we have an age verification failure! */
 		}
 
-		if (mport_pkgmeta_search_master(mport, &already_installed, "pkg=%Q", pkg->name) ==
+		mportPackageMeta **registered = NULL;
+
+		if (mport_pkgmeta_search_master(mport, &registered, "pkg=%Q", pkg->name) ==
 		    MPORT_OK) {
-			if (already_installed != NULL && already_installed[0] != NULL) {
+			if (registered != NULL && registered[0] != NULL) {
 				if (mport->force) {
 					pkg->automatic =
-					    already_installed[0]->automatic; // honor old flag
+					    registered[0]->automatic; // honor old flag
 				}
-				mport_pkgmeta_vec_free(already_installed);
-				already_installed = NULL;
+				mport_pkgmeta_vec_free(registered);
+				registered = NULL;
 			} else if (mport->force) {
 				/* re-register: clear rows a failed install or delete left
 				 * behind, or the fresh inserts below fail */
@@ -608,6 +611,32 @@ mport_install_primative_impl(
 			}
 		}
 
+		/*
+		 * Verify, then delete, then install.  Everything that can refuse
+		 * the replacement runs while the installed copy (same release or
+		 * stale release) is still registered, so a refusal costs nothing.
+		 * Files the installed copy owns are not conflicts: the file check
+		 * matches on package name, whatever release the copy is from.
+		 */
+		precheck_flags = MPORT_PRECHECK_DEPENDS | MPORT_PRECHECK_CONFLICTS;
+		if (!mport->force)
+			precheck_flags |= MPORT_PRECHECK_FILE_CONFLICTS;
+		if (mport_check_preconditions(mport, pkg, precheck_flags) != MPORT_OK) {
+			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name,
+			    pkg->version, mport_err_string());
+			ret = MPORT_ERR_FATAL;
+			break;
+		}
+
+		if (replace_current && current_installed != NULL &&
+		    strcmp(current_installed->name, pkg->name) == 0) {
+			if (mport_delete_primative(mport, current_installed, 1) != MPORT_OK) {
+				ret = mport_err_code();
+				goto cleanup;
+			}
+			replace_current = false;
+		}
+
 		if (remove_stale_os_release_copy(mport, pkg) != MPORT_OK) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name,
 			    pkg->version, mport_err_string());
@@ -615,11 +644,7 @@ mport_install_primative_impl(
 			break;
 		}
 
-		precheck_flags =
-		    MPORT_PRECHECK_INSTALLED | MPORT_PRECHECK_DEPENDS | MPORT_PRECHECK_CONFLICTS;
-		if (!mport->force)
-			precheck_flags |= MPORT_PRECHECK_FILE_CONFLICTS;
-		if ((mport_check_preconditions(mport, pkg, precheck_flags) != MPORT_OK) ||
+		if ((mport_check_preconditions(mport, pkg, MPORT_PRECHECK_INSTALLED) != MPORT_OK) ||
 		    (mport_bundle_read_install_pkg(mport, bundle, pkg) != MPORT_OK)) {
 			mport_call_msg_cb(mport, "Unable to install %s-%s: %s", pkg->name,
 			    pkg->version, mport_err_string());
