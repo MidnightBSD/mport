@@ -23,7 +23,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"
-.Dd April 19, 2026
+.Dd October 3, 2026
 .Dt MPORT 1
 .Os
 .Sh NAME
@@ -44,6 +44,7 @@
 .Nm
 .Cm add
 .Op Fl A
+.Op Fl l
 .Ar package-file ...
 .Pp
 .Nm
@@ -219,9 +220,19 @@ Run inside the specified chroot.
 .It Fl f, Cm --force
 Force the operation when supported.
 This currently applies to commands such as
+.Cm add ,
 .Cm install
 and
 .Cm delete .
+For
+.Cm add
+and
+.Cm install ,
+the package named on the command line is reinstalled even when the same
+version is already installed, and registry rows left behind by a failed
+install are cleared first.
+The flag applies only to the named package; its dependencies are never
+reinstalled because of it.
 .It Fl o Ar output-path , Cm --output Ar output-path
 Write downloaded package files to
 .Ar output-path .
@@ -240,7 +251,7 @@ and exit.
 The following commands are supported by
 .Nm :
 .Bl -tag -width ".Cm annotate Fl A Ar package Ar tag Ar value"
-.It Cm add Op Fl A Ar package-file ...
+.It Cm add Oo Fl A Oc Oo Fl l Oc Ar package-file ...
 Install one or more local
 .Pa .mport
 package files.
@@ -251,6 +262,24 @@ If the package is already installed and the local package file contains a newer
 version,
 .Nm
 updates it by removing the installed package and installing the local file.
+.Pp
+Dependencies that are not installed, or are installed for a previous
+release of MidnightBSD, are looked for as package files in the same directory
+and installed first.
+Dependencies that are already installed for the running release are left
+alone, and
+.Fl f
+never applies to them.
+With
+.Fl l ,
+only the named package files are installed and no dependency package files
+are looked for; a missing dependency is then an error.
+This matches the behaviour of
+.Xr mport.install 1 ,
+which the ports collection uses to install packages it has just built.
+.Pp
+.Cm add
+was written for installing packages from the install media.
 For repository installs, use
 .Cm install .
 .It Cm annotate Op Fl a Op Fl q Fl S Ar package Ar tag

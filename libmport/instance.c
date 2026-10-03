@@ -67,6 +67,7 @@ mport_instance_init(mportInstance *mport, const char *root, const char *outputPa
 	mport->noIndex = noIndex;
 	mport->verbosity = verbosity;
 	mport->offline = false;
+	mport->noDepends = false;
 	mport->force = false;
 	mport->ignoreMissing = false;
 

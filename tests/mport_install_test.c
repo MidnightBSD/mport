@@ -89,46 +89,75 @@ create_test_instance(void)
 	return mport;
 }
 
-/* Build a minimal one-file package under the test root and return its path. */
+/*
+ * Build a minimal one-file package named `name` under the test root and
+ * return its path.  The package installs share/<name>/catalog.mk and an
+ * empty share/<name>/emptydir.  `depend`, if not NULL, is another package
+ * name recorded as a dependency with no version requirement.
+ */
 static const char *
-create_test_package(mportInstance *mport)
+create_package(mportInstance *mport, const char *name, const char *depend)
 {
 	mportAssetList *assetlist;
 	mportPackageMeta *pack;
 	mportCreateExtras *extra;
 	FILE *fp;
+	char stage[PATH_MAX];
+	char buf[PATH_MAX];
+	char plist[PATH_MAX];
 
-	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage"), 0755));
-	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage/usr"), 0755));
-	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage/usr/local"), 0755));
-	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage/usr/local/share"), 0755));
-	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage/usr/local/share/testpkg"), 0755));
-	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage" PKG_DIR_ABS), 0755));
-	write_file(test_path("/stage" PKG_FILE_ABS), "catalog\n");
-	write_file(test_path("/plist"), PKG_FILE_REL "\n@dir " PKG_DIR_REL "\n");
+	(void)snprintf(stage, sizeof(stage), "%s/stage-%s", test_root, name);
+	ATF_REQUIRE_EQ(0, mkdir(stage, 0755));
+	(void)snprintf(buf, sizeof(buf), "%s/usr", stage);
+	ATF_REQUIRE_EQ(0, mkdir(buf, 0755));
+	(void)snprintf(buf, sizeof(buf), "%s/usr/local", stage);
+	ATF_REQUIRE_EQ(0, mkdir(buf, 0755));
+	(void)snprintf(buf, sizeof(buf), "%s/usr/local/share", stage);
+	ATF_REQUIRE_EQ(0, mkdir(buf, 0755));
+	(void)snprintf(buf, sizeof(buf), "%s/usr/local/share/%s", stage, name);
+	ATF_REQUIRE_EQ(0, mkdir(buf, 0755));
+	(void)snprintf(buf, sizeof(buf), "%s/usr/local/share/%s/emptydir", stage, name);
+	ATF_REQUIRE_EQ(0, mkdir(buf, 0755));
+	(void)snprintf(buf, sizeof(buf), "%s/usr/local/share/%s/catalog.mk", stage, name);
+	write_file(buf, "catalog\n");
+
+	(void)snprintf(plist, sizeof(plist), "share/%s/catalog.mk\n@dir share/%s/emptydir\n",
+	    name, name);
+	(void)snprintf(buf, sizeof(buf), "%s/plist-%s", test_root, name);
+	write_file(buf, plist);
 
 	assetlist = mport_assetlist_new();
 	ATF_REQUIRE(assetlist != NULL);
-	fp = fopen(test_path("/plist"), "r");
+	fp = fopen(buf, "r");
 	ATF_REQUIRE(fp != NULL);
 	ATF_REQUIRE_EQ(0, mport_parse_plistfile(fp, assetlist));
 	(void)fclose(fp);
 
 	pack = mport_pkgmeta_new();
 	ATF_REQUIRE(pack != NULL);
-	pack->name = strdup(PKG_NAME);
+	pack->name = strdup(name);
 	pack->version = strdup(PKG_VERSION);
 	pack->prefix = strdup(PKG_PREFIX);
-	pack->origin = strdup("misc/testpkg");
+	(void)snprintf(buf, sizeof(buf), "misc/%s", name);
+	pack->origin = strdup(buf);
 	pack->lang = strdup("");
 	pack->comment = strdup("test package");
 	pack->type = MPORT_TYPE_APP;
 
 	extra = mport_createextras_new();
 	ATF_REQUIRE(extra != NULL);
-	(void)strlcpy(
-	    extra->pkg_filename, test_path("/testpkg-1.0.mport"), sizeof(extra->pkg_filename));
-	(void)strlcpy(extra->sourcedir, test_path("/stage"), sizeof(extra->sourcedir));
+	(void)snprintf(extra->pkg_filename, sizeof(extra->pkg_filename), "%s/%s-%s.mport",
+	    test_root, name, PKG_VERSION);
+	(void)strlcpy(extra->sourcedir, stage, sizeof(extra->sourcedir));
+	if (depend != NULL) {
+		/* name:origin, no version requirement */
+		extra->depends = calloc(2, sizeof(char *));
+		ATF_REQUIRE(extra->depends != NULL);
+		(void)snprintf(buf, sizeof(buf), "%s:misc/%s", depend, depend);
+		extra->depends[0] = strdup(buf);
+		ATF_REQUIRE(extra->depends[0] != NULL);
+		extra->depends_count = 1;
+	}
 
 	ATF_REQUIRE_MSG(mport_create_primative(mport, assetlist, pack, extra) == MPORT_OK, "%s",
 	    mport_err_string());
@@ -137,7 +166,51 @@ create_test_package(mportInstance *mport)
 	mport_pkgmeta_free(pack);
 	mport_createextras_free(extra);
 
-	return test_path("/testpkg-1.0.mport");
+	(void)snprintf(buf, sizeof(buf), "/%s-%s.mport", name, PKG_VERSION);
+	return test_path(buf);
+}
+
+/* The default test package: no dependencies. */
+static const char *
+create_test_package(mportInstance *mport)
+{
+	return create_package(mport, PKG_NAME, NULL);
+}
+
+/* Number of registry rows for a package by name. */
+static int
+count_pkg(mportInstance *mport, const char *name)
+{
+	mportPackageMeta **found = NULL;
+	int count;
+
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", name));
+	if (found == NULL)
+		return 0;
+	for (count = 0; found[count] != NULL; count++)
+		;
+	mport_pkgmeta_vec_free(found);
+
+	return count;
+}
+
+/* Contents of a small file, or "" if it cannot be read. */
+static const char *
+read_file(const char *path)
+{
+	static char contents[256];
+	FILE *fp;
+	size_t n;
+
+	contents[0] = '\0';
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		return contents;
+	n = fread(contents, 1, sizeof(contents) - 1, fp);
+	contents[n] = '\0';
+	(void)fclose(fp);
+
+	return contents;
 }
 
 /* Number of registry rows for the test package, and its os_release. */
@@ -459,6 +532,203 @@ ATF_TC_CLEANUP(dir_asset_through_symlinked_parent, tc)
 }
 
 /*
+ * mport add installs a missing dependency from a package file next to the one
+ * named, and marks it automatic.
+ */
+ATF_TC_WITH_CLEANUP(add_installs_missing_dependency_from_sibling);
+ATF_TC_HEAD(add_installs_missing_dependency_from_sibling, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "a dependency missing from the registry is installed from a sibling file");
+}
+ATF_TC_BODY(add_installs_missing_dependency_from_sibling, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	mportPackageMeta **dep = NULL;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	(void)create_package(mport, "testdep", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
+	ATF_REQUIRE_EQ(1, count_pkg(mport, "testdep"));
+	ATF_REQUIRE_EQ(0, access(test_path(PKG_PREFIX "/share/testdep/catalog.mk"), F_OK));
+
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &dep, "pkg=%Q", "testdep"));
+	ATF_REQUIRE(dep != NULL && dep[0] != NULL);
+	ATF_REQUIRE_EQ(MPORT_AUTOMATIC, dep[0]->automatic);
+	mport_pkgmeta_vec_free(dep);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(add_installs_missing_dependency_from_sibling, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * A forced add repairs the package named and nothing else.  A dependency that
+ * is installed for the running release must not be reinstalled from a sibling
+ * file, and must not be needed as a sibling file at all.
+ */
+ATF_TC_WITH_CLEANUP(forced_add_leaves_installed_dependency_alone);
+ATF_TC_HEAD(forced_add_leaves_installed_dependency_alone, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "--force does not cascade into dependencies that are already installed");
+}
+ATF_TC_BODY(forced_add_leaves_installed_dependency_alone, tc)
+{
+	mportInstance *mport;
+	const char *depfile;
+	const char *pkgfile;
+	char dep_path[PATH_MAX];
+
+	(void)tc;
+
+	mport = create_test_instance();
+	depfile = create_package(mport, "testdep", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, depfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	/* a reinstall of testdep would put "catalog" back and would need the
+	 * sibling file, so change the one and remove the other */
+	(void)strlcpy(dep_path, test_path(PKG_PREFIX "/share/testdep/catalog.mk"), sizeof(dep_path));
+	write_file(dep_path, "modified\n");
+	ATF_REQUIRE_EQ(0, unlink(depfile));
+
+	mport->force = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
+	ATF_REQUIRE_EQ(1, count_pkg(mport, "testdep"));
+	ATF_REQUIRE_STREQ("modified\n", read_file(dep_path));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(forced_add_leaves_installed_dependency_alone, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * A dependency installed for a previous OS release is replaced from a sibling
+ * file, but without force even when the named package is forced.
+ */
+ATF_TC_WITH_CLEANUP(add_replaces_stale_release_dependency);
+ATF_TC_HEAD(add_replaces_stale_release_dependency, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "a dependency registered under an older os_release is reinstalled");
+}
+ATF_TC_BODY(add_replaces_stale_release_dependency, tc)
+{
+	mportInstance *mport;
+	const char *depfile;
+	const char *pkgfile;
+	mportPackageMeta **dep = NULL;
+	char *system_os_release;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	depfile = create_package(mport, "testdep", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, depfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "UPDATE packages SET os_release='0.0-OLD' WHERE pkg='testdep'"));
+
+	mport->force = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
+	ATF_REQUIRE_EQ(1, count_pkg(mport, "testdep"));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &dep, "pkg=%Q", "testdep"));
+	ATF_REQUIRE(dep != NULL && dep[0] != NULL);
+	system_os_release = mport_get_osrelease(mport);
+	ATF_REQUIRE(system_os_release != NULL);
+	ATF_REQUIRE_STREQ(system_os_release, dep[0]->os_release);
+	free(system_os_release);
+	mport_pkgmeta_vec_free(dep);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(add_replaces_stale_release_dependency, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * mport add -l (mport->noDepends) installs only the named file.  A sibling
+ * dependency file is never opened, so a missing dependency fails the install.
+ */
+ATF_TC_WITH_CLEANUP(local_only_add_ignores_sibling_dependencies);
+ATF_TC_HEAD(local_only_add_ignores_sibling_dependencies, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr", "noDepends installs the named package file and nothing else");
+}
+ATF_TC_BODY(local_only_add_ignores_sibling_dependencies, tc)
+{
+	mportInstance *mport;
+	const char *depfile;
+	const char *pkgfile;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	depfile = create_package(mport, "testdep", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	mport->noDepends = true;
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+	ATF_REQUIRE_EQ(0, count_pkg(mport, PKG_NAME));
+	ATF_REQUIRE_EQ(0, count_pkg(mport, "testdep"));
+	ATF_REQUIRE_EQ(-1, access(test_path(PKG_PREFIX "/share/testdep/catalog.mk"), F_OK));
+
+	/* with the dependency installed by hand, the named file goes in */
+	ATF_REQUIRE_MSG(mport_install_primative(mport, depfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(local_only_add_ignores_sibling_dependencies, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
  * A delete that fails partway through unregistering the package must roll
  * back, leaving the package fully registered and the connection free for the
  * next package in the same run.
@@ -635,6 +905,10 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, force_reinstall_over_orphaned_rows);
 	ATF_TP_ADD_TC(tp, failed_install_registers_nothing);
 	ATF_TP_ADD_TC(tp, dir_asset_through_symlinked_parent);
+	ATF_TP_ADD_TC(tp, add_installs_missing_dependency_from_sibling);
+	ATF_TP_ADD_TC(tp, forced_add_leaves_installed_dependency_alone);
+	ATF_TP_ADD_TC(tp, add_replaces_stale_release_dependency);
+	ATF_TP_ADD_TC(tp, local_only_add_ignores_sibling_dependencies);
 	ATF_TP_ADD_TC(tp, failed_delete_rolls_back);
 	ATF_TP_ADD_TC(tp, failed_schema_upgrade_rolls_back);
 

@@ -85,6 +85,7 @@ typedef struct {
 	mportVerbosity verbosity;
 	bool force;
 	bool ignoreMissing; /* ignore mising dependencies during installation */
+	bool noDepends; /* do not install dependencies from sibling package files */
 	mport_msg_cb msg_cb;
 	mport_progress_init_cb progress_init_cb;
 	mport_progress_step_cb progress_step_cb;

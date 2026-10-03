@@ -363,10 +363,15 @@ main(int argc, char *argv[])
 			optreset = 1;
 #endif
 			optind = 1;
-			while ((ch2 = getopt(local_argc, local_argv, "A")) != -1) {
+			while ((ch2 = getopt(local_argc, local_argv, "Al")) != -1) {
 				switch (ch2) {
 				case 'A':
 					aflag = 1;
+					break;
+				case 'l':
+					/* local only: the named files and nothing else,
+					 * like mport.install(1) */
+					mport->noDepends = true;
 					break;
 				}
 			}
@@ -922,7 +927,7 @@ usage(void)
 	    "  -v          Show version\n"
 	    "Commands:\n"
 	    "  Package Management:\n"
-	    "    add [-A] <package file>     Install package from file\n"
+	    "    add [-Al] <package file>    Install package from file\n"
 	    "    install [-AMry] <package>     Install package from repository\n"
 	    "    delete <package>            Remove installed package\n"
 	    "    update [package]            Update installed package(s)\n"
