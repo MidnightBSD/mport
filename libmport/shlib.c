@@ -987,3 +987,79 @@ mport_check_missing_shlibs(mportInstance *mport)
 
 	return missing;
 }
+
+/*
+ * Whether an installed package's provided libraries are all also provided
+ * by some other package registered for the given release.  Used to judge a
+ * dependency left over from an older release: if every soname it exports is
+ * exported again by a current build, consumers link against the current one
+ * and the old copy is harmless.  Returns 1 when the package has recorded
+ * libraries and each is superseded, 0 otherwise, -1 on error.  A package
+ * with no recorded libraries is not superseded; it is unknown.
+ */
+int
+mport_shlibs_superseded(mportInstance *mport, const char *pkgname, const char *os_release)
+{
+	int total = 0;
+	int unmatched = 0;
+
+	if (mport == NULL || pkgname == NULL || os_release == NULL)
+		return -1;
+
+	if (mport_db_count(mport->db, &total, "SELECT count(*) FROM shlibs_provided WHERE pkg=%Q",
+		pkgname) != MPORT_OK)
+		return -1;
+	if (total == 0)
+		return 0;
+
+	if (mport_db_count(mport->db, &unmatched,
+		"SELECT count(*) FROM shlibs_provided sp WHERE sp.pkg=%Q AND NOT EXISTS ("
+		"SELECT 1 FROM shlibs_provided o JOIN packages p ON p.pkg = o.pkg "
+		"WHERE o.name = sp.name AND o.pkg != sp.pkg AND p.status='clean' AND p.os_release=%Q)",
+		pkgname, os_release) != MPORT_OK)
+		return -1;
+
+	return unmatched == 0 ? 1 : 0;
+}
+
+/*
+ * Say which libraries the package file about to be installed needs that
+ * no installed package provides and the base system does not ship.  A
+ * warning rather than a refusal: packages registered before the scan
+ * existed have no provided list, so on such a registry a missing provider
+ * usually means "not recorded", not "not installed".  Returns the count.
+ */
+int
+mport_shlibs_warn_missing(mportInstance *mport, mportPackageMeta *pkg)
+{
+	sqlite3_stmt *stmt = NULL;
+	int missing = 0;
+	int rc;
+
+	if (mport == NULL || pkg == NULL)
+		return 0;
+	if (!stub_has_table(mport, "shlibs_required"))
+		return 0;
+
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT r.name FROM stub.shlibs_required r WHERE r.pkg=%Q "
+		"AND NOT EXISTS (SELECT 1 FROM shlibs_provided s WHERE s.name = r.name) "
+		"ORDER BY r.name",
+		pkg->name) != MPORT_OK) {
+		sqlite3_finalize(stmt);
+		return 0;
+	}
+
+	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		const char *name = (const char *)sqlite3_column_text(stmt, 0);
+
+		if (name == NULL || mport_shlib_in_base(name))
+			continue;
+		mport_call_msg_cb(mport, "Warning: %s-%s needs %s, which no installed package provides",
+		    pkg->name, pkg->version, name);
+		missing++;
+	}
+	sqlite3_finalize(stmt);
+
+	return missing;
+}

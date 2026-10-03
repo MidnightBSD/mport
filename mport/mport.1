@@ -302,10 +302,15 @@ alone, and
 .Fl f
 never applies to them.
 A dependency installed for a previous release is also left alone when it
-provides no shared libraries, since nothing links against it; see
-.Fl S
-in
+provides no shared libraries, since nothing links against it, or when every
+shared library it provides is also provided by a package built for the
+running release, since the run-time linker finds the current copy; see
 .Xr mport.create 1 .
+.Pp
+After the dependency check, a warning names each shared library the package
+needs that no installed package provides and the base system does not ship.
+It is a warning rather than a refusal because packages registered before
+shared libraries were recorded have no provided list.
 With
 .Fl l ,
 only the named package files are installed and no dependency package files
@@ -582,6 +587,8 @@ Upgrade all installed packages to the newest available versions.
 Packages that are still registered for an older MidnightBSD release are
 updated first, lowest-level dependencies before the packages that use them,
 so that nothing is upgraded against libraries from the previous release.
+A package that links against a shared library another package provides is
+ordered after that package whether or not the port declared the dependency.
 A package from an older release for which the repository has no package is
 reported and left in place.
 The remaining packages are then upgraded in dependency order.

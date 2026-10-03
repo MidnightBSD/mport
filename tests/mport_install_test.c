@@ -1214,6 +1214,76 @@ ATF_TC_CLEANUP(old_release_dependency_without_shlibs_is_accepted, tc)
 }
 
 /*
+ * A dependency from another release that still provides shared libraries
+ * is accepted once every one of them is also provided by a package built
+ * for the running release.
+ */
+ATF_TC_WITH_CLEANUP(old_release_dependency_with_superseded_libraries_is_accepted);
+ATF_TC_HEAD(old_release_dependency_with_superseded_libraries_is_accepted, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr",
+	    "the dependency release check is waived when a current package provides the same sonames");
+}
+ATF_TC_BODY(old_release_dependency_with_superseded_libraries_is_accepted, tc)
+{
+	mportInstance *mport;
+	const char *depfile;
+	const char *pkgfile;
+	char *system_os_release;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	depfile = create_package(mport, "testdep", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+	system_os_release = mport_get_osrelease(mport);
+	ATF_REQUIRE(system_os_release != NULL);
+
+	mport->offline = true;
+	mport->noDepends = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, depfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	/* from another release and providing two libraries: refused */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"UPDATE packages SET os_release='0.0-OLD', no_provide_shlib=0 WHERE pkg='testdep'"));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"INSERT INTO shlibs_provided (pkg, name) VALUES ('testdep', 'libq.so.1'), ('testdep', 'libr.so.2')"));
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+	ATF_REQUIRE_EQ(0, count_pkg(mport, PKG_NAME));
+
+	/* a current-release package providing only one of them is not enough */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"INSERT INTO packages (pkg, version, origin, prefix, lang, status, os_release, cpe, no_provide_shlib) "
+		"VALUES ('newq', '2.0', 'misc/newq', '/usr/local', '', 'clean', %Q, '', 0)",
+		system_os_release));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "INSERT INTO shlibs_provided (pkg, name) VALUES ('newq', 'libq.so.1')"));
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+	ATF_REQUIRE_EQ(0, count_pkg(mport, PKG_NAME));
+
+	/* both superseded: accepted */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "INSERT INTO shlibs_provided (pkg, name) VALUES ('newq', 'libr.so.2')"));
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
+
+	free(system_os_release);
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(old_release_dependency_with_superseded_libraries_is_accepted, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
  * A delete that fails partway through unregistering the package must roll
  * back, leaving the package fully registered and the connection free for the
  * next package in the same run.
@@ -1401,6 +1471,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, stale_release_detection);
 	ATF_TP_ADD_TC(tp, create_records_shared_library_provision);
 	ATF_TP_ADD_TC(tp, old_release_dependency_without_shlibs_is_accepted);
+	ATF_TP_ADD_TC(tp, old_release_dependency_with_superseded_libraries_is_accepted);
 	ATF_TP_ADD_TC(tp, failed_delete_rolls_back);
 	ATF_TP_ADD_TC(tp, failed_schema_upgrade_rolls_back);
 

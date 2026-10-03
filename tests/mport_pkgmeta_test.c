@@ -575,6 +575,59 @@ ATF_TC_CLEANUP(sort_dependencies_dependency_first, tc)
 	cleanup_test_root();
 }
 
+/*
+ * x links against libq.so.1, which y installs; no port declared it.  The
+ * registry's shared library records still order y before x.
+ */
+ATF_TC_WITH_CLEANUP(sort_dependencies_follows_library_providers);
+ATF_TC_HEAD(sort_dependencies_follows_library_providers, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr", "a shared library provider sorts before the package using it");
+}
+ATF_TC_BODY(sort_dependencies_follows_library_providers, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta x = { .name = "x" };
+	mportPackageMeta y = { .name = "y" };
+	mportPackageMeta z = { .name = "z" };
+	mportPackageMeta *flat[] = { &x, &y, &z };
+	mportPackageMeta **sorted;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	insert_package(mport, "x");
+	insert_package(mport, "y");
+	insert_package(mport, "z");
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"INSERT INTO shlibs_required (pkg, name) VALUES ('x', 'libq.so.1'), ('x', 'libc.so.7')"));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"INSERT INTO shlibs_provided (pkg, name) VALUES ('y', 'libq.so.1'), ('z', 'libz.so.6')"));
+
+	/* dependencies first, as upgrade uses it */
+	sorted = mport_pkgmeta_sort_dependencies(mport, flat, 3, true);
+	ATF_REQUIRE(sorted != NULL);
+	require_before(sorted, 3, "y", "x");
+	free(sorted);
+
+	/* dependents first, as delete uses it */
+	sorted = mport_pkgmeta_sort_dependencies(mport, flat, 3, false);
+	ATF_REQUIRE(sorted != NULL);
+	require_before(sorted, 3, "x", "y");
+	free(sorted);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(sort_dependencies_follows_library_providers, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 ATF_TC_WITH_CLEANUP(sort_dependencies_dependent_first);
 ATF_TC_HEAD(sort_dependencies_dependent_first, tc)
 {
@@ -732,6 +785,7 @@ ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, sort_dependencies_dependency_first);
 	ATF_TP_ADD_TC(tp, sort_dependencies_dependent_first);
+	ATF_TP_ADD_TC(tp, sort_dependencies_follows_library_providers);
 	ATF_TP_ADD_TC(tp, delete_removes_autodirs);
 	ATF_TP_ADD_TC(tp, delete_keeps_nonempty_autodirs);
 	ATF_TP_ADD_TC(tp, delete_keeps_shared_autodirs);

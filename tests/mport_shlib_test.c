@@ -978,6 +978,81 @@ ATF_TC_CLEANUP(schema_upgrade_adds_tables, tc)
 	cleanup_test_root();
 }
 
+
+static char last_messages[4096];
+
+static void
+capture_msg(const char *msg)
+{
+	size_t len = strlen(last_messages);
+
+	(void)snprintf(last_messages + len, sizeof(last_messages) - len, "%s\n", msg);
+}
+
+ATF_TC_WITH_CLEANUP(install_warns_about_unprovided_libraries);
+ATF_TC_HEAD(install_warns_about_unprovided_libraries, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "require.files", LIBZ " " GZIP);
+	atf_tc_set_md_var(tc, "descr",
+	    "a required library no package provides and base lacks is warned about, not refused");
+}
+ATF_TC_BODY(install_warns_about_unprovided_libraries, tc)
+{
+	mportInstance *mport;
+	mportBundleRead *bundle;
+	mportPackageMeta *pack;
+	const char *pkgfile;
+	const char *lib, *bin;
+
+	(void)tc;
+
+	clear_shlib_env();
+	stage_lib_and_user(&lib, &bin);
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib", 1));
+	mport = registry_instance();
+	pkgfile = build_shlibpkg(mport);
+	mport->msg_cb = capture_msg;
+
+	/* everything gzip needs is in base or shipped: no warning on install */
+	last_messages[0] = '\0';
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_MSG(strstr(last_messages, "no installed package provides") == NULL, "%s",
+	    last_messages);
+
+	/* open the same package file, rewrite one requirement in its stub to a
+	 * library nobody ships, and run the install-time check against it */
+	bundle = mport_bundle_read_new();
+	ATF_REQUIRE(bundle != NULL);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_bundle_read_init(bundle, pkgfile));
+	ATF_REQUIRE_MSG(mport_bundle_read_prep_for_install(mport, bundle) == MPORT_OK, "%s",
+	    mport_err_string());
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"UPDATE stub.shlibs_required SET name='libnothere.so.9' WHERE name='liblzma.so.5'"));
+	pack = mport_pkgmeta_new();
+	ATF_REQUIRE(pack != NULL);
+	pack->name = strdup("shlibpkg");
+	pack->version = strdup("1.0");
+
+	last_messages[0] = '\0';
+	ATF_REQUIRE_EQ(1, mport_shlibs_warn_missing(mport, pack));
+	ATF_REQUIRE_MSG(strstr(last_messages, "Warning: shlibpkg-1.0 needs libnothere.so.9") != NULL,
+	    "%s", last_messages);
+
+	mport_pkgmeta_free(pack);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_bundle_read_finish(mport, bundle));
+	mport_instance_free(mport);
+	clear_shlib_env();
+}
+ATF_TC_CLEANUP(install_warns_about_unprovided_libraries, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, analyse_shared_library);
@@ -999,6 +1074,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, base_system_libraries);
 	ATF_TP_ADD_TC(tp, missing_shlib_check);
 	ATF_TP_ADD_TC(tp, schema_upgrade_adds_tables);
+	ATF_TP_ADD_TC(tp, install_warns_about_unprovided_libraries);
 
 	return atf_no_error();
 }
