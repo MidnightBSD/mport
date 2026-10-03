@@ -479,6 +479,14 @@ mport_delete_primative(mportInstance *mport, mportPackageMeta *pack, int force)
 	if (mport_db_do(mport->db, "DELETE FROM annotation WHERE pkg=%Q", pack->name) != MPORT_OK)
 		goto rollback;
 
+	if (mport_db_do(mport->db, "DELETE FROM shlibs_provided WHERE pkg=%Q", pack->name) !=
+	    MPORT_OK)
+		goto rollback;
+
+	if (mport_db_do(mport->db, "DELETE FROM shlibs_required WHERE pkg=%Q", pack->name) !=
+	    MPORT_OK)
+		goto rollback;
+
 	if (mport_db_do(mport->db, "COMMIT TRANSACTION") != MPORT_OK)
 		goto rollback;
 

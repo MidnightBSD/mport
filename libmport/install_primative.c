@@ -324,7 +324,7 @@ static int
 purge_orphaned_rows(mportInstance *mport, const char *pkg_name)
 {
 	static const char *const tables[] = { "assets", "depends", "categories", "conflicts",
-		"annotation" };
+		"annotation", "shlibs_provided", "shlibs_required" };
 	size_t i;
 
 	if (mport_db_do(mport->db, "BEGIN IMMEDIATE TRANSACTION") != MPORT_OK)
