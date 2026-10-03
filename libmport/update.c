@@ -197,8 +197,8 @@ mport_update(mportInstance *mport, const char *packageName)
 
 		depends = depends_orig;
 		while (depends != NULL && *depends != NULL) {
-			if (mport_install_depends(mport, (*depends)->d_pkgname,
-				(*depends)->d_version, MPORT_AUTOMATIC) != MPORT_OK) {
+			if (mport_install_dependency(mport, (*depends)->d_pkgname,
+				(*depends)->d_version) != MPORT_OK) {
 				mport_call_msg_cb(mport, "%s", mport_err_string());
 
 				if (mport->ignoreMissing) {
@@ -272,8 +272,8 @@ migrate_default_package(
 		return ret;
 	}
 	for (depends = depends_orig; depends != NULL && *depends != NULL; depends++) {
-		if (mport_install_depends(mport, (*depends)->d_pkgname, (*depends)->d_version,
-			MPORT_AUTOMATIC) != MPORT_OK) {
+		if (mport_install_dependency(mport, (*depends)->d_pkgname, (*depends)->d_version) !=
+		    MPORT_OK) {
 			ret = mport_err_code();
 			mport_index_depends_free_vec(depends_orig);
 			mport_index_entry_free_vec(entries);

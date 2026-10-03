@@ -43,6 +43,7 @@ static /*@null@*/ /*@only@*/ mportPackageMeta **lookup_current_os_installed(
 static int remove_stale_os_release_copy(/*@notnull@*/ mportInstance *,
     /*@notnull@*/ mportPackageMeta *);
 static int purge_orphaned_rows(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
+static int dependency_is_current(/*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
 
 #define GOTO_CLEANUP_ON_MPORT_ERR(expr)         \
 	do {                                    \
@@ -310,6 +311,50 @@ rollback:
 	RETURN_CURRENT_ERROR;
 }
 
+/*
+ * Whether a dependency is installed, clean and registered under the running
+ * OS release.  Returns 1 if so, 0 if it is missing or registered under another
+ * release, -1 on error.  The lookup mirrors check_depends() so a dependency
+ * recorded with a flavor prefix is found the same way the precheck finds it.
+ */
+static int
+dependency_is_current(mportInstance *mport, const char *depend_pkg)
+{
+	sqlite3_stmt *stmt = NULL;
+	char *system_os_release;
+	const char *os_release;
+	int ret;
+
+	if ((system_os_release = mport_get_osrelease(mport)) == NULL)
+		return -1;
+
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT os_release FROM packages WHERE (pkg=%Q or (flavor is not null and flavor != '' and pkg=substr(%Q, length(flavor) + 2))) AND status='clean'",
+		depend_pkg, depend_pkg) != MPORT_OK) {
+		sqlite3_finalize(stmt);
+		free(system_os_release);
+		return -1;
+	}
+
+	switch (sqlite3_step(stmt)) {
+	case SQLITE_ROW:
+		os_release = (const char *)sqlite3_column_text(stmt, 0);
+		ret = (os_release != NULL && strcmp(os_release, system_os_release) == 0) ? 1 : 0;
+		break;
+	case SQLITE_DONE:
+		ret = 0;
+		break;
+	default:
+		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		ret = -1;
+		break;
+	}
+
+	sqlite3_finalize(stmt);
+	free(system_os_release);
+	return ret;
+}
+
 static int
 mport_install_primative_impl(
     /*@notnull@*/ mportInstance *mport, /*@null@*/ const char *filename, int fd,
@@ -411,10 +456,31 @@ mport_install_primative_impl(
 			pkgs = NULL;
 		}
 
-		deps = dependencies;
+		/*
+		 * Pull missing dependencies from package files next to this one.
+		 * Dependencies that are installed and current are left alone, and
+		 * a forced install never forces them: --force repairs the package
+		 * the caller named, not everything underneath it.  mport->noDepends
+		 * (mport add -l) skips the walk entirely, like mport.install(1).
+		 */
+		deps = mport->noDepends ? NULL : dependencies;
 		dir = mport_directory(filename);
 		while (deps != NULL && *deps != NULL) {
 			char *dep_filename = NULL;
+			bool saved_force;
+			int dep_ret;
+			int current;
+
+			current = dependency_is_current(mport, *deps);
+			if (current < 0) {
+				ret = mport_err_code();
+				goto cleanup;
+			}
+			if (current == 1) {
+				deps++;
+				continue;
+			}
+
 			if (asprintf(&dep_filename, "%s/%s.mport", dir, *deps) == -1) {
 				deps++;
 				continue;
@@ -437,8 +503,11 @@ mport_install_primative_impl(
 				}
 			}
 
-			if (mport_install_primative(mport, dep_filename, prefix, MPORT_AUTOMATIC) !=
-			    MPORT_OK) {
+			saved_force = mport->force;
+			mport->force = false;
+			dep_ret = mport_install_primative(mport, dep_filename, prefix, MPORT_AUTOMATIC);
+			mport->force = saved_force;
+			if (dep_ret != MPORT_OK) {
 				mport_call_msg_cb(
 				    mport, "Unable to install %s: %s", *deps, mport_err_string());
 				if (!mport->ignoreMissing) {
