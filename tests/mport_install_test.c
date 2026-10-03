@@ -729,6 +729,116 @@ ATF_TC_CLEANUP(local_only_add_ignores_sibling_dependencies, tc)
 }
 
 /*
+ * A forced reinstall whose replacement cannot pass its prechecks must leave
+ * the installed copy exactly as it was.  The replacement fails because the
+ * dependency is registered for another OS release and no sibling file can
+ * replace it.
+ */
+ATF_TC_WITH_CLEANUP(forced_reinstall_failing_precheck_keeps_installed_copy);
+ATF_TC_HEAD(forced_reinstall_failing_precheck_keeps_installed_copy, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "a forced reinstall is verified before the installed copy is removed");
+}
+ATF_TC_BODY(forced_reinstall_failing_precheck_keeps_installed_copy, tc)
+{
+	mportInstance *mport;
+	const char *depfile;
+	const char *pkgfile;
+	char pkg_path[PATH_MAX];
+
+	(void)tc;
+
+	mport = create_test_instance();
+	depfile = create_package(mport, "testdep", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, depfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	(void)strlcpy(pkg_path, test_path(PKG_FILE_ABS), sizeof(pkg_path));
+	write_file(pkg_path, "modified\n");
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "UPDATE packages SET os_release='0.0-OLD' WHERE pkg='testdep'"));
+	ATF_REQUIRE_EQ(0, unlink(depfile));
+
+	mport->force = true;
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+
+	/* nothing was removed: the package, its files and the dependency row */
+	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
+	ATF_REQUIRE_EQ(1, count_pkg(mport, "testdep"));
+	ATF_REQUIRE_STREQ("modified\n", read_file(pkg_path));
+	ATF_REQUIRE(count_rows(mport, "assets") > 0);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(forced_reinstall_failing_precheck_keeps_installed_copy, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * Replacing a copy registered for a previous OS release follows the same
+ * rule: the stale copy is removed only after the replacement passes its
+ * prechecks.
+ */
+ATF_TC_WITH_CLEANUP(stale_release_replacement_failing_precheck_keeps_copy);
+ATF_TC_HEAD(stale_release_replacement_failing_precheck_keeps_copy, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr",
+	    "a copy from an older os_release survives a replacement that fails precheck");
+}
+ATF_TC_BODY(stale_release_replacement_failing_precheck_keeps_copy, tc)
+{
+	mportInstance *mport;
+	const char *depfile;
+	const char *pkgfile;
+	char os_release[64];
+
+	(void)tc;
+
+	mport = create_test_instance();
+	depfile = create_package(mport, "testdep", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, depfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	/* both came from the previous release; only the package has a file to
+	 * replace it with */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_db_do(mport->db,
+				     "UPDATE packages SET os_release='0.0-OLD' WHERE pkg IN (%Q, 'testdep')",
+				     PKG_NAME));
+	ATF_REQUIRE_EQ(0, unlink(depfile));
+
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+
+	ATF_REQUIRE_EQ(1, count_installed(mport, os_release, sizeof(os_release)));
+	ATF_REQUIRE_STREQ("0.0-OLD", os_release);
+	ATF_REQUIRE_EQ(1, count_pkg(mport, "testdep"));
+	ATF_REQUIRE_EQ(0, access(test_path(PKG_FILE_ABS), F_OK));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(stale_release_replacement_failing_precheck_keeps_copy, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
  * A delete that fails partway through unregistering the package must roll
  * back, leaving the package fully registered and the connection free for the
  * next package in the same run.
@@ -909,6 +1019,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, forced_add_leaves_installed_dependency_alone);
 	ATF_TP_ADD_TC(tp, add_replaces_stale_release_dependency);
 	ATF_TP_ADD_TC(tp, local_only_add_ignores_sibling_dependencies);
+	ATF_TP_ADD_TC(tp, forced_reinstall_failing_precheck_keeps_installed_copy);
+	ATF_TP_ADD_TC(tp, stale_release_replacement_failing_precheck_keeps_copy);
 	ATF_TP_ADD_TC(tp, failed_delete_rolls_back);
 	ATF_TP_ADD_TC(tp, failed_schema_upgrade_rolls_back);
 
