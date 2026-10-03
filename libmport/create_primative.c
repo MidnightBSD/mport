@@ -185,7 +185,7 @@ insert_assetlist(
 	strlcat(cwd, pack->prefix, FILENAME_MAX);
 
 	if ((scan = mport_shlib_scan_new()) == NULL)
-		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+		RETURN_CURRENT_ERROR;
 
 	if (mport_db_prepare(db, &stmnt, sql) != MPORT_OK) {
 		mport_shlib_scan_free(scan);
@@ -296,7 +296,8 @@ insert_assetlist(
 			 * the stage directory removed.  The provide-path filter in
 			 * the scan compares its directory with SHLIB_PROVIDE_PATHS_*.
 			 */
-			(void)strlcpy(installed, file + strlen(extra->sourcedir), sizeof(installed));
+			(void)strlcpy(
+			    installed, file + strlen(extra->sourcedir), sizeof(installed));
 			if (mport_shlib_scan_file(scan, file, installed) != MPORT_OK) {
 				error_code = mport_err_code();
 				goto done;
@@ -350,8 +351,10 @@ insert_shlibs(sqlite3 *db, mportPackageMeta *pack)
 			continue;
 		if (mport_db_prepare(db, &stmnt, sql[i]) != MPORT_OK)
 			RETURN_CURRENT_ERROR;
-		tll_foreach(*lists[i], it) {
-			if (sqlite3_bind_text(stmnt, 1, pack->name, -1, SQLITE_STATIC) != SQLITE_OK ||
+		tll_foreach(*lists[i], it)
+		{
+			if (sqlite3_bind_text(stmnt, 1, pack->name, -1, SQLITE_STATIC) !=
+				SQLITE_OK ||
 			    sqlite3_bind_text(stmnt, 2, it->item, -1, SQLITE_STATIC) != SQLITE_OK ||
 			    sqlite3_step(stmnt) != SQLITE_DONE) {
 				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));

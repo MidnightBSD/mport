@@ -196,7 +196,6 @@ int mport_install_depends(mportInstance *, const char *, const char *, mportAuto
 int mport_install_dependency(mportInstance *, const char *, const char *);
 bool mport_allow_old_release_env(void);
 bool mport_pkgmeta_is_stale_release(mportInstance *, const mportPackageMeta *);
-bool mport_elf_is_shared_library(const char *);
 
 /* shared library analysis at package creation (shlib.c) */
 #define MPORT_SHLIB_NATIVE 0
@@ -204,12 +203,14 @@ bool mport_elf_is_shared_library(const char *);
 #define MPORT_SHLIB_LINUX 2
 #define MPORT_SHLIB_NFLAGS 4
 typedef struct mport_shlib_scan mportShlibScan;
-mportShlibScan *mport_shlib_scan_new(void);
-void mport_shlib_scan_free(mportShlibScan *);
-int mport_shlib_scan_file(mportShlibScan *, const char *, const char *);
-int mport_shlib_scan_finish(mportShlibScan *, mportPackageMeta *);
-int mport_shlib_analyse_elf(const char *, char **, int *, stringlist_t *);
-char *mport_shlib_name_with_flags(const char *, int);
+/*@null@*/ /*@only@*/ mportShlibScan *mport_shlib_scan_new(void);
+void mport_shlib_scan_free(/*@null@*/ /*@only@*/ mportShlibScan *);
+int mport_shlib_scan_file(/*@null@*/ mportShlibScan *, /*@notnull@*/ const char *,
+    /*@notnull@*/ const char *);
+int mport_shlib_scan_finish(/*@null@*/ mportShlibScan *, /*@null@*/ mportPackageMeta *);
+int mport_shlib_analyse_elf(/*@notnull@*/ const char *, /*@out@*/ char **, /*@out@*/ int *,
+    /*@notnull@*/ stringlist_t *);
+/*@null@*/ /*@only@*/ char *mport_shlib_name_with_flags(/*@notnull@*/ const char *, int);
 int mport_install_primative_fd(
     /*@notnull@*/ mportInstance *, int, /*@null@*/ const char *, mportAutomatic);
 int mport_update_down(mportInstance *, mportPackageMeta *, struct ohash_info *, struct ohash *);

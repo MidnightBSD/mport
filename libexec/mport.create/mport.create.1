@@ -169,9 +169,17 @@ for both.
 A library the package requires is dropped from the required list when the
 package itself installs it, under any path, since nothing else is needed to
 satisfy it.
+A symbolic link is read through its target only when the target lies inside
+the staged tree; a link that points outside it, or at nothing, is ignored
+rather than resolved against the build host.
+A package whose shared objects carry no soname, or whose libraries are all
+outside the provide paths, is recorded as providing none.
 .Pp
 The following environment variables shape the lists.
-Each holds a comma separated list; the ports collection sets them from
+Each holds a comma separated list, so a pattern cannot itself contain a
+comma, and a regular expression that does not compile stops the package
+from being created.
+The ports collection sets them from
 .Va USE_LDCONFIG ,
 .Va LIB_DIRS ,
 .Va NO_SHLIB_REQUIRES_GLOB

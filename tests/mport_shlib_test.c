@@ -70,6 +70,8 @@ copy_file(const char *from, const char *to)
 	char buf[8192];
 	size_t n;
 
+	/* ATF_REQUIRE aborts the case on a NULL stream; cppcheck cannot see that */
+	/* cppcheck-suppress-begin nullPointerOutOfResources */
 	in = fopen(from, "rb");
 	ATF_REQUIRE(in != NULL);
 	out = fopen(to, "wb");
@@ -78,12 +80,14 @@ copy_file(const char *from, const char *to)
 		ATF_REQUIRE_EQ(n, fwrite(buf, 1, n, out));
 	ATF_REQUIRE_EQ(0, fclose(out));
 	ATF_REQUIRE_EQ(0, fclose(in));
+	/* cppcheck-suppress-end nullPointerOutOfResources */
 }
 
 static bool
 list_has(const stringlist_t *list, const char *s)
 {
-	tll_foreach(*list, it) {
+	tll_foreach(*list, it)
+	{
 		if (strcmp(it->item, s) == 0)
 			return true;
 	}
@@ -171,8 +175,8 @@ ATF_TC_BODY(analyse_plain_file, tc)
 	    mport_shlib_analyse_elf(test_path("/notes.txt"), &provided, &flags, &required));
 	ATF_REQUIRE(provided == NULL);
 	ATF_REQUIRE_EQ(0, tll_length(required));
-	ATF_REQUIRE_EQ(MPORT_OK,
-	    mport_shlib_analyse_elf(test_path("/absent"), &provided, &flags, &required));
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_shlib_analyse_elf(test_path("/absent"), &provided, &flags, &required));
 	ATF_REQUIRE(provided == NULL);
 }
 ATF_TC_CLEANUP(analyse_plain_file, tc)
@@ -198,7 +202,11 @@ ATF_TC_BODY(analyse_linux_object, tc)
 
 	(void)tc;
 
-	ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_analyse_elf(LINUX_LIBZ, &provided, &flags, &required));
+	char target[PATH_MAX];
+
+	/* the compat path is a symlink; analyse_elf reads regular files only */
+	ATF_REQUIRE(realpath(LINUX_LIBZ, target) != NULL);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_analyse_elf(target, &provided, &flags, &required));
 	ATF_REQUIRE(provided != NULL);
 	ATF_REQUIRE_STREQ("libz.so.1", provided);
 	ATF_REQUIRE_EQ(MPORT_SHLIB_LINUX, flags);
@@ -231,6 +239,194 @@ ATF_TC_BODY(name_with_flags, tc)
 	s = mport_shlib_name_with_flags("libfoo.so.1", MPORT_SHLIB_LINUX | MPORT_SHLIB_COMPAT_32);
 	ATF_REQUIRE_STREQ("libfoo.so.1:Linux:32", s);
 	free(s);
+}
+
+#define LDSO "/usr/libexec/ld-elf.so.1"
+
+static void stage_lib_and_user(const char **, const char **);
+
+ATF_TC(analyse_object_without_soname);
+ATF_TC_HEAD(analyse_object_without_soname, tc)
+{
+	atf_tc_set_md_var(tc, "require.files", LDSO);
+	atf_tc_set_md_var(tc, "descr", "an ET_DYN object with no DT_SONAME provides nothing");
+}
+ATF_TC_BODY(analyse_object_without_soname, tc)
+{
+	char *provided = NULL;
+	int flags = -1;
+	stringlist_t required = tll_init();
+
+	(void)tc;
+
+	ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_analyse_elf(LDSO, &provided, &flags, &required));
+	ATF_REQUIRE(provided == NULL);
+	tll_free_and_free(required, free);
+}
+
+ATF_TC_WITH_CLEANUP(analyse_refuses_symlink);
+ATF_TC_HEAD(analyse_refuses_symlink, tc)
+{
+	atf_tc_set_md_var(tc, "require.files", LIBZ);
+	atf_tc_set_md_var(tc, "descr", "analyse_elf does not follow a symlink itself");
+}
+ATF_TC_BODY(analyse_refuses_symlink, tc)
+{
+	char *provided = NULL;
+	int flags = -1;
+	stringlist_t required = tll_init();
+
+	(void)tc;
+
+	make_test_root();
+	ATF_REQUIRE_EQ(0, symlink(LIBZ, test_path("/link.so")));
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_shlib_analyse_elf(test_path("/link.so"), &provided, &flags, &required));
+	ATF_REQUIRE(provided == NULL);
+	ATF_REQUIRE_EQ(0, tll_length(required));
+}
+ATF_TC_CLEANUP(analyse_refuses_symlink, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(scan_symlinks_stay_inside_the_stage);
+ATF_TC_HEAD(scan_symlinks_stay_inside_the_stage, tc)
+{
+	atf_tc_set_md_var(tc, "require.files", LIBZ " " GZIP);
+	atf_tc_set_md_var(tc, "descr",
+	    "a link to a staged library is read; one pointing at the build host is ignored");
+}
+ATF_TC_BODY(scan_symlinks_stay_inside_the_stage, tc)
+{
+	mportShlibScan *scan;
+	mportPackageMeta *pack;
+	const char *lib, *bin;
+
+	(void)tc;
+
+	clear_shlib_env();
+	stage_lib_and_user(&lib, &bin);
+	/* the real library lives in a private directory; the provide path holds
+	 * links: one relative into the stage, one absolute as the package would
+	 * install it (resolved against the stage root), one to the host */
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage/usr/local/lib/private"), 0755));
+	ATF_REQUIRE_EQ(0, rename(lib, test_path("/stage/usr/local/lib/private/libtestz.so.6")));
+	ATF_REQUIRE_EQ(
+	    0, symlink("private/libtestz.so.6", test_path("/stage/usr/local/lib/libz.so.6")));
+	ATF_REQUIRE_EQ(0,
+	    symlink("/usr/local/lib/private/libtestz.so.6",
+		test_path("/stage/usr/local/lib/libabs.so")));
+	ATF_REQUIRE_EQ(0, symlink("/lib/libc.so.7", test_path("/stage/usr/local/lib/libhost.so")));
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib", 1));
+
+	scan = mport_shlib_scan_new();
+	ATF_REQUIRE(scan != NULL);
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_shlib_scan_file(scan, test_path("/stage/usr/local/lib/private/libtestz.so.6"),
+		"/usr/local/lib/private/libtestz.so.6"));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_shlib_scan_file(
+		scan, test_path("/stage/usr/local/lib/libz.so.6"), "/usr/local/lib/libz.so.6"));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_shlib_scan_file(
+		scan, test_path("/stage/usr/local/lib/libabs.so"), "/usr/local/lib/libabs.so"));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_shlib_scan_file(
+		scan, test_path("/stage/usr/local/lib/libhost.so"), "/usr/local/lib/libhost.so"));
+
+	pack = mport_pkgmeta_new();
+	ATF_REQUIRE(pack != NULL);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_scan_finish(scan, pack));
+
+	/* libz.so.6 is provided through the in-stage links; the host's libc
+	 * never entered the picture */
+	ATF_REQUIRE_EQ(1, tll_length(pack->shlibs_provided));
+	ATF_REQUIRE(list_has(&pack->shlibs_provided, "libz.so.6"));
+	ATF_REQUIRE(!list_has(&pack->shlibs_provided, "libc.so.7"));
+
+	mport_pkgmeta_free(pack);
+	mport_shlib_scan_free(scan);
+	clear_shlib_env();
+}
+ATF_TC_CLEANUP(scan_symlinks_stay_inside_the_stage, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(scan_normalises_installed_path);
+ATF_TC_HEAD(scan_normalises_installed_path, tc)
+{
+	atf_tc_set_md_var(tc, "require.files", LIBZ);
+	atf_tc_set_md_var(tc, "descr",
+	    "doubled slashes, dot and dot-dot components do not defeat the path filter");
+}
+ATF_TC_BODY(scan_normalises_installed_path, tc)
+{
+	mportShlibScan *scan;
+	mportPackageMeta *pack;
+	const char *lib, *bin;
+	static const char *const spellings[] = { "/usr/local//lib/libtestz.so.6",
+		"/usr/local/./lib/libtestz.so.6", "/usr/local/lib/../lib/libtestz.so.6",
+		"usr/local/lib/libtestz.so.6", NULL };
+
+	(void)tc;
+
+	clear_shlib_env();
+	stage_lib_and_user(&lib, &bin);
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib", 1));
+
+	for (const char *const *sp = spellings; *sp != NULL; sp++) {
+		scan = mport_shlib_scan_new();
+		ATF_REQUIRE(scan != NULL);
+		ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_scan_file(scan, lib, *sp));
+		pack = mport_pkgmeta_new();
+		ATF_REQUIRE(pack != NULL);
+		ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_scan_finish(scan, pack));
+		ATF_REQUIRE_MSG(
+		    list_has(&pack->shlibs_provided, "libz.so.6"), "not provided for %s", *sp);
+		mport_pkgmeta_free(pack);
+		mport_shlib_scan_free(scan);
+	}
+
+	clear_shlib_env();
+}
+ATF_TC_CLEANUP(scan_normalises_installed_path, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC(bad_ignore_regex_is_an_error);
+ATF_TC_HEAD(bad_ignore_regex_is_an_error, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "a pattern that does not compile stops the scan, not silently");
+}
+ATF_TC_BODY(bad_ignore_regex_is_an_error, tc)
+{
+	mportShlibScan *scan;
+
+	(void)tc;
+
+	clear_shlib_env();
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_REQUIRE_IGNORE_REGEX", "lib(unclosed", 1));
+	scan = mport_shlib_scan_new();
+	ATF_REQUIRE(scan == NULL);
+	ATF_REQUIRE_MSG(strstr(mport_err_string(), "SHLIB_REQUIRE_IGNORE_REGEX") != NULL, "%s",
+	    mport_err_string());
+	clear_shlib_env();
+
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_IGNORE_REGEX", "^libz\\.so, ^libfoo", 1));
+	scan = mport_shlib_scan_new();
+	ATF_REQUIRE(scan != NULL);
+	mport_shlib_scan_free(scan);
+	clear_shlib_env();
 }
 
 /* ---- the scan over a staged package ----------------------------------- */
@@ -268,7 +464,8 @@ ATF_TC_BODY(scan_provides_and_requires, tc)
 
 	clear_shlib_env();
 	stage_lib_and_user(&lib, &bin);
-	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib,/usr/local/lib/foo", 1));
+	ATF_REQUIRE_EQ(
+	    0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib,/usr/local/lib/foo", 1));
 
 	scan = mport_shlib_scan_new();
 	ATF_REQUIRE(scan != NULL);
@@ -360,8 +557,8 @@ ATF_TC_BODY(scan_unset_paths_provide_everything, tc)
 
 	scan = mport_shlib_scan_new();
 	ATF_REQUIRE(scan != NULL);
-	ATF_REQUIRE_EQ(MPORT_OK,
-	    mport_shlib_scan_file(scan, lib, "/usr/local/libexec/odd/libtestz.so.6"));
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_shlib_scan_file(scan, lib, "/usr/local/libexec/odd/libtestz.so.6"));
 
 	pack = mport_pkgmeta_new();
 	ATF_REQUIRE(pack != NULL);
@@ -382,7 +579,8 @@ ATF_TC_WITH_CLEANUP(scan_ignore_lists);
 ATF_TC_HEAD(scan_ignore_lists, tc)
 {
 	atf_tc_set_md_var(tc, "require.files", LIBZ " " GZIP);
-	atf_tc_set_md_var(tc, "descr", "glob and regex ignore lists drop provided and required names");
+	atf_tc_set_md_var(
+	    tc, "descr", "glob and regex ignore lists drop provided and required names");
 }
 ATF_TC_BODY(scan_ignore_lists, tc)
 {
@@ -466,10 +664,12 @@ ATF_TC_BODY(create_stores_shlib_tables, tc)
 	write_file(test_path("/plist"), "lib/libtestz.so.6\nbin/gzip\n");
 	assetlist = mport_assetlist_new();
 	ATF_REQUIRE(assetlist != NULL);
+	/* cppcheck-suppress-begin nullPointerOutOfResources */
 	fp = fopen(test_path("/plist"), "r");
 	ATF_REQUIRE(fp != NULL);
 	ATF_REQUIRE_EQ(0, mport_parse_plistfile(fp, assetlist));
 	(void)fclose(fp);
+	/* cppcheck-suppress-end nullPointerOutOfResources */
 
 	pack = mport_pkgmeta_new();
 	ATF_REQUIRE(pack != NULL);
@@ -483,8 +683,8 @@ ATF_TC_BODY(create_stores_shlib_tables, tc)
 
 	extra = mport_createextras_new();
 	ATF_REQUIRE(extra != NULL);
-	(void)strlcpy(extra->pkg_filename, test_path("/shlibpkg-1.0.mport"),
-	    sizeof(extra->pkg_filename));
+	(void)strlcpy(
+	    extra->pkg_filename, test_path("/shlibpkg-1.0.mport"), sizeof(extra->pkg_filename));
 	(void)strlcpy(extra->sourcedir, test_path("/stage"), sizeof(extra->sourcedir));
 
 	ATF_REQUIRE_MSG(mport_create_primative(mport, assetlist, pack, extra) == MPORT_OK, "%s",
@@ -536,6 +736,11 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, analyse_plain_file);
 	ATF_TP_ADD_TC(tp, analyse_linux_object);
 	ATF_TP_ADD_TC(tp, name_with_flags);
+	ATF_TP_ADD_TC(tp, analyse_object_without_soname);
+	ATF_TP_ADD_TC(tp, analyse_refuses_symlink);
+	ATF_TP_ADD_TC(tp, scan_symlinks_stay_inside_the_stage);
+	ATF_TP_ADD_TC(tp, scan_normalises_installed_path);
+	ATF_TP_ADD_TC(tp, bad_ignore_regex_is_an_error);
 	ATF_TP_ADD_TC(tp, scan_provides_and_requires);
 	ATF_TP_ADD_TC(tp, scan_private_library);
 	ATF_TP_ADD_TC(tp, scan_unset_paths_provide_everything);
