@@ -772,3 +772,218 @@ mport_shlib_scan_finish(mportShlibScan *scan, mportPackageMeta *pack)
 
 	return MPORT_OK;
 }
+
+/* ---- registry ---------------------------------------------------------- */
+
+static bool
+stub_has_table(mportInstance *mport, const char *table)
+{
+	int count = 0;
+
+	if (mport_db_count(mport->db, &count,
+		"SELECT count(*) FROM stub.sqlite_master WHERE type='table' AND name=%Q", table) !=
+	    MPORT_OK)
+		return false;
+	return count > 0;
+}
+
+/*
+ * Copy the package file's lists into the registry.  Packages built before
+ * the scan existed carry neither table and register nothing, which reads
+ * as "unknown" rather than "none" to the consumers.
+ */
+int
+mport_shlibs_register(mportInstance *mport, mportPackageMeta *pkg)
+{
+	if (pkg == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "pkg is null");
+	if (mport->db == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "mport database is not initialized");
+
+	if (stub_has_table(mport, "shlibs_provided") &&
+	    mport_db_do(mport->db,
+		"INSERT INTO shlibs_provided (pkg, name) SELECT pkg, name FROM stub.shlibs_provided WHERE pkg=%Q",
+		pkg->name) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	if (stub_has_table(mport, "shlibs_required") &&
+	    mport_db_do(mport->db,
+		"INSERT INTO shlibs_required (pkg, name) SELECT pkg, name FROM stub.shlibs_required WHERE pkg=%Q",
+		pkg->name) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	return MPORT_OK;
+}
+
+static int
+load_names(mportInstance *mport, const char *table, const char *pkgname, stringlist_t *out)
+{
+	sqlite3_stmt *stmt = NULL;
+	int rc;
+
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT name FROM %s WHERE pkg=%Q ORDER BY name", table, pkgname) != MPORT_OK) {
+		sqlite3_finalize(stmt);
+		RETURN_CURRENT_ERROR;
+	}
+	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		const char *name = (const char *)sqlite3_column_text(stmt, 0);
+		char *copy;
+
+		if (name == NULL)
+			continue;
+		if ((copy = strdup(name)) == NULL) {
+			sqlite3_finalize(stmt);
+			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory");
+		}
+		tll_push_back(*out, copy);
+	}
+	sqlite3_finalize(stmt);
+	if (rc != SQLITE_DONE)
+		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+
+	return MPORT_OK;
+}
+
+/* the registered lists for an installed package; either output may be NULL */
+MPORT_PUBLIC_API int
+mport_shlibs_get(
+    mportInstance *mport, const char *pkgname, stringlist_t *provided, stringlist_t *required)
+{
+	if (mport == NULL || pkgname == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid arguments");
+
+	if (provided != NULL && load_names(mport, "shlibs_provided", pkgname, provided) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+	if (required != NULL && load_names(mport, "shlibs_required", pkgname, required) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
+	return MPORT_OK;
+}
+
+/* "libfoo.so.1" from "/usr/local/lib/libfoo.so.1"; the flag suffix is kept */
+static const char *
+library_name(const char *library)
+{
+	const char *slash = strrchr(library, '/');
+
+	return slash == NULL ? library : slash + 1;
+}
+
+MPORT_PUBLIC_API int
+mport_shlib_providers(mportInstance *mport, const char *library, mportPackageMeta ***packs)
+{
+	if (mport == NULL || library == NULL || packs == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid arguments");
+
+	return mport_pkgmeta_search_master(mport, packs,
+	    "pkg IN (SELECT pkg FROM shlibs_provided WHERE name=%Q) ORDER BY pkg",
+	    library_name(library));
+}
+
+MPORT_PUBLIC_API int
+mport_shlib_requirers(mportInstance *mport, const char *library, mportPackageMeta ***packs)
+{
+	if (mport == NULL || library == NULL || packs == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid arguments");
+
+	return mport_pkgmeta_search_master(mport, packs,
+	    "pkg IN (SELECT pkg FROM shlibs_required WHERE name=%Q) ORDER BY pkg",
+	    library_name(library));
+}
+
+/*
+ * Whether the base system ships a library, by looking in the directories
+ * the run-time linker searches for the object's class.  The base system is
+ * not a package here, the way pkgbase is on FreeBSD, so this stands in for
+ * a provider.
+ */
+MPORT_PUBLIC_API bool
+mport_shlib_in_base(const char *name)
+{
+	static const char *const native[] = { "/lib", "/usr/lib", NULL };
+	static const char *const compat32[] = { "/usr/lib32", NULL };
+	static const char *const linux64[] = { "/compat/linux/lib64", "/compat/linux/usr/lib64",
+		NULL };
+	static const char *const linux32[] = { "/compat/linux/lib", "/compat/linux/usr/lib",
+		NULL };
+	const char *const *dirs = native;
+	const char *colon;
+	char plain[PATH_MAX];
+	char path[PATH_MAX];
+	size_t len;
+	struct stat sb;
+
+	if (name == NULL || name[0] == '\0')
+		return false;
+	name = library_name(name);
+
+	colon = strchr(name, ':');
+	len = (colon == NULL) ? strlen(name) : (size_t)(colon - name);
+	if (len == 0 || len >= sizeof(plain))
+		return false;
+	memcpy(plain, name, len);
+	plain[len] = '\0';
+
+	if (colon != NULL) {
+		bool is_linux = strstr(colon, ":Linux") != NULL;
+		bool is_32 = strstr(colon, ":32") != NULL;
+
+		if (is_linux)
+			dirs = is_32 ? linux32 : linux64;
+		else if (is_32)
+			dirs = compat32;
+	}
+
+	for (; *dirs != NULL; dirs++) {
+		if (snprintf(path, sizeof(path), "%s/%s", *dirs, plain) >= (int)sizeof(path))
+			continue;
+		if (stat(path, &sb) == 0 && S_ISREG(sb.st_mode))
+			return true;
+	}
+	return false;
+}
+
+/*
+ * Report every registered requirement that no installed package provides
+ * and the base system does not ship.  Returns the count, or -1 on error.
+ */
+MPORT_PUBLIC_API int
+mport_check_missing_shlibs(mportInstance *mport)
+{
+	sqlite3_stmt *stmt = NULL;
+	int missing = 0;
+	int rc;
+
+	if (mport == NULL)
+		return -1;
+
+	if (mport_db_prepare(mport->db, &stmt,
+		"SELECT r.pkg, r.name FROM shlibs_required r "
+		"WHERE EXISTS (SELECT 1 FROM packages p WHERE p.pkg = r.pkg) "
+		"AND NOT EXISTS (SELECT 1 FROM shlibs_provided s WHERE s.name = r.name) "
+		"ORDER BY r.pkg, r.name") != MPORT_OK) {
+		sqlite3_finalize(stmt);
+		return -1;
+	}
+
+	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		const char *pkg = (const char *)sqlite3_column_text(stmt, 0);
+		const char *name = (const char *)sqlite3_column_text(stmt, 1);
+
+		if (pkg == NULL || name == NULL || mport_shlib_in_base(name))
+			continue;
+		mport_call_msg_cb(mport,
+		    "Missing shared library: %s needs %s, which no installed package provides", pkg,
+		    name);
+		missing++;
+	}
+	sqlite3_finalize(stmt);
+
+	if (rc != SQLITE_DONE) {
+		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
+		return -1;
+	}
+
+	return missing;
+}

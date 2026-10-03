@@ -362,6 +362,9 @@ run_master_schema_upgrades(sqlite3 *db, int databaseVersion)
 		/* falls through */
 	case 13:
 		UPGRADE_STEP(mport_upgrade_master_schema_13to14);
+		/* falls through */
+	case 14:
+		UPGRADE_STEP(mport_upgrade_master_schema_14to15);
 		break;
 	default:
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid master database version");
@@ -532,6 +535,22 @@ mport_upgrade_master_schema_13to14(sqlite3 *db)
 	return (MPORT_OK);
 }
 
+/* shared libraries each package provides and requires (see shlib.c) */
+int
+mport_upgrade_master_schema_14to15(sqlite3 *db)
+{
+	RUN_SQL(db,
+	    "CREATE TABLE IF NOT EXISTS shlibs_provided (pkg text NOT NULL, name text NOT NULL)");
+	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS shlibs_provided_pkg ON shlibs_provided (pkg)");
+	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS shlibs_provided_name ON shlibs_provided (name)");
+	RUN_SQL(db,
+	    "CREATE TABLE IF NOT EXISTS shlibs_required (pkg text NOT NULL, name text NOT NULL)");
+	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS shlibs_required_pkg ON shlibs_required (pkg)");
+	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS shlibs_required_name ON shlibs_required (name)");
+
+	return (MPORT_OK);
+}
+
 int
 mport_generate_master_schema(sqlite3 *db)
 {
@@ -574,6 +593,14 @@ mport_generate_master_schema(sqlite3 *db)
 
 	RUN_SQL(db,
 	    "CREATE TABLE IF NOT EXISTS annotation (pkg text NOT NULL, tag TEXT NOT NULL, val TEXT NOT NULL, PRIMARY KEY (pkg, tag))");
+	RUN_SQL(db,
+	    "CREATE TABLE IF NOT EXISTS shlibs_provided (pkg text NOT NULL, name text NOT NULL)");
+	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS shlibs_provided_pkg ON shlibs_provided (pkg)");
+	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS shlibs_provided_name ON shlibs_provided (name)");
+	RUN_SQL(db,
+	    "CREATE TABLE IF NOT EXISTS shlibs_required (pkg text NOT NULL, name text NOT NULL)");
+	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS shlibs_required_pkg ON shlibs_required (pkg)");
+	RUN_SQL(db, "CREATE INDEX IF NOT EXISTS shlibs_required_name ON shlibs_required (name)");
 
 	mport_set_database_version(db);
 

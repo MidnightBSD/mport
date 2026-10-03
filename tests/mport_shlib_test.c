@@ -729,6 +729,255 @@ ATF_TC_CLEANUP(create_stores_shlib_tables, tc)
 	cleanup_test_root();
 }
 
+
+/* ---- the registry --------------------------------------------------- */
+
+/* a test instance rooted in test_root, with the stage already prepared */
+static mportInstance *
+registry_instance(void)
+{
+	mportInstance *mport;
+
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/var"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/var/db"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/usr"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/usr/local"), 0755));
+	mport = mport_instance_new();
+	ATF_REQUIRE(mport != NULL);
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_instance_init(mport, test_root, "root", false, MPORT_VQUIET));
+	mport->offline = true;
+	return mport;
+}
+
+/* build shlibpkg-1.0.mport from the staged libz copy and gzip */
+static const char *
+build_shlibpkg(mportInstance *mport)
+{
+	mportAssetList *assetlist;
+	mportPackageMeta *pack;
+	mportCreateExtras *extra;
+	FILE *fp;
+
+	write_file(test_path("/plist"), "lib/libtestz.so.6\nbin/gzip\n");
+	assetlist = mport_assetlist_new();
+	ATF_REQUIRE(assetlist != NULL);
+	fp = fopen(test_path("/plist"), "r");
+	ATF_REQUIRE(fp != NULL);
+	ATF_REQUIRE_EQ(0, mport_parse_plistfile(fp, assetlist));
+	(void)fclose(fp);
+
+	pack = mport_pkgmeta_new();
+	ATF_REQUIRE(pack != NULL);
+	pack->name = strdup("shlibpkg");
+	pack->version = strdup("1.0");
+	pack->prefix = strdup("/usr/local");
+	pack->origin = strdup("misc/shlibpkg");
+	pack->lang = strdup("");
+	pack->comment = strdup("shared library test package");
+	pack->type = MPORT_TYPE_APP;
+
+	extra = mport_createextras_new();
+	ATF_REQUIRE(extra != NULL);
+	(void)strlcpy(extra->pkg_filename, test_path("/shlibpkg-1.0.mport"),
+	    sizeof(extra->pkg_filename));
+	(void)strlcpy(extra->sourcedir, test_path("/stage"), sizeof(extra->sourcedir));
+
+	ATF_REQUIRE_MSG(mport_create_primative(mport, assetlist, pack, extra) == MPORT_OK, "%s",
+	    mport_err_string());
+	mport_assetlist_free(assetlist);
+	mport_pkgmeta_free(pack);
+	mport_createextras_free(extra);
+
+	return test_path("/shlibpkg-1.0.mport");
+}
+
+ATF_TC_WITH_CLEANUP(install_registers_and_delete_unregisters);
+ATF_TC_HEAD(install_registers_and_delete_unregisters, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "require.files", LIBZ " " GZIP);
+	atf_tc_set_md_var(tc, "descr", "the registry carries the package's lists while it is installed");
+}
+ATF_TC_BODY(install_registers_and_delete_unregisters, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	const char *lib, *bin;
+	stringlist_t prov = tll_init();
+	stringlist_t req = tll_init();
+	mportPackageMeta **packs = NULL;
+	int count;
+
+	(void)tc;
+
+	clear_shlib_env();
+	stage_lib_and_user(&lib, &bin);
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib", 1));
+	mport = registry_instance();
+	pkgfile = build_shlibpkg(mport);
+
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	/* the lists */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_shlibs_get(mport, "shlibpkg", &prov, &req));
+	ATF_REQUIRE_EQ(1, tll_length(prov));
+	ATF_REQUIRE(list_has(&prov, "libz.so.6"));
+	ATF_REQUIRE(list_has(&req, "libc.so.7"));
+	ATF_REQUIRE(list_has(&req, "liblzma.so.5"));
+	ATF_REQUIRE(!list_has(&req, "libz.so.6"));
+	tll_free_and_free(prov, free);
+	tll_free_and_free(req, free);
+
+	/* who provides, who requires; a path is accepted */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_providers(mport, "/usr/local/lib/libz.so.6", &packs));
+	ATF_REQUIRE(packs != NULL && packs[0] != NULL && packs[1] == NULL);
+	ATF_REQUIRE_STREQ("shlibpkg", packs[0]->name);
+	mport_pkgmeta_vec_free(packs);
+	packs = NULL;
+	ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_requirers(mport, "libc.so.7", &packs));
+	ATF_REQUIRE(packs != NULL && packs[0] != NULL);
+	ATF_REQUIRE_STREQ("shlibpkg", packs[0]->name);
+	mport_pkgmeta_vec_free(packs);
+	packs = NULL;
+	ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_providers(mport, "libnothere.so.9", &packs));
+	ATF_REQUIRE(packs == NULL);
+
+	/* delete takes the rows with it */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &packs, "pkg=%Q", "shlibpkg"));
+	ATF_REQUIRE(packs != NULL && packs[0] != NULL);
+	ATF_REQUIRE_MSG(mport_delete_primative(mport, packs[0], 1) == MPORT_OK, "%s",
+	    mport_err_string());
+	mport_pkgmeta_vec_free(packs);
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_count(mport->db, &count, "SELECT count(*) FROM shlibs_provided"));
+	ATF_REQUIRE_EQ(0, count);
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_count(mport->db, &count, "SELECT count(*) FROM shlibs_required"));
+	ATF_REQUIRE_EQ(0, count);
+
+	mport_instance_free(mport);
+	clear_shlib_env();
+}
+ATF_TC_CLEANUP(install_registers_and_delete_unregisters, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC(base_system_libraries);
+ATF_TC_HEAD(base_system_libraries, tc)
+{
+	atf_tc_set_md_var(tc, "require.files", "/lib/libc.so.7");
+	atf_tc_set_md_var(tc, "descr", "libraries the base system ships are recognised by class");
+}
+ATF_TC_BODY(base_system_libraries, tc)
+{
+	(void)tc;
+
+	ATF_REQUIRE(mport_shlib_in_base("libc.so.7"));
+	ATF_REQUIRE(mport_shlib_in_base("/some/where/libc.so.7"));
+	ATF_REQUIRE(!mport_shlib_in_base("libnothere.so.9"));
+	ATF_REQUIRE(!mport_shlib_in_base(""));
+	ATF_REQUIRE(!mport_shlib_in_base(NULL));
+	/* a native name is not looked for under the Linux or 32-bit trees */
+	ATF_REQUIRE(!mport_shlib_in_base("libc.so.7:Linux"));
+	if (access("/compat/linux/lib64/libc.so.6", F_OK) == 0)
+		ATF_REQUIRE(mport_shlib_in_base("libc.so.6:Linux"));
+}
+
+ATF_TC_WITH_CLEANUP(missing_shlib_check);
+ATF_TC_HEAD(missing_shlib_check, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "require.files", LIBZ " " GZIP);
+	atf_tc_set_md_var(tc, "descr",
+	    "a requirement nothing provides is reported; base and package provided ones are not");
+}
+ATF_TC_BODY(missing_shlib_check, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	const char *lib, *bin;
+
+	(void)tc;
+
+	clear_shlib_env();
+	stage_lib_and_user(&lib, &bin);
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib", 1));
+	mport = registry_instance();
+	pkgfile = build_shlibpkg(mport);
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	/* everything gzip needs is in base or in the package */
+	ATF_REQUIRE_EQ(0, mport_check_missing_shlibs(mport));
+
+	/* pretend one requirement is for a library nobody ships */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"UPDATE shlibs_required SET name='libnothere.so.9' WHERE name='liblzma.so.5'"));
+	ATF_REQUIRE_EQ(1, mport_check_missing_shlibs(mport));
+
+	/* a second package providing it clears the report */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"INSERT INTO shlibs_provided (pkg, name) VALUES ('other', 'libnothere.so.9')"));
+	ATF_REQUIRE_EQ(0, mport_check_missing_shlibs(mport));
+
+	mport_instance_free(mport);
+	clear_shlib_env();
+}
+ATF_TC_CLEANUP(missing_shlib_check, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(schema_upgrade_adds_tables);
+ATF_TC_HEAD(schema_upgrade_adds_tables, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr", "a version 14 registry gains the shared library tables");
+}
+ATF_TC_BODY(schema_upgrade_adds_tables, tc)
+{
+	mportInstance *mport;
+	int count;
+
+	(void)tc;
+
+	make_test_root();
+	mport = registry_instance();
+
+	/* a fresh registry has them */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_count(mport->db, &count,
+		"SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('shlibs_provided', 'shlibs_required')"));
+	ATF_REQUIRE_EQ(2, count);
+
+	/* roll it back to 14 and upgrade again */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_db_do(mport->db, "DROP TABLE shlibs_provided"));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_db_do(mport->db, "DROP TABLE shlibs_required"));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_upgrade_master_schema(mport->db, 14));
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_count(mport->db, &count,
+		"SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('shlibs_provided', 'shlibs_required')"));
+	ATF_REQUIRE_EQ(2, count);
+	ATF_REQUIRE_EQ(MPORT_MASTER_VERSION, mport_get_database_version(mport->db));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(schema_upgrade_adds_tables, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, analyse_shared_library);
@@ -746,6 +995,10 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, scan_unset_paths_provide_everything);
 	ATF_TP_ADD_TC(tp, scan_ignore_lists);
 	ATF_TP_ADD_TC(tp, create_stores_shlib_tables);
+	ATF_TP_ADD_TC(tp, install_registers_and_delete_unregisters);
+	ATF_TP_ADD_TC(tp, base_system_libraries);
+	ATF_TP_ADD_TC(tp, missing_shlib_check);
+	ATF_TP_ADD_TC(tp, schema_upgrade_adds_tables);
 
 	return atf_no_error();
 }
