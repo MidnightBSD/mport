@@ -195,6 +195,7 @@ int mport_bundle_read_update_pkg(mportInstance *, mportBundleRead *, mportPackag
 int mport_install_depends(mportInstance *, const char *, const char *, mportAutomatic);
 int mport_install_dependency(mportInstance *, const char *, const char *);
 bool mport_allow_old_release_env(void);
+bool mport_pkgmeta_is_stale_release(mportInstance *, const mportPackageMeta *);
 int mport_install_primative_fd(
     /*@notnull@*/ mportInstance *, int, /*@null@*/ const char *, mportAutomatic);
 int mport_update_down(mportInstance *, mportPackageMeta *, struct ohash_info *, struct ohash *);
