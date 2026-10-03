@@ -74,6 +74,7 @@ struct ohash { };
 #define MPORT_PRECHECK_MOVED 32
 #define MPORT_PRECHECK_DEPRECATED 64
 #define MPORT_PRECHECK_FILE_CONFLICTS 128
+#define MPORT_PRECHECK_BUNDLE_OS 256
 int mport_check_preconditions(mportInstance *, mportPackageMeta *, long);
 
 /* schema */
@@ -193,6 +194,7 @@ int mport_bundle_read_update_pkg(mportInstance *, mportBundleRead *, mportPackag
 
 int mport_install_depends(mportInstance *, const char *, const char *, mportAutomatic);
 int mport_install_dependency(mportInstance *, const char *, const char *);
+bool mport_allow_old_release_env(void);
 int mport_install_primative_fd(
     /*@notnull@*/ mportInstance *, int, /*@null@*/ const char *, mportAutomatic);
 int mport_update_down(mportInstance *, mportPackageMeta *, struct ohash_info *, struct ohash *);

@@ -258,8 +258,10 @@ main(int argc, char *argv[])
 	bool verbose = false;
 	bool force = false;
 	bool brief = false;
+	bool allowOldRelease = false;
 
 	struct option longopts[] = {
+		{ "allow-old-release", no_argument, NULL, 'O' },
 		{ "no-index", no_argument, NULL, 'U' },
 		{ "verbose", no_argument, NULL, 'V' },
 		{ "brief", no_argument, NULL, 'b' },
@@ -282,6 +284,9 @@ main(int argc, char *argv[])
 
 	while ((ch = getopt_long(argc, argv, "+c:o:bfhqUVv", longopts, NULL)) != -1) {
 		switch (ch) {
+		case 'O':
+			allowOldRelease = true;
+			break;
 		case 'U':
 			noIndex++;
 			break;
@@ -335,6 +340,8 @@ main(int argc, char *argv[])
 		errx(1, "%s", mport_err_string());
 	}
 	mport->force = force;
+	if (allowOldRelease)
+		mport->allowOldRelease = true;
 
 	if (version == 1) {
 		show_version(mport, version);
@@ -924,6 +931,8 @@ usage(void)
 	    "  -b          Brief output\n\n"
 	    "  -V          Verbose mode\n"
 	    "  -U          No index update\n"
+	    "  --allow-old-release\n"
+	    "              Install package files built for another OS release\n"
 	    "  -v          Show version\n"
 	    "Commands:\n"
 	    "  Package Management:\n"

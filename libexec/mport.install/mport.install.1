@@ -32,6 +32,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl A
+.Op Fl O
 .Op Fl c Ar chroot-path
 .Op Fl p Ar prefix
 .Ar pkgfile ...
@@ -50,10 +51,24 @@ The same behaviour is available as
 .Bl -tag -width ".Fl p Ar prefix"
 .It Fl A
 Mark installed packages as automatic dependencies.
+.It Fl O
+Install package files that were built for a MidnightBSD release other than
+the target release.
+Such files are refused by default; see
+.Cm --allow-old-release
+in
+.Xr mport 1 .
 .It Fl c Ar chroot-path
 Run the installation inside the specified chroot.
 .It Fl p Ar prefix
 Override the installation prefix.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width ".Ev MPORT_ALLOW_OLD_RELEASE"
+.It Ev MPORT_ALLOW_OLD_RELEASE
+If set to a non-empty value, behave as if
+.Fl O
+had been given.
 .El
 .Sh EXAMPLES
 Install a local package file:
