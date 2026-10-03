@@ -47,6 +47,15 @@
 
 static void usage(void);
 
+/*
+ * Every subcommand parses its own options with getopt(3) over the argument
+ * vector that remains after the global options.  getopt keeps its position
+ * in optind (and, on BSD, internal state that optreset clears), so it must
+ * be restarted first: after a global option such as -U, optind already
+ * points past the subcommand's arguments and the parse comes up empty.
+ */
+static void reset_getopt(void);
+
 static void show_version(/*@null@*/ mportInstance *, int);
 
 static int loadIndex(/*@notnull@*/ mportInstance *);
@@ -366,10 +375,7 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
-#if defined(__MidnightBSD__)
-			optreset = 1;
-#endif
-			optind = 1;
+			reset_getopt();
 			while ((ch2 = getopt(local_argc, local_argv, "Al")) != -1) {
 				switch (ch2) {
 				case 'A':
@@ -409,10 +415,7 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
-#if defined(__MidnightBSD__)
-			optreset = 1;
-#endif
-			optind = 1;
+			reset_getopt();
 			while ((ch2 = getopt(local_argc, local_argv, "AMry")) != -1) {
 				switch (ch2) {
 				case 'A':
@@ -456,10 +459,7 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
-#if defined(__MidnightBSD__)
-			optreset = 1;
-#endif
-			optind = 1;
+			reset_getopt();
 			while ((ch2 = getopt(local_argc, local_argv, "y")) != -1) {
 				switch (ch2) {
 				case 'y':
@@ -485,10 +485,7 @@ main(int argc, char *argv[])
 		int dflag = 0;
 		int ch2;
 
-#if defined(__MidnightBSD__)
-		optreset = 1;
-#endif
-		optind = 1;
+		reset_getopt();
 		while ((ch2 = getopt(argc, argv, "ad")) != -1) {
 			switch (ch2) {
 			case 'a':
@@ -531,6 +528,7 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
+			reset_getopt();
 			while ((ch2 = getopt(local_argc, local_argv, "aqADS")) != -1) {
 				switch (ch2) {
 				case 'S':
@@ -575,10 +573,7 @@ main(int argc, char *argv[])
 		int rflag = 0;
 		int ch2;
 
-#if defined(__MidnightBSD__)
-		optreset = 1;
-#endif
-		optind = 1;
+		reset_getopt();
 		while ((ch2 = getopt(argc, argv, "r")) != -1) {
 			switch (ch2) {
 			case 'r':
@@ -654,6 +649,7 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
+			reset_getopt();
 			while ((ch2 = getopt(local_argc, local_argv, "e")) != -1) {
 				switch (ch2) {
 				case 'e':
@@ -803,7 +799,7 @@ main(int argc, char *argv[])
 
 		if (local_argc > 1) {
 			int ch2;
-			optind = 1;
+			reset_getopt();
 			while ((ch2 = getopt(local_argc, local_argv, "dr")) != -1) {
 				switch (ch2) {
 				case 'd':
@@ -858,6 +854,7 @@ main(int argc, char *argv[])
 		if (local_argc > 1) {
 			int ch2, tflag;
 			tflag = 0;
+			reset_getopt();
 			while ((ch2 = getopt(local_argc, local_argv, "t")) != -1) {
 				switch (ch2) {
 				case 't':
@@ -890,6 +887,7 @@ main(int argc, char *argv[])
 		if (local_argc > 1) {
 			int ch2, oflag;
 			oflag = 0;
+			reset_getopt();
 			while ((ch2 = getopt(local_argc, local_argv, "qo")) != -1) {
 				switch (ch2) {
 				case 'q':
@@ -913,6 +911,15 @@ main(int argc, char *argv[])
 
 	mport_instance_free(mport);
 	exit(resultCode);
+}
+
+static void
+reset_getopt(void)
+{
+#if defined(__MidnightBSD__)
+	optreset = 1;
+#endif
+	optind = 1;
 }
 
 static void
@@ -1120,10 +1127,7 @@ query(/*@notnull@*/ mportInstance *mport, int argc, /*@notnull@*/ char *argv[])
 	opts.case_sensitive = false;
 	opts.match = MPORT_QUERY_MATCH_EXACT;
 
-#if defined(__MidnightBSD__)
-	optreset = 1;
-#endif
-	optind = 1;
+	reset_getopt();
 	while ((ch2 = getopt(argc, argv, "aCe:F:gix")) != -1) {
 		switch (ch2) {
 		case 'a':
