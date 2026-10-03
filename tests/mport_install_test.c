@@ -408,6 +408,57 @@ ATF_TC_CLEANUP(failed_install_registers_nothing, tc)
 }
 
 /*
+ * A @dir asset whose parent directory is a symlink to a directory elsewhere
+ * (the bind chroot layout, /usr/local/etc/namedb -> /var/named/...) must be
+ * created through the link rather than failing the install.
+ */
+ATF_TC_WITH_CLEANUP(dir_asset_through_symlinked_parent);
+ATF_TC_HEAD(dir_asset_through_symlinked_parent, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "a @dir asset below a symlinked parent directory installs");
+}
+ATF_TC_BODY(dir_asset_through_symlinked_parent, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	struct stat sb;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkgfile = create_test_package(mport);
+
+	/* share/testpkg is a link into a tree outside the prefix */
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/var/chroot"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/var/chroot/testpkg"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path(PKG_PREFIX "/share"), 0755));
+	ATF_REQUIRE_EQ(
+	    0, symlink(test_path("/var/chroot/testpkg"), test_path(PKG_PREFIX "/share/testpkg")));
+
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+
+	/* the directory landed behind the link, and the link itself survived */
+	ATF_REQUIRE_EQ(0, lstat(test_path(PKG_PREFIX "/share/testpkg"), &sb));
+	ATF_REQUIRE(S_ISLNK(sb.st_mode));
+	ATF_REQUIRE_EQ(0, lstat(test_path("/var/chroot/testpkg/emptydir"), &sb));
+	ATF_REQUIRE(S_ISDIR(sb.st_mode));
+	ATF_REQUIRE_EQ(0, access(test_path("/var/chroot/testpkg/catalog.mk"), F_OK));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(dir_asset_through_symlinked_parent, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
  * A delete that fails partway through unregistering the package must roll
  * back, leaving the package fully registered and the connection free for the
  * next package in the same run.
@@ -583,6 +634,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, install_from_verified_fd);
 	ATF_TP_ADD_TC(tp, force_reinstall_over_orphaned_rows);
 	ATF_TP_ADD_TC(tp, failed_install_registers_nothing);
+	ATF_TP_ADD_TC(tp, dir_asset_through_symlinked_parent);
 	ATF_TP_ADD_TC(tp, failed_delete_rolls_back);
 	ATF_TP_ADD_TC(tp, failed_schema_upgrade_rolls_back);
 
