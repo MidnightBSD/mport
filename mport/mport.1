@@ -291,6 +291,11 @@ Dependencies that are already installed for the running release are left
 alone, and
 .Fl f
 never applies to them.
+A dependency installed for a previous release is also left alone when it
+provides no shared libraries, since nothing links against it; see
+.Fl S
+in
+.Xr mport.create 1 .
 With
 .Fl l ,
 only the named package files are installed and no dependency package files

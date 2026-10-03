@@ -176,6 +176,7 @@ insert_assetlist(
 	char file[FILENAME_MAX];
 	char cwd[FILENAME_MAX];
 	struct stat st;
+	int shlibs_provided = 0;
 	int error_code = MPORT_OK;
 
 	strlcpy(cwd, extra->sourcedir, FILENAME_MAX);
@@ -279,6 +280,9 @@ insert_assetlist(
 				}
 
 				pack->flatsize += st.st_size;
+
+				if (mport_elf_is_shared_library(file))
+					shlibs_provided++;
 			} else {
 				sqlite3_bind_null(stmnt, 4);
 			}
@@ -298,6 +302,16 @@ insert_assetlist(
 		sqlite3_clear_bindings(stmnt);
 		sqlite3_reset(stmnt);
 	}
+
+	/*
+	 * A package that ships no shared library cannot break anything else
+	 * through a library change, which is what no_provide_shlib records.
+	 * The caller may already have set it (mport.create -S, for ports that
+	 * bundle private libraries) and that stands; the scan only ever adds
+	 * the "provides none" fact.
+	 */
+	if (shlibs_provided == 0)
+		pack->no_provide_shlib = 1;
 	/* cppcheck-suppress-end nullPointer */
 
 done:

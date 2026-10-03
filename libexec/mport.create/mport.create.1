@@ -115,12 +115,19 @@ Expiration date in
 .Dq YYYY-MM-DD
 format.
 .It Fl S Ar no-provide-shlib
-Control whether shared library provides are omitted.
+Record that the package provides no shared libraries to other packages,
+even if it ships some, for example a port that bundles private copies.
 Truthy values include
 .Dq 1 ,
 .Dq y ,
 and
 .Dq t .
+Without this option the staged files are scanned, and the package is
+recorded as providing no shared libraries when none of its files is an ELF
+shared object with a soname.
+.Xr mport 1
+uses the record to accept such a package as a dependency even when it was
+built for an earlier MidnightBSD release.
 .It Fl L Ar lua-script-dir
 Directory containing the Lua hook scripts
 .Pa pkg-pre-install.lua ,

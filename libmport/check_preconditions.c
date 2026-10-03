@@ -300,7 +300,7 @@ check_depends(mportInstance *mport, mportPackageMeta *pack)
 	/* package name on dependencies can contain the flavor prefix. native-binutils but there is
 	 * no guarnatee we stored it as native-bintuils in master. check for binutils also. */
 	if (mport_db_prepare(db, &lookup,
-		"SELECT version, os_release, flavor FROM packages WHERE (pkg=? or (flavor is not null and flavor != '' and pkg=substr(?, length(flavor) + 2) )) AND status='clean'") !=
+		"SELECT version, os_release, flavor, no_provide_shlib FROM packages WHERE (pkg=? or (flavor is not null and flavor != '' and pkg=substr(?, length(flavor) + 2) )) AND status='clean'") !=
 	    MPORT_OK) {
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
@@ -339,8 +339,16 @@ check_depends(mportInstance *mport, mportPackageMeta *pack)
 				os_release = sqlite3_column_text(lookup, 1);
 				int ok;
 
-				if (os_release == NULL || system_os_release == NULL ||
-				    strcmp(os_release, system_os_release) != 0) {
+				/*
+				 * A dependency from another release matters because its
+				 * shared libraries may not match what this package was
+				 * linked against.  One that ships no shared library
+				 * (no_provide_shlib, recorded when it was built) cannot
+				 * cause that, so it is accepted as installed.
+				 */
+				if ((os_release == NULL || system_os_release == NULL ||
+					strcmp(os_release, system_os_release) != 0) &&
+				    sqlite3_column_int(lookup, 3) == 0) {
 					SET_ERRORX(MPORT_ERR_FATAL,
 					    "%s depends on %s version %s.  Version %s for MidnightBSD %s is installed.",
 					    pack->name, depend_pkg,
