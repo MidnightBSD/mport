@@ -348,9 +348,10 @@ rollback:
 }
 
 /*
- * Whether a dependency is installed, clean and registered under the running
- * OS release.  Returns 1 if so, 0 if it is missing or registered under another
- * release, -1 on error.  The lookup mirrors check_depends() so a dependency
+ * Whether a dependency is installed and satisfies check_depends(): clean and
+ * registered under the running OS release, or from another release but
+ * providing no shared library.  Returns 1 if so, 0 if it is missing or needs
+ * replacing, -1 on error.  The lookup mirrors check_depends() so a dependency
  * recorded with a flavor prefix is found the same way the precheck finds it.
  */
 static int
@@ -365,7 +366,7 @@ dependency_is_current(mportInstance *mport, const char *depend_pkg)
 		return -1;
 
 	if (mport_db_prepare(mport->db, &stmt,
-		"SELECT os_release FROM packages WHERE (pkg=%Q or (flavor is not null and flavor != '' and pkg=substr(%Q, length(flavor) + 2))) AND status='clean'",
+		"SELECT os_release, no_provide_shlib FROM packages WHERE (pkg=%Q or (flavor is not null and flavor != '' and pkg=substr(%Q, length(flavor) + 2))) AND status='clean'",
 		depend_pkg, depend_pkg) != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		free(system_os_release);
@@ -375,7 +376,10 @@ dependency_is_current(mportInstance *mport, const char *depend_pkg)
 	switch (sqlite3_step(stmt)) {
 	case SQLITE_ROW:
 		os_release = (const char *)sqlite3_column_text(stmt, 0);
-		ret = (os_release != NULL && strcmp(os_release, system_os_release) == 0) ? 1 : 0;
+		ret = (os_release != NULL && strcmp(os_release, system_os_release) == 0) ||
+			sqlite3_column_int(stmt, 1) != 0 ?
+		    1 :
+		    0;
 		break;
 	case SQLITE_DONE:
 		ret = 0;

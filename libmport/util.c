@@ -1615,6 +1615,70 @@ mport_is_elf_file(const char *file)
 	return (memcmp(magic, ELF_MAGIC, ELF_MAGIC_SIZE) == 0);
 }
 
+/*
+ * Whether file is a shared library: an ET_DYN ELF object whose dynamic
+ * section carries DT_SONAME.  Position-independent executables are ET_DYN
+ * too but have no soname, so they are not counted.  Anything unreadable or
+ * not ELF is simply not a shared library.
+ */
+bool
+mport_elf_is_shared_library(const char *file)
+{
+	int fd;
+	Elf *elf;
+	GElf_Ehdr ehdr;
+	Elf_Scn *scn = NULL;
+	bool soname = false;
+
+	if (elf_version(EV_CURRENT) == EV_NONE)
+		return false;
+
+	if ((fd = open(file, O_RDONLY | O_CLOEXEC)) < 0)
+		return false;
+
+	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
+		close(fd);
+		return false;
+	}
+
+	if (elf_kind(elf) != ELF_K_ELF || gelf_getehdr(elf, &ehdr) == NULL ||
+	    ehdr.e_type != ET_DYN) {
+		elf_end(elf);
+		close(fd);
+		return false;
+	}
+
+	while (!soname && (scn = elf_nextscn(elf, scn)) != NULL) {
+		GElf_Shdr shdr;
+		Elf_Data *data;
+		size_t n, count;
+
+		if (gelf_getshdr(scn, &shdr) != &shdr || shdr.sh_type != SHT_DYNAMIC)
+			continue;
+		if ((data = elf_getdata(scn, NULL)) == NULL || shdr.sh_entsize == 0)
+			continue;
+
+		count = shdr.sh_size / shdr.sh_entsize;
+		for (n = 0; n < count; n++) {
+			GElf_Dyn dyn;
+
+			if (gelf_getdyn(data, (int)n, &dyn) != &dyn)
+				break;
+			if (dyn.d_tag == DT_NULL)
+				break;
+			if (dyn.d_tag == DT_SONAME) {
+				soname = true;
+				break;
+			}
+		}
+	}
+
+	elf_end(elf);
+	close(fd);
+
+	return soname;
+}
+
 MPORT_PUBLIC_API bool
 mport_is_statically_linked(const char *file)
 {
