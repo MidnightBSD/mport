@@ -977,6 +977,69 @@ ATF_TC_CLEANUP(sibling_search_picks_newest_exact_match, tc)
 }
 
 /*
+ * The upgrade pass for packages from an older release keys off the
+ * registered os_release compared with the target.
+ */
+ATF_TC_WITH_CLEANUP(stale_release_detection);
+ATF_TC_HEAD(stale_release_detection, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr", "a package registered for an older release is stale");
+}
+ATF_TC_BODY(stale_release_detection, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	mportPackageMeta **found = NULL;
+	mportPackageMeta none;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkgfile = create_test_package(mport);
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	/* current release: not stale */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", PKG_NAME));
+	ATF_REQUIRE(found != NULL && found[0] != NULL);
+	ATF_REQUIRE(!mport_pkgmeta_is_stale_release(mport, found[0]));
+	mport_pkgmeta_vec_free(found);
+	found = NULL;
+
+	/* older release: stale */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(
+		mport->db, "UPDATE packages SET os_release='0.0-OLD' WHERE pkg=%Q", PKG_NAME));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", PKG_NAME));
+	ATF_REQUIRE(found != NULL && found[0] != NULL);
+	ATF_REQUIRE(mport_pkgmeta_is_stale_release(mport, found[0]));
+	mport_pkgmeta_vec_free(found);
+	found = NULL;
+
+	/* newer release or no recorded release: not stale */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(
+		mport->db, "UPDATE packages SET os_release='999.0' WHERE pkg=%Q", PKG_NAME));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", PKG_NAME));
+	ATF_REQUIRE(found != NULL && found[0] != NULL);
+	ATF_REQUIRE(!mport_pkgmeta_is_stale_release(mport, found[0]));
+	mport_pkgmeta_vec_free(found);
+	memset(&none, 0, sizeof(none));
+	ATF_REQUIRE(!mport_pkgmeta_is_stale_release(mport, &none));
+	ATF_REQUIRE(!mport_pkgmeta_is_stale_release(mport, NULL));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(stale_release_detection, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
  * A delete that fails partway through unregistering the package must roll
  * back, leaving the package fully registered and the connection free for the
  * next package in the same run.
@@ -1161,6 +1224,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, stale_release_replacement_failing_precheck_keeps_copy);
 	ATF_TP_ADD_TC(tp, bundle_from_other_release_is_refused_unless_allowed);
 	ATF_TP_ADD_TC(tp, sibling_search_picks_newest_exact_match);
+	ATF_TP_ADD_TC(tp, stale_release_detection);
 	ATF_TP_ADD_TC(tp, failed_delete_rolls_back);
 	ATF_TP_ADD_TC(tp, failed_schema_upgrade_rolls_back);
 
