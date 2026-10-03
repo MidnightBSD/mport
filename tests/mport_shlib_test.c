@@ -83,6 +83,24 @@ copy_file(const char *from, const char *to)
 	/* cppcheck-suppress-end nullPointerOutOfResources */
 }
 
+/* contents of a small file, or "" if it cannot be read */
+static const char *
+read_file(const char *path)
+{
+	static char contents[1024];
+	FILE *fp;
+	size_t n;
+
+	contents[0] = '\0';
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		return contents;
+	n = fread(contents, 1, sizeof(contents) - 1, fp);
+	contents[n] = '\0';
+	(void)fclose(fp);
+	return contents;
+}
+
 static bool
 list_has(const stringlist_t *list, const char *s)
 {
@@ -750,16 +768,28 @@ registry_instance(void)
 	return mport;
 }
 
+static const char *build_shlibpkg_with(
+    mportInstance *, const char *, const char *, const char *);
+
 /* build shlibpkg-1.0.mport from the staged libz copy and gzip */
 static const char *
 build_shlibpkg(mportInstance *mport)
+{
+	return build_shlibpkg_with(mport, "shlibpkg", "lib/libtestz.so.6\nbin/gzip\n", NULL);
+}
+
+/* the same with a chosen name, plist and optional post-install Lua script */
+static const char *
+build_shlibpkg_with(
+    mportInstance *mport, const char *name, const char *plist, const char *postinstall)
 {
 	mportAssetList *assetlist;
 	mportPackageMeta *pack;
 	mportCreateExtras *extra;
 	FILE *fp;
+	char buf[PATH_MAX];
 
-	write_file(test_path("/plist"), "lib/libtestz.so.6\nbin/gzip\n");
+	write_file(test_path("/plist"), plist);
 	assetlist = mport_assetlist_new();
 	ATF_REQUIRE(assetlist != NULL);
 	fp = fopen(test_path("/plist"), "r");
@@ -769,19 +799,27 @@ build_shlibpkg(mportInstance *mport)
 
 	pack = mport_pkgmeta_new();
 	ATF_REQUIRE(pack != NULL);
-	pack->name = strdup("shlibpkg");
+	pack->name = strdup(name);
 	pack->version = strdup("1.0");
 	pack->prefix = strdup("/usr/local");
-	pack->origin = strdup("misc/shlibpkg");
+	(void)snprintf(buf, sizeof(buf), "misc/%s", name);
+	pack->origin = strdup(buf);
 	pack->lang = strdup("");
 	pack->comment = strdup("shared library test package");
 	pack->type = MPORT_TYPE_APP;
 
 	extra = mport_createextras_new();
 	ATF_REQUIRE(extra != NULL);
-	(void)strlcpy(extra->pkg_filename, test_path("/shlibpkg-1.0.mport"),
-	    sizeof(extra->pkg_filename));
+	(void)snprintf(extra->pkg_filename, sizeof(extra->pkg_filename), "%s/%s-1.0.mport",
+	    test_root, name);
 	(void)strlcpy(extra->sourcedir, test_path("/stage"), sizeof(extra->sourcedir));
+	if (postinstall != NULL) {
+		/* scripts are stored as a UCL array of chunks, one file per hook */
+		(void)snprintf(buf, sizeof(buf), "%s/pkg-post-install.lua", test_root);
+		write_file(buf, postinstall);
+		extra->luapkgpostinstall = strdup(buf);
+		ATF_REQUIRE(extra->luapkgpostinstall != NULL);
+	}
 
 	ATF_REQUIRE_MSG(mport_create_primative(mport, assetlist, pack, extra) == MPORT_OK, "%s",
 	    mport_err_string());
@@ -789,7 +827,8 @@ build_shlibpkg(mportInstance *mport)
 	mport_pkgmeta_free(pack);
 	mport_createextras_free(extra);
 
-	return test_path("/shlibpkg-1.0.mport");
+	(void)snprintf(buf, sizeof(buf), "/%s-1.0.mport", name);
+	return test_path(buf);
 }
 
 ATF_TC_WITH_CLEANUP(install_registers_and_delete_unregisters);
@@ -1053,6 +1092,150 @@ ATF_TC_CLEANUP(install_warns_about_unprovided_libraries, tc)
 	cleanup_test_root();
 }
 
+
+/* ---- scripts and the plist --------------------------------------------- */
+
+ATF_TC_WITH_CLEANUP(lua_scripts_see_shlib_lists);
+ATF_TC_HEAD(lua_scripts_see_shlib_lists, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "require.files", LIBZ " " GZIP);
+	atf_tc_set_md_var(
+	    tc, "descr", "pkg_shlibs_provided and pkg_shlibs_required reach a post-install script");
+}
+ATF_TC_BODY(lua_scripts_see_shlib_lists, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	const char *lib, *bin;
+	const char *out;
+
+	(void)tc;
+
+	clear_shlib_env();
+	stage_lib_and_user(&lib, &bin);
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib", 1));
+	mport = registry_instance();
+	pkgfile = build_shlibpkg_with(mport, "shlibpkg", "lib/libtestz.so.6\nbin/gzip\n",
+	    "[\"local f = io.open('/shlibs.txt', 'w') local nl = string.char(10) "
+	    "for _, n in ipairs(pkg_shlibs_provided) do f:write('P ', n, nl) end "
+	    "for _, n in ipairs(pkg_shlibs_required) do f:write('R ', n, nl) end "
+	    "f:close()\"]");
+
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	out = read_file(test_path("/shlibs.txt"));
+	ATF_REQUIRE_MSG(strstr(out, "P libz.so.6\n") != NULL, "script output: %s", out);
+	ATF_REQUIRE_MSG(strstr(out, "R libc.so.7\n") != NULL, "script output: %s", out);
+	ATF_REQUIRE_MSG(strstr(out, "R libz.so.6") == NULL, "script output: %s", out);
+
+	mport_instance_free(mport);
+	clear_shlib_env();
+}
+ATF_TC_CLEANUP(lua_scripts_see_shlib_lists, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(create_warns_when_ldconfig_and_scan_disagree);
+ATF_TC_HEAD(create_warns_when_ldconfig_and_scan_disagree, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "require.files", LIBZ);
+	atf_tc_set_md_var(tc, "descr", "@ldconfig without a provided library, and the reverse, warn");
+}
+ATF_TC_BODY(create_warns_when_ldconfig_and_scan_disagree, tc)
+{
+	mportInstance *mport;
+	const char *lib, *bin;
+
+	(void)tc;
+
+	clear_shlib_env();
+	stage_lib_and_user(&lib, &bin);
+	mport = registry_instance();
+	mport->msg_cb = capture_msg;
+
+	/* @ldconfig, but the library is not under the provide paths */
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib64", 1));
+	last_messages[0] = '\0';
+	(void)build_shlibpkg_with(mport, "ldc1", "lib/libtestz.so.6\n@ldconfig\n", NULL);
+	ATF_REQUIRE_MSG(strstr(last_messages, "plist has @ldconfig but no shared library") != NULL,
+	    "%s", last_messages);
+
+	/* a provided library, but no @ldconfig */
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib", 1));
+	last_messages[0] = '\0';
+	(void)build_shlibpkg_with(mport, "ldc2", "lib/libtestz.so.6\n", NULL);
+	ATF_REQUIRE_MSG(strstr(last_messages, "plist has no @ldconfig") != NULL, "%s",
+	    last_messages);
+
+	/* both agree: silence */
+	last_messages[0] = '\0';
+	(void)build_shlibpkg_with(mport, "ldc3", "lib/libtestz.so.6\n@ldconfig\n", NULL);
+	ATF_REQUIRE_MSG(strstr(last_messages, "Warning") == NULL, "%s", last_messages);
+
+	/* no libraries and no keyword: silence */
+	last_messages[0] = '\0';
+	(void)build_shlibpkg_with(mport, "ldc4", "bin/gzip\n", NULL);
+	ATF_REQUIRE_MSG(strstr(last_messages, "Warning") == NULL, "%s", last_messages);
+
+	mport_instance_free(mport);
+	clear_shlib_env();
+}
+ATF_TC_CLEANUP(create_warns_when_ldconfig_and_scan_disagree, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+
+ATF_TC_WITH_CLEANUP(plain_lua_file_runs_as_one_script);
+ATF_TC_HEAD(plain_lua_file_runs_as_one_script, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "require.files", LIBZ " " GZIP);
+	atf_tc_set_md_var(tc, "descr", "a hook file that is plain Lua, not a UCL array, runs too");
+}
+ATF_TC_BODY(plain_lua_file_runs_as_one_script, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	const char *lib, *bin;
+	const char *out;
+
+	(void)tc;
+
+	clear_shlib_env();
+	stage_lib_and_user(&lib, &bin);
+	ATF_REQUIRE_EQ(0, setenv("SHLIB_PROVIDE_PATHS_NATIVE", "/usr/local/lib", 1));
+	mport = registry_instance();
+	pkgfile = build_shlibpkg_with(mport, "shlibpkg", "lib/libtestz.so.6\nbin/gzip\n",
+	    "-- plain lua, two lines\n"
+	    "local f = io.open('/plain.txt', 'w')\n"
+	    "f:write(pkg_name, ' ', #pkg_shlibs_provided, ' ', #pkg_shlibs_required > 0 and 'req' or 'none')\n"
+	    "f:close()\n");
+
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	out = read_file(test_path("/plain.txt"));
+	ATF_REQUIRE_STREQ("shlibpkg 1 req", out);
+
+	mport_instance_free(mport);
+	clear_shlib_env();
+}
+ATF_TC_CLEANUP(plain_lua_file_runs_as_one_script, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, analyse_shared_library);
@@ -1075,6 +1258,9 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, missing_shlib_check);
 	ATF_TP_ADD_TC(tp, schema_upgrade_adds_tables);
 	ATF_TP_ADD_TC(tp, install_warns_about_unprovided_libraries);
+	ATF_TP_ADD_TC(tp, lua_scripts_see_shlib_lists);
+	ATF_TP_ADD_TC(tp, plain_lua_file_runs_as_one_script);
+	ATF_TP_ADD_TC(tp, create_warns_when_ldconfig_and_scan_disagree);
 
 	return atf_no_error();
 }
