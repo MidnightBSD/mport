@@ -95,8 +95,18 @@ create_test_instance(void)
  * empty share/<name>/emptydir.  `depend`, if not NULL, is another package
  * name recorded as a dependency with no version requirement.
  */
+static const char *create_package_version(
+    mportInstance *, const char *, const char *, const char *);
+
 static const char *
 create_package(mportInstance *mport, const char *name, const char *depend)
+{
+	return create_package_version(mport, name, PKG_VERSION, depend);
+}
+
+static const char *
+create_package_version(
+    mportInstance *mport, const char *name, const char *version, const char *depend)
 {
 	mportAssetList *assetlist;
 	mportPackageMeta *pack;
@@ -106,7 +116,7 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 	char buf[PATH_MAX];
 	char plist[PATH_MAX];
 
-	(void)snprintf(stage, sizeof(stage), "%s/stage-%s", test_root, name);
+	(void)snprintf(stage, sizeof(stage), "%s/stage-%s-%s", test_root, name, version);
 	ATF_REQUIRE_EQ(0, mkdir(stage, 0755));
 	(void)snprintf(buf, sizeof(buf), "%s/usr", stage);
 	ATF_REQUIRE_EQ(0, mkdir(buf, 0755));
@@ -123,7 +133,7 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 
 	(void)snprintf(plist, sizeof(plist), "share/%s/catalog.mk\n@dir share/%s/emptydir\n",
 	    name, name);
-	(void)snprintf(buf, sizeof(buf), "%s/plist-%s", test_root, name);
+	(void)snprintf(buf, sizeof(buf), "%s/plist-%s-%s", test_root, name, version);
 	write_file(buf, plist);
 
 	assetlist = mport_assetlist_new();
@@ -136,7 +146,7 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 	pack = mport_pkgmeta_new();
 	ATF_REQUIRE(pack != NULL);
 	pack->name = strdup(name);
-	pack->version = strdup(PKG_VERSION);
+	pack->version = strdup(version);
 	pack->prefix = strdup(PKG_PREFIX);
 	(void)snprintf(buf, sizeof(buf), "misc/%s", name);
 	pack->origin = strdup(buf);
@@ -147,7 +157,7 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 	extra = mport_createextras_new();
 	ATF_REQUIRE(extra != NULL);
 	(void)snprintf(extra->pkg_filename, sizeof(extra->pkg_filename), "%s/%s-%s.mport",
-	    test_root, name, PKG_VERSION);
+	    test_root, name, version);
 	(void)strlcpy(extra->sourcedir, stage, sizeof(extra->sourcedir));
 	if (depend != NULL) {
 		/* name:origin, no version requirement */
@@ -166,7 +176,7 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 	mport_pkgmeta_free(pack);
 	mport_createextras_free(extra);
 
-	(void)snprintf(buf, sizeof(buf), "/%s-%s.mport", name, PKG_VERSION);
+	(void)snprintf(buf, sizeof(buf), "/%s-%s.mport", name, version);
 	return test_path(buf);
 }
 
@@ -657,8 +667,10 @@ ATF_TC_BODY(add_replaces_stale_release_dependency, tc)
 	mport->offline = true;
 	ATF_REQUIRE_MSG(mport_install_primative(mport, depfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
 	    "%s", mport_err_string());
+	/* from an older release and a library provider, so it must be replaced */
 	ATF_REQUIRE_EQ(MPORT_OK,
-	    mport_db_do(mport->db, "UPDATE packages SET os_release='0.0-OLD' WHERE pkg='testdep'"));
+	    mport_db_do(mport->db,
+		"UPDATE packages SET os_release='0.0-OLD', no_provide_shlib=0 WHERE pkg='testdep'"));
 
 	mport->force = true;
 	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
@@ -722,6 +734,479 @@ ATF_TC_BODY(local_only_add_ignores_sibling_dependencies, tc)
 	mport_instance_free(mport);
 }
 ATF_TC_CLEANUP(local_only_add_ignores_sibling_dependencies, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * A forced reinstall whose replacement cannot pass its prechecks must leave
+ * the installed copy exactly as it was.  The replacement fails because the
+ * dependency is registered for another OS release and no sibling file can
+ * replace it.
+ */
+ATF_TC_WITH_CLEANUP(forced_reinstall_failing_precheck_keeps_installed_copy);
+ATF_TC_HEAD(forced_reinstall_failing_precheck_keeps_installed_copy, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "a forced reinstall is verified before the installed copy is removed");
+}
+ATF_TC_BODY(forced_reinstall_failing_precheck_keeps_installed_copy, tc)
+{
+	mportInstance *mport;
+	const char *depfile;
+	const char *pkgfile;
+	char pkg_path[PATH_MAX];
+
+	(void)tc;
+
+	mport = create_test_instance();
+	depfile = create_package(mport, "testdep", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, depfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	(void)strlcpy(pkg_path, test_path(PKG_FILE_ABS), sizeof(pkg_path));
+	write_file(pkg_path, "modified\n");
+	/* from an older release and a library provider, so it must be replaced */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"UPDATE packages SET os_release='0.0-OLD', no_provide_shlib=0 WHERE pkg='testdep'"));
+	ATF_REQUIRE_EQ(0, unlink(depfile));
+
+	mport->force = true;
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+
+	/* nothing was removed: the package, its files and the dependency row */
+	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
+	ATF_REQUIRE_EQ(1, count_pkg(mport, "testdep"));
+	ATF_REQUIRE_STREQ("modified\n", read_file(pkg_path));
+	ATF_REQUIRE(count_rows(mport, "assets") > 0);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(forced_reinstall_failing_precheck_keeps_installed_copy, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * Replacing a copy registered for a previous OS release follows the same
+ * rule: the stale copy is removed only after the replacement passes its
+ * prechecks.
+ */
+ATF_TC_WITH_CLEANUP(stale_release_replacement_failing_precheck_keeps_copy);
+ATF_TC_HEAD(stale_release_replacement_failing_precheck_keeps_copy, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr",
+	    "a copy from an older os_release survives a replacement that fails precheck");
+}
+ATF_TC_BODY(stale_release_replacement_failing_precheck_keeps_copy, tc)
+{
+	mportInstance *mport;
+	const char *depfile;
+	const char *pkgfile;
+	char os_release[64];
+
+	(void)tc;
+
+	mport = create_test_instance();
+	depfile = create_package(mport, "testdep", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, depfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	/* both came from the previous release; only the package has a file to
+	 * replace it with */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"UPDATE packages SET os_release='0.0-OLD', no_provide_shlib=0 WHERE pkg IN (%Q, 'testdep')",
+		PKG_NAME));
+	ATF_REQUIRE_EQ(0, unlink(depfile));
+
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+
+	ATF_REQUIRE_EQ(1, count_installed(mport, os_release, sizeof(os_release)));
+	ATF_REQUIRE_STREQ("0.0-OLD", os_release);
+	ATF_REQUIRE_EQ(1, count_pkg(mport, "testdep"));
+	ATF_REQUIRE_EQ(0, access(test_path(PKG_FILE_ABS), F_OK));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(stale_release_replacement_failing_precheck_keeps_copy, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/* Version string of the single registered copy of a package, or "". */
+static const char *
+installed_version(mportInstance *mport, const char *name)
+{
+	static char version[64];
+	mportPackageMeta **found = NULL;
+
+	version[0] = '\0';
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", name));
+	if (found != NULL && found[0] != NULL && found[0]->version != NULL)
+		(void)strlcpy(version, found[0]->version, sizeof(version));
+	if (found != NULL)
+		mport_pkgmeta_vec_free(found);
+
+	return version;
+}
+
+/*
+ * A package file built for another OS release is refused, and the refusal
+ * names both releases.  --allow-old-release (mport->allowOldRelease) and
+ * MPORT_ALLOW_OLD_RELEASE each let it through.
+ */
+ATF_TC_WITH_CLEANUP(bundle_from_other_release_is_refused_unless_allowed);
+ATF_TC_HEAD(bundle_from_other_release_is_refused_unless_allowed, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr",
+	    "a package file from another os_release is refused without the override");
+}
+ATF_TC_BODY(bundle_from_other_release_is_refused_unless_allowed, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	char os_release[64];
+
+	(void)tc;
+
+	mport = create_test_instance();
+
+	/* stamp the package file with a release the host is not running */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_setting_set(mport, MPORT_SETTING_TARGET_OS, "0.0-OLD"));
+	pkgfile = create_test_package(mport);
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "DELETE FROM settings WHERE name=%Q", MPORT_SETTING_TARGET_OS));
+
+	mport->offline = true;
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+	ATF_REQUIRE_MSG(strstr(mport_err_string(), "0.0-OLD") != NULL, "%s", mport_err_string());
+	ATF_REQUIRE_MSG(
+	    strstr(mport_err_string(), "older") != NULL, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_EQ(-1, access(test_path(PKG_FILE_ABS), F_OK));
+
+	/* the flag */
+	mport->allowOldRelease = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, os_release, sizeof(os_release)));
+	ATF_REQUIRE_STREQ("0.0-OLD", os_release);
+	ATF_REQUIRE_EQ(0, access(test_path(PKG_FILE_ABS), F_OK));
+	mport_instance_free(mport);
+
+	/* the environment variable, picked up by instance init */
+	ATF_REQUIRE_EQ(0, setenv(MPORT_ALLOW_OLD_RELEASE_ENV, "1", 1));
+	mport = mport_instance_new();
+	ATF_REQUIRE(mport != NULL);
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_instance_init(mport, test_root, "root", false, MPORT_VQUIET));
+	ATF_REQUIRE_EQ(0, unsetenv(MPORT_ALLOW_OLD_RELEASE_ENV));
+	ATF_REQUIRE(mport->allowOldRelease);
+	mport->offline = true;
+	mport->force = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(bundle_from_other_release_is_refused_unless_allowed, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * When several versions of a dependency sit next to the package file, the
+ * newest is used, and a package that merely shares the name prefix
+ * (testdep-extra) is not mistaken for it.
+ */
+ATF_TC_WITH_CLEANUP(sibling_search_picks_newest_exact_match);
+ATF_TC_HEAD(sibling_search_picks_newest_exact_match, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "dependency lookup in the package directory takes the newest version");
+}
+ATF_TC_BODY(sibling_search_picks_newest_exact_match, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	(void)create_package_version(mport, "testdep", "1.0", NULL);
+	(void)create_package_version(mport, "testdep", "2.0", NULL);
+	(void)create_package_version(mport, "testdep", "10.0", NULL);
+	(void)create_package_version(mport, "testdep-extra", "99.0", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
+	ATF_REQUIRE_EQ(1, count_pkg(mport, "testdep"));
+	ATF_REQUIRE_STREQ("10.0", installed_version(mport, "testdep"));
+	ATF_REQUIRE_EQ(0, count_pkg(mport, "testdep-extra"));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(sibling_search_picks_newest_exact_match, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * The upgrade pass for packages from an older release keys off the
+ * registered os_release compared with the target.
+ */
+ATF_TC_WITH_CLEANUP(stale_release_detection);
+ATF_TC_HEAD(stale_release_detection, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr", "a package registered for an older release is stale");
+}
+ATF_TC_BODY(stale_release_detection, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	mportPackageMeta **found = NULL;
+	mportPackageMeta none;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkgfile = create_test_package(mport);
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	/* current release: not stale */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", PKG_NAME));
+	ATF_REQUIRE(found != NULL && found[0] != NULL);
+	ATF_REQUIRE(!mport_pkgmeta_is_stale_release(mport, found[0]));
+	mport_pkgmeta_vec_free(found);
+	found = NULL;
+
+	/* older release: stale */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(
+		mport->db, "UPDATE packages SET os_release='0.0-OLD' WHERE pkg=%Q", PKG_NAME));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", PKG_NAME));
+	ATF_REQUIRE(found != NULL && found[0] != NULL);
+	ATF_REQUIRE(mport_pkgmeta_is_stale_release(mport, found[0]));
+	mport_pkgmeta_vec_free(found);
+	found = NULL;
+
+	/* newer release or no recorded release: not stale */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(
+		mport->db, "UPDATE packages SET os_release='999.0' WHERE pkg=%Q", PKG_NAME));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", PKG_NAME));
+	ATF_REQUIRE(found != NULL && found[0] != NULL);
+	ATF_REQUIRE(!mport_pkgmeta_is_stale_release(mport, found[0]));
+	mport_pkgmeta_vec_free(found);
+	memset(&none, 0, sizeof(none));
+	ATF_REQUIRE(!mport_pkgmeta_is_stale_release(mport, &none));
+	ATF_REQUIRE(!mport_pkgmeta_is_stale_release(mport, NULL));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(stale_release_detection, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/* Value of no_provide_shlib for the single registered copy of a package. */
+static int
+provides_no_shlib(mportInstance *mport, const char *name)
+{
+	mportPackageMeta **found = NULL;
+	int value = -1;
+
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", name));
+	if (found != NULL && found[0] != NULL)
+		value = found[0]->no_provide_shlib;
+	if (found != NULL)
+		mport_pkgmeta_vec_free(found);
+
+	return value;
+}
+
+/* Copy a file byte for byte; used to stage a real shared library. */
+static void
+copy_file(const char *from, const char *to)
+{
+	FILE *in, *out;
+	char buf[8192];
+	size_t n;
+
+	in = fopen(from, "rb");
+	ATF_REQUIRE(in != NULL);
+	out = fopen(to, "wb");
+	ATF_REQUIRE(out != NULL);
+	while ((n = fread(buf, 1, sizeof(buf), in)) > 0)
+		ATF_REQUIRE_EQ(n, fwrite(buf, 1, n, out));
+	ATF_REQUIRE_EQ(0, fclose(out));
+	ATF_REQUIRE_EQ(0, fclose(in));
+}
+
+/*
+ * Package creation records whether the package ships a shared library: a
+ * package of plain files is marked as providing none, one that stages a
+ * real .so is not.
+ */
+ATF_TC_WITH_CLEANUP(create_records_shared_library_provision);
+ATF_TC_HEAD(create_records_shared_library_provision, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "require.files", "/lib/libz.so.6");
+	atf_tc_set_md_var(tc, "descr", "no_provide_shlib is set from the staged files");
+}
+ATF_TC_BODY(create_records_shared_library_provision, tc)
+{
+	mportInstance *mport;
+	mportAssetList *assetlist;
+	mportPackageMeta *pack;
+	mportCreateExtras *extra;
+	const char *plainfile;
+	FILE *fp;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	plainfile = create_test_package(mport);
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, plainfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, provides_no_shlib(mport, PKG_NAME));
+
+	/* a second package whose only file is a copy of libz */
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage-libpkg"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage-libpkg/usr"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage-libpkg/usr/local"), 0755));
+	ATF_REQUIRE_EQ(0, mkdir(test_path("/stage-libpkg/usr/local/lib"), 0755));
+	copy_file("/lib/libz.so.6", test_path("/stage-libpkg/usr/local/lib/libtestz.so.6"));
+	write_file(test_path("/plist-libpkg"), "lib/libtestz.so.6\n");
+
+	assetlist = mport_assetlist_new();
+	ATF_REQUIRE(assetlist != NULL);
+	fp = fopen(test_path("/plist-libpkg"), "r");
+	ATF_REQUIRE(fp != NULL);
+	ATF_REQUIRE_EQ(0, mport_parse_plistfile(fp, assetlist));
+	(void)fclose(fp);
+
+	pack = mport_pkgmeta_new();
+	ATF_REQUIRE(pack != NULL);
+	pack->name = strdup("libpkg");
+	pack->version = strdup(PKG_VERSION);
+	pack->prefix = strdup(PKG_PREFIX);
+	pack->origin = strdup("misc/libpkg");
+	pack->lang = strdup("");
+	pack->comment = strdup("shared library test package");
+	pack->type = MPORT_TYPE_APP;
+
+	extra = mport_createextras_new();
+	ATF_REQUIRE(extra != NULL);
+	(void)strlcpy(extra->pkg_filename, test_path("/libpkg-1.0.mport"),
+	    sizeof(extra->pkg_filename));
+	(void)strlcpy(extra->sourcedir, test_path("/stage-libpkg"), sizeof(extra->sourcedir));
+
+	ATF_REQUIRE_MSG(mport_create_primative(mport, assetlist, pack, extra) == MPORT_OK, "%s",
+	    mport_err_string());
+	ATF_REQUIRE_EQ(0, pack->no_provide_shlib);
+	mport_assetlist_free(assetlist);
+	mport_pkgmeta_free(pack);
+	mport_createextras_free(extra);
+
+	ATF_REQUIRE_MSG(mport_install_primative(mport, test_path("/libpkg-1.0.mport"), NULL,
+			    MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(0, provides_no_shlib(mport, "libpkg"));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(create_records_shared_library_provision, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * A dependency registered for another release is refused when it may
+ * provide shared libraries, and accepted when it is recorded as providing
+ * none.
+ */
+ATF_TC_WITH_CLEANUP(old_release_dependency_without_shlibs_is_accepted);
+ATF_TC_HEAD(old_release_dependency_without_shlibs_is_accepted, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr",
+	    "the dependency release check is waived for packages that provide no shared library");
+}
+ATF_TC_BODY(old_release_dependency_without_shlibs_is_accepted, tc)
+{
+	mportInstance *mport;
+	const char *depfile;
+	const char *pkgfile;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	depfile = create_package(mport, "testdep", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	mport->noDepends = true; /* no sibling replacement: the check must decide */
+	ATF_REQUIRE_MSG(mport_install_primative(mport, depfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+
+	/* from another release and possibly a library provider: refused */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db,
+		"UPDATE packages SET os_release='0.0-OLD', no_provide_shlib=0 WHERE pkg='testdep'"));
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+	ATF_REQUIRE_MSG(strstr(mport_err_string(), "0.0-OLD") != NULL, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(0, count_pkg(mport, PKG_NAME));
+
+	/* same, but known to ship no shared library: accepted */
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "UPDATE packages SET no_provide_shlib=1 WHERE pkg='testdep'"));
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(old_release_dependency_without_shlibs_is_accepted, tc)
 {
 	(void)tc;
 
@@ -909,6 +1394,13 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, forced_add_leaves_installed_dependency_alone);
 	ATF_TP_ADD_TC(tp, add_replaces_stale_release_dependency);
 	ATF_TP_ADD_TC(tp, local_only_add_ignores_sibling_dependencies);
+	ATF_TP_ADD_TC(tp, forced_reinstall_failing_precheck_keeps_installed_copy);
+	ATF_TP_ADD_TC(tp, stale_release_replacement_failing_precheck_keeps_copy);
+	ATF_TP_ADD_TC(tp, bundle_from_other_release_is_refused_unless_allowed);
+	ATF_TP_ADD_TC(tp, sibling_search_picks_newest_exact_match);
+	ATF_TP_ADD_TC(tp, stale_release_detection);
+	ATF_TP_ADD_TC(tp, create_records_shared_library_provision);
+	ATF_TP_ADD_TC(tp, old_release_dependency_without_shlibs_is_accepted);
 	ATF_TP_ADD_TC(tp, failed_delete_rolls_back);
 	ATF_TP_ADD_TC(tp, failed_schema_upgrade_rolls_back);
 

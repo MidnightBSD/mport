@@ -39,6 +39,7 @@
 .Op Fl U
 .Op Fl V
 .Op Fl v
+.Op Cm --allow-old-release
 .Ar command Op Ar args ...
 .Pp
 .Nm
@@ -213,6 +214,26 @@ package database.
 The following global options are supported by
 .Nm :
 .Bl -tag -width ".Fl o Ar output-path"
+.It Cm --allow-old-release
+Install package files that were built for a MidnightBSD release other than
+the target release.
+Package files record the release they were built on, and
+.Cm add ,
+.Cm install
+and
+.Cm update
+refuse one whose release differs from the target, because libraries from
+another release may carry different symbols or shared library versions.
+The target release is the
+.Cm target_os
+setting when set, otherwise the running system.
+Use this option, or set
+.Ev MPORT_ALLOW_OLD_RELEASE ,
+to install such a file anyway, for example software that is no longer
+available for the current release or packages for a jail running an older
+release.
+The option applies to the named package and to any dependencies installed
+with it.
 .It Fl b, Cm --brief
 Use brief output when supported by the command.
 .It Fl c Ar chroot-path , Cm --chroot Ar chroot-path
@@ -270,6 +291,11 @@ Dependencies that are already installed for the running release are left
 alone, and
 .Fl f
 never applies to them.
+A dependency installed for a previous release is also left alone when it
+provides no shared libraries, since nothing links against it; see
+.Fl S
+in
+.Xr mport.create 1 .
 With
 .Fl l ,
 only the named package files are installed and no dependency package files
@@ -531,6 +557,12 @@ offers to switch it to the package built for the current default.
 If both versions remain available, the old version may instead be retained.
 .It Cm upgrade
 Upgrade all installed packages to the newest available versions.
+Packages that are still registered for an older MidnightBSD release are
+updated first, lowest-level dependencies before the packages that use them,
+so that nothing is upgraded against libraries from the previous release.
+A package from an older release for which the repository has no package is
+reported and left in place.
+The remaining packages are then upgraded in dependency order.
 .It Cm verify Op Fl r Op Ar package ...
 Verify that installed package files have not been deleted or modified.
 If package names are provided, verify only those packages.
@@ -615,9 +647,15 @@ Use
 .Cm mport config list
 to see additional settings supported by the local installation.
 .Sh ENVIRONMENT
-.Bl -tag -width ".Ev FETCH_BIND_ADDRESS"
+.Bl -tag -width ".Ev MPORT_ALLOW_OLD_RELEASE"
 .It Ev ASSUME_ALWAYS_YES
 If set to a non-empty value, answer yes to confirmation prompts.
+.It Ev MPORT_ALLOW_OLD_RELEASE
+If set to a non-empty value, behave as if
+.Cm --allow-old-release
+had been given.
+This is read by the library, so it also applies to
+.Xr mport.install 1 .
 .It Ev FETCH_BIND_ADDRESS
 Bind outgoing network connections to the specified hostname or IP address.
 .It Ev FTP_LOGIN

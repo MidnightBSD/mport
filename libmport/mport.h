@@ -69,6 +69,7 @@ typedef tll(char *) stringlist_t;
 /* Mport Instance (an installed copy of the mport system) */
 #define MPORT_INST_HAVE_INDEX 1
 #define MPORT_LOCAL_PKG_PATH "/var/db/mport/downloads"
+#define MPORT_ALLOW_OLD_RELEASE_ENV "MPORT_ALLOW_OLD_RELEASE"
 
 enum _Verbosity { MPORT_VQUIET, MPORT_VBRIEF, MPORT_VNORMAL, MPORT_VVERBOSE };
 typedef enum _Verbosity mportVerbosity;
@@ -86,6 +87,7 @@ typedef struct {
 	bool force;
 	bool ignoreMissing; /* ignore mising dependencies during installation */
 	bool noDepends; /* do not install dependencies from sibling package files */
+	bool allowOldRelease; /* install package files built for another OS release */
 	mport_msg_cb msg_cb;
 	mport_progress_init_cb progress_init_cb;
 	mport_progress_step_cb progress_step_cb;
