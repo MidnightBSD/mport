@@ -46,6 +46,15 @@
  * @return A pointer to the newly allocated mportInstance structure.
  *         Returns NULL if memory allocation fails.
  */
+/* MPORT_ALLOW_OLD_RELEASE set to a non-empty value, like MPORT_FORCE_HTTP */
+bool
+mport_allow_old_release_env(void)
+{
+	const char *value = getenv(MPORT_ALLOW_OLD_RELEASE_ENV);
+
+	return value != NULL && value[0] != '\0';
+}
+
 MPORT_PUBLIC_API mportInstance *
 mport_instance_new(void)
 {
@@ -68,6 +77,9 @@ mport_instance_init(mportInstance *mport, const char *root, const char *outputPa
 	mport->verbosity = verbosity;
 	mport->offline = false;
 	mport->noDepends = false;
+	/* the environment form exists for jails and scripts that install
+	 * packages built for another release; the CLI flag sets it too */
+	mport->allowOldRelease = mport_allow_old_release_env();
 	mport->force = false;
 	mport->ignoreMissing = false;
 

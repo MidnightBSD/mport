@@ -124,29 +124,65 @@ get_dependencies(mportInstance *mport, mportPackageMeta *pkg)
 	return dependencies;
 }
 
+/*
+ * Find the newest "<prefix><version>.mport" in dir, where prefix is the
+ * package name plus "-".  Package versions never contain "-", so an entry
+ * whose remainder does is another package that happens to share the prefix
+ * (bind- against bind-tools-9.20.29.mport) and is skipped.  Among the rest
+ * the highest version wins rather than whatever readdir returns first.
+ */
 char *
 find_file_with_prefix(const char *dir, const char *prefix)
 {
 	DIR *d;
 	struct dirent *dir_entry;
 	char *found_file = NULL;
+	char *best_version = NULL;
 	size_t prefix_len = strlen(prefix);
+	const char *suffix = ".mport";
+	size_t suffix_len = strlen(suffix);
 
 	d = opendir(dir);
-	if (d) {
-		while ((dir_entry = readdir(d)) != NULL) {
-			if (strncmp(dir_entry->d_name, prefix, prefix_len) == 0) {
-				// Found a file with the correct prefix
-				found_file = malloc(strlen(dir) + strlen(dir_entry->d_name) +
-				    2); // +2 for '/' and null terminator
-				if (found_file) {
-					sprintf(found_file, "%s/%s", dir, dir_entry->d_name);
-				}
-				break;
-			}
+	if (d == NULL)
+		return NULL;
+
+	while ((dir_entry = readdir(d)) != NULL) {
+		const char *name = dir_entry->d_name;
+		size_t name_len = strlen(name);
+		char *version;
+		size_t version_len;
+
+		if (name_len <= prefix_len + suffix_len ||
+		    strncmp(name, prefix, prefix_len) != 0 ||
+		    strcmp(name + name_len - suffix_len, suffix) != 0)
+			continue;
+
+		version_len = name_len - prefix_len - suffix_len;
+		version = strndup(name + prefix_len, version_len);
+		if (version == NULL)
+			continue;
+		if (strchr(version, '-') != NULL) {
+			free(version);
+			continue;
 		}
-		closedir(d);
+
+		if (best_version == NULL || mport_version_cmp(version, best_version) > 0) {
+			char *candidate;
+
+			if (asprintf(&candidate, "%s/%s", dir, name) == -1) {
+				free(version);
+				continue;
+			}
+			free(found_file);
+			free(best_version);
+			found_file = candidate;
+			best_version = version;
+		} else {
+			free(version);
+		}
 	}
+	closedir(d);
+	free(best_version);
 
 	return found_file;
 }
@@ -618,7 +654,8 @@ mport_install_primative_impl(
 		 * Files the installed copy owns are not conflicts: the file check
 		 * matches on package name, whatever release the copy is from.
 		 */
-		precheck_flags = MPORT_PRECHECK_DEPENDS | MPORT_PRECHECK_CONFLICTS;
+		precheck_flags =
+		    MPORT_PRECHECK_BUNDLE_OS | MPORT_PRECHECK_DEPENDS | MPORT_PRECHECK_CONFLICTS;
 		if (!mport->force)
 			precheck_flags |= MPORT_PRECHECK_FILE_CONFLICTS;
 		if (mport_check_preconditions(mport, pkg, precheck_flags) != MPORT_OK) {

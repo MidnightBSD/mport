@@ -95,8 +95,18 @@ create_test_instance(void)
  * empty share/<name>/emptydir.  `depend`, if not NULL, is another package
  * name recorded as a dependency with no version requirement.
  */
+static const char *create_package_version(
+    mportInstance *, const char *, const char *, const char *);
+
 static const char *
 create_package(mportInstance *mport, const char *name, const char *depend)
+{
+	return create_package_version(mport, name, PKG_VERSION, depend);
+}
+
+static const char *
+create_package_version(
+    mportInstance *mport, const char *name, const char *version, const char *depend)
 {
 	mportAssetList *assetlist;
 	mportPackageMeta *pack;
@@ -106,7 +116,7 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 	char buf[PATH_MAX];
 	char plist[PATH_MAX];
 
-	(void)snprintf(stage, sizeof(stage), "%s/stage-%s", test_root, name);
+	(void)snprintf(stage, sizeof(stage), "%s/stage-%s-%s", test_root, name, version);
 	ATF_REQUIRE_EQ(0, mkdir(stage, 0755));
 	(void)snprintf(buf, sizeof(buf), "%s/usr", stage);
 	ATF_REQUIRE_EQ(0, mkdir(buf, 0755));
@@ -123,7 +133,7 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 
 	(void)snprintf(plist, sizeof(plist), "share/%s/catalog.mk\n@dir share/%s/emptydir\n",
 	    name, name);
-	(void)snprintf(buf, sizeof(buf), "%s/plist-%s", test_root, name);
+	(void)snprintf(buf, sizeof(buf), "%s/plist-%s-%s", test_root, name, version);
 	write_file(buf, plist);
 
 	assetlist = mport_assetlist_new();
@@ -136,7 +146,7 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 	pack = mport_pkgmeta_new();
 	ATF_REQUIRE(pack != NULL);
 	pack->name = strdup(name);
-	pack->version = strdup(PKG_VERSION);
+	pack->version = strdup(version);
 	pack->prefix = strdup(PKG_PREFIX);
 	(void)snprintf(buf, sizeof(buf), "misc/%s", name);
 	pack->origin = strdup(buf);
@@ -147,7 +157,7 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 	extra = mport_createextras_new();
 	ATF_REQUIRE(extra != NULL);
 	(void)snprintf(extra->pkg_filename, sizeof(extra->pkg_filename), "%s/%s-%s.mport",
-	    test_root, name, PKG_VERSION);
+	    test_root, name, version);
 	(void)strlcpy(extra->sourcedir, stage, sizeof(extra->sourcedir));
 	if (depend != NULL) {
 		/* name:origin, no version requirement */
@@ -166,7 +176,7 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 	mport_pkgmeta_free(pack);
 	mport_createextras_free(extra);
 
-	(void)snprintf(buf, sizeof(buf), "/%s-%s.mport", name, PKG_VERSION);
+	(void)snprintf(buf, sizeof(buf), "/%s-%s.mport", name, version);
 	return test_path(buf);
 }
 
@@ -838,6 +848,134 @@ ATF_TC_CLEANUP(stale_release_replacement_failing_precheck_keeps_copy, tc)
 	cleanup_test_root();
 }
 
+/* Version string of the single registered copy of a package, or "". */
+static const char *
+installed_version(mportInstance *mport, const char *name)
+{
+	static char version[64];
+	mportPackageMeta **found = NULL;
+
+	version[0] = '\0';
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", name));
+	if (found != NULL && found[0] != NULL && found[0]->version != NULL)
+		(void)strlcpy(version, found[0]->version, sizeof(version));
+	if (found != NULL)
+		mport_pkgmeta_vec_free(found);
+
+	return version;
+}
+
+/*
+ * A package file built for another OS release is refused, and the refusal
+ * names both releases.  --allow-old-release (mport->allowOldRelease) and
+ * MPORT_ALLOW_OLD_RELEASE each let it through.
+ */
+ATF_TC_WITH_CLEANUP(bundle_from_other_release_is_refused_unless_allowed);
+ATF_TC_HEAD(bundle_from_other_release_is_refused_unless_allowed, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr",
+	    "a package file from another os_release is refused without the override");
+}
+ATF_TC_BODY(bundle_from_other_release_is_refused_unless_allowed, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	char os_release[64];
+
+	(void)tc;
+
+	mport = create_test_instance();
+
+	/* stamp the package file with a release the host is not running */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_setting_set(mport, MPORT_SETTING_TARGET_OS, "0.0-OLD"));
+	pkgfile = create_test_package(mport);
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_db_do(mport->db, "DELETE FROM settings WHERE name=%Q", MPORT_SETTING_TARGET_OS));
+
+	mport->offline = true;
+	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
+	ATF_REQUIRE_MSG(strstr(mport_err_string(), "0.0-OLD") != NULL, "%s", mport_err_string());
+	ATF_REQUIRE_MSG(
+	    strstr(mport_err_string(), "older") != NULL, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_EQ(-1, access(test_path(PKG_FILE_ABS), F_OK));
+
+	/* the flag */
+	mport->allowOldRelease = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, os_release, sizeof(os_release)));
+	ATF_REQUIRE_STREQ("0.0-OLD", os_release);
+	ATF_REQUIRE_EQ(0, access(test_path(PKG_FILE_ABS), F_OK));
+	mport_instance_free(mport);
+
+	/* the environment variable, picked up by instance init */
+	ATF_REQUIRE_EQ(0, setenv(MPORT_ALLOW_OLD_RELEASE_ENV, "1", 1));
+	mport = mport_instance_new();
+	ATF_REQUIRE(mport != NULL);
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_instance_init(mport, test_root, "root", false, MPORT_VQUIET));
+	ATF_REQUIRE_EQ(0, unsetenv(MPORT_ALLOW_OLD_RELEASE_ENV));
+	ATF_REQUIRE(mport->allowOldRelease);
+	mport->offline = true;
+	mport->force = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(bundle_from_other_release_is_refused_unless_allowed, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/*
+ * When several versions of a dependency sit next to the package file, the
+ * newest is used, and a package that merely shares the name prefix
+ * (testdep-extra) is not mistaken for it.
+ */
+ATF_TC_WITH_CLEANUP(sibling_search_picks_newest_exact_match);
+ATF_TC_HEAD(sibling_search_picks_newest_exact_match, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "dependency lookup in the package directory takes the newest version");
+}
+ATF_TC_BODY(sibling_search_picks_newest_exact_match, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	(void)create_package_version(mport, "testdep", "1.0", NULL);
+	(void)create_package_version(mport, "testdep", "2.0", NULL);
+	(void)create_package_version(mport, "testdep", "10.0", NULL);
+	(void)create_package_version(mport, "testdep-extra", "99.0", NULL);
+	pkgfile = create_package(mport, PKG_NAME, "testdep");
+
+	mport->offline = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
+	ATF_REQUIRE_EQ(1, count_pkg(mport, "testdep"));
+	ATF_REQUIRE_STREQ("10.0", installed_version(mport, "testdep"));
+	ATF_REQUIRE_EQ(0, count_pkg(mport, "testdep-extra"));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(sibling_search_picks_newest_exact_match, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 /*
  * A delete that fails partway through unregistering the package must roll
  * back, leaving the package fully registered and the connection free for the
@@ -1021,6 +1159,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, local_only_add_ignores_sibling_dependencies);
 	ATF_TP_ADD_TC(tp, forced_reinstall_failing_precheck_keeps_installed_copy);
 	ATF_TP_ADD_TC(tp, stale_release_replacement_failing_precheck_keeps_copy);
+	ATF_TP_ADD_TC(tp, bundle_from_other_release_is_refused_unless_allowed);
+	ATF_TP_ADD_TC(tp, sibling_search_picks_newest_exact_match);
 	ATF_TP_ADD_TC(tp, failed_delete_rolls_back);
 	ATF_TP_ADD_TC(tp, failed_schema_upgrade_rolls_back);
 
