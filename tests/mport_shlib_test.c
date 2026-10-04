@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 
 #include <atf-c.h>
+#include <elf.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
@@ -20,6 +21,7 @@
 #define TEST_ROOT_TEMPLATE "/tmp/mport-shlib-test-root.XXXXXX"
 #define LIBZ "/lib/libz.so.6"
 #define GZIP "/usr/bin/gzip"
+#define LIB32_LIBZ "/usr/lib32/libz.so.6"
 
 static char test_root[PATH_MAX];
 
@@ -1236,8 +1238,94 @@ ATF_TC_CLEANUP(plain_lua_file_runs_as_one_script, tc)
 	cleanup_test_root();
 }
 
+/* ---- ABI_FILE: the target's word size, not the host's ------------------ */
+
+ATF_TC(analyse_for_32bit_target);
+ATF_TC_HEAD(analyse_for_32bit_target, tc)
+{
+	atf_tc_set_md_var(tc, "require.files", LIBZ " " LIB32_LIBZ);
+	atf_tc_set_md_var(tc, "descr",
+	    "a 32-bit object is native for a 32-bit target, and a 64-bit one is skipped");
+}
+ATF_TC_BODY(analyse_for_32bit_target, tc)
+{
+	char *provided = NULL;
+	int flags = -1;
+	stringlist_t required = tll_init();
+
+	(void)tc;
+
+#if defined(__LP64__)
+	/* the host's view, unchanged */
+	ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_analyse_elf(LIB32_LIBZ, &provided, &flags, &required));
+	ATF_REQUIRE_STREQ("libz.so.6", provided);
+	ATF_REQUIRE_EQ(MPORT_SHLIB_COMPAT_32, flags);
+	ATF_REQUIRE(list_has(&required, "libc.so.7:32"));
+	free(provided);
+	tll_free_and_free(required, free);
+#endif
+
+	ATF_REQUIRE_EQ(MPORT_OK,
+	    mport_shlib_analyse_elf_for(ELFCLASS32, LIB32_LIBZ, &provided, &flags, &required));
+	ATF_REQUIRE_STREQ("libz.so.6", provided);
+	ATF_REQUIRE_EQ(MPORT_SHLIB_NATIVE, flags);
+	ATF_REQUIRE(list_has(&required, "libc.so.7"));
+	ATF_REQUIRE(!list_has(&required, "libc.so.7:32"));
+	free(provided);
+	tll_free_and_free(required, free);
+
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_shlib_analyse_elf_for(ELFCLASS32, LIBZ, &provided, &flags, &required));
+	ATF_REQUIRE(provided == NULL);
+	ATF_REQUIRE_EQ(0, (int)tll_length(required));
+
+	ATF_REQUIRE_EQ(
+	    MPORT_OK, mport_shlib_analyse_elf_for(ELFCLASS64, LIBZ, &provided, &flags, &required));
+	ATF_REQUIRE_STREQ("libz.so.6", provided);
+	ATF_REQUIRE_EQ(MPORT_SHLIB_NATIVE, flags);
+	free(provided);
+	tll_free_and_free(required, free);
+}
+
+ATF_TC(scan_uses_abi_file_class);
+ATF_TC_HEAD(scan_uses_abi_file_class, tc)
+{
+	atf_tc_set_md_var(tc, "require.files", LIB32_LIBZ);
+	atf_tc_set_md_var(tc, "descr", "the scan judges word size against ABI_FILE when it is set");
+}
+ATF_TC_BODY(scan_uses_abi_file_class, tc)
+{
+	mportShlibScan *scan;
+	mportPackageMeta *pack;
+
+	(void)tc;
+
+	clear_shlib_env();
+	ATF_REQUIRE_EQ(0, setenv("ABI_FILE", LIB32_LIBZ, 1));
+
+	scan = mport_shlib_scan_new();
+	ATF_REQUIRE(scan != NULL);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_scan_file(scan, LIB32_LIBZ, "/usr/lib/libz.so.6"));
+	pack = mport_pkgmeta_new();
+	ATF_REQUIRE(pack != NULL);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_shlib_scan_finish(scan, pack));
+	ATF_REQUIRE(list_has(&pack->shlibs_provided, "libz.so.6"));
+	ATF_REQUIRE(!list_has(&pack->shlibs_provided, "libz.so.6:32"));
+	ATF_REQUIRE(list_has(&pack->shlibs_required, "libc.so.7"));
+	mport_pkgmeta_free(pack);
+	mport_shlib_scan_free(scan);
+
+	/* an ABI_FILE that cannot be read stops the scan rather than use the host */
+	ATF_REQUIRE_EQ(0, setenv("ABI_FILE", "/nonexistent/abi-file", 1));
+	ATF_REQUIRE(mport_shlib_scan_new() == NULL);
+
+	ATF_REQUIRE_EQ(0, unsetenv("ABI_FILE"));
+}
+
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, analyse_for_32bit_target);
+	ATF_TP_ADD_TC(tp, scan_uses_abi_file_class);
 	ATF_TP_ADD_TC(tp, analyse_shared_library);
 	ATF_TP_ADD_TC(tp, analyse_executable);
 	ATF_TP_ADD_TC(tp, analyse_plain_file);

@@ -215,6 +215,15 @@ int mport_shlibs_load(mportInstance *, mportPackageMeta *);
 int mport_upgrade_master_schema_14to15(sqlite3 *);
 int mport_shlib_analyse_elf(/*@notnull@*/ const char *, /*@out@*/ char **, /*@out@*/ int *,
     /*@notnull@*/ stringlist_t *);
+int mport_shlib_analyse_elf_for(int, /*@notnull@*/ const char *, /*@out@*/ char **,
+    /*@out@*/ int *, /*@notnull@*/ stringlist_t *);
+int mport_abi_file_read(/*@notnull@*/ const char *, /*@null@*/ /*@out@*/ char **,
+    /*@null@*/ /*@out@*/ uint32_t *, /*@null@*/ /*@out@*/ int *);
+#if defined(__LP64__)
+#define MPORT_HOST_ELFCLASS ELFCLASS64
+#else
+#define MPORT_HOST_ELFCLASS ELFCLASS32
+#endif
 /*@null@*/ /*@only@*/ char *mport_shlib_name_with_flags(/*@notnull@*/ const char *, int);
 int mport_install_primative_fd(
     /*@notnull@*/ mportInstance *, int, /*@null@*/ const char *, mportAutomatic);

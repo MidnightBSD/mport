@@ -49,7 +49,9 @@
  * in PKG_ENV when it runs mport.create(1).
  */
 
+#include <sys/endian.h>
 #include <sys/stat.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <gelf.h>
@@ -80,6 +82,7 @@ struct mport_shlib_scan {
 	stringlist_t internal; /* sonames found outside the provide paths */
 	stringlist_t required; /* every DT_NEEDED seen */
 	stringlist_t basenames; /* of every regular file, for the self-check */
+	int elfclass; /* word size of the target: ABI_FILE's, else the host's */
 };
 
 /* comma separated, surrounding blanks dropped; a pattern cannot contain a comma */
@@ -323,12 +326,18 @@ mport_shlib_name_with_flags(const char *name, int flags)
 /*
  * The OS an object was built for, from its ABI note when it has one: a
  * FreeBSD or MidnightBSD NT_FREEBSD_ABI_TAG is native, a GNU NT_GNU_ABI_TAG
- * is Linux.  Returns -1 when no note says.
+ * is Linux.  *os is -1 when no note says.  *osreldate is the value of a
+ * MidnightBSD tag (__MidnightBSD_version, MMmmppp), or 0 without one; a
+ * FreeBSD tag counts FreeBSD releases, so it does not name ours.
  */
-static int
-elf_os_from_notes(Elf *elf)
+static void
+elf_abi_from_notes(Elf *elf, unsigned char encoding, /*@out@*/ int *os,
+    /*@out@*/ uint32_t *osreldate)
 {
 	Elf_Scn *scn = NULL;
+
+	*os = -1;
+	*osreldate = 0;
 
 	while ((scn = elf_nextscn(elf, scn)) != NULL) {
 		GElf_Shdr shdr;
@@ -356,20 +365,103 @@ elf_os_from_notes(Elf *elf)
 			if (owner[namesz - 1] == '\0') {
 				if (note->n_type == NT_FREEBSD_ABI_TAG &&
 				    (strcmp(owner, "FreeBSD") == 0 ||
-					strcmp(owner, "MidnightBSD") == 0))
-					return MPORT_SHLIB_NATIVE;
-				if (note->n_type == NT_GNU_ABI_TAG && strcmp(owner, "GNU") == 0)
-					return MPORT_SHLIB_LINUX;
+					strcmp(owner, "MidnightBSD") == 0)) {
+					/* the descriptor is not translated to host order */
+					if (strcmp(owner, "MidnightBSD") == 0 &&
+					    descsz >= sizeof(uint32_t)) {
+						const void *desc = owner + name_pad;
+						*osreldate = encoding == ELFDATA2MSB ?
+						    be32dec(desc) :
+						    le32dec(desc);
+					}
+					*os = MPORT_SHLIB_NATIVE;
+					return;
+				}
+				if (note->n_type == NT_GNU_ABI_TAG && strcmp(owner, "GNU") == 0) {
+					*os = MPORT_SHLIB_LINUX;
+					return;
+				}
 			}
 			off += sizeof(Elf_Note) + name_pad + desc_pad;
 		}
 	}
-	return -1;
+}
+
+/*
+ * Read the target ABI from a binary, as ABI_FILE names one for cross builds:
+ * *osrelease is the release ("4.1") and *osreldate the raw tag from a
+ * MidnightBSD ABI note, or NULL and 0 when the file has none, and *elfclass
+ * its word size.  Any output may be NULL.  A file that cannot be read or is
+ * not ELF is an error: guessing would record the build host's ABI.
+ */
+int
+mport_abi_file_read(/*@notnull@*/ const char *path, /*@null@*/ /*@out@*/ char **osrelease,
+    /*@null@*/ /*@out@*/ uint32_t *osreldate, /*@null@*/ /*@out@*/ int *elfclass)
+{
+	int fd;
+	Elf *elf;
+	GElf_Ehdr ehdr;
+	struct stat sb;
+	uint32_t tag;
+	int os;
+	int ret = MPORT_OK;
+
+	if (osrelease != NULL)
+		*osrelease = NULL;
+	if (osreldate != NULL)
+		*osreldate = 0;
+	if (elfclass != NULL)
+		*elfclass = ELFCLASSNONE;
+
+	if (elf_version(EV_CURRENT) == EV_NONE)
+		RETURN_ERRORX(
+		    MPORT_ERR_FATAL, "ELF library initialization failed: %s", elf_errmsg(-1));
+
+	if ((fd = open(path, O_RDONLY | O_CLOEXEC)) < 0)
+		RETURN_ERRORX(MPORT_ERR_FATAL, "ABI_FILE %s: %s", path, strerror(errno));
+	if (fstat(fd, &sb) != 0 || !S_ISREG(sb.st_mode)) {
+		close(fd);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "ABI_FILE %s is not a regular file", path);
+	}
+	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
+		close(fd);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "ABI_FILE %s is not an ELF file", path);
+	}
+
+	if (elf_kind(elf) != ELF_K_ELF || gelf_getehdr(elf, &ehdr) == NULL ||
+	    (ehdr.e_ident[EI_CLASS] != ELFCLASS32 && ehdr.e_ident[EI_CLASS] != ELFCLASS64)) {
+		ret = SET_ERRORX(MPORT_ERR_FATAL, "ABI_FILE %s is not an ELF file", path);
+		goto out;
+	}
+
+	elf_abi_from_notes(elf, ehdr.e_ident[EI_DATA], &os, &tag);
+	if (elfclass != NULL)
+		*elfclass = ehdr.e_ident[EI_CLASS];
+	if (osreldate != NULL)
+		*osreldate = tag;
+	if (osrelease != NULL && tag != 0 &&
+	    asprintf(osrelease, "%u.%u", tag / 100000, (tag / 1000) % 100) == -1) {
+		*osrelease = NULL;
+		ret = SET_ERROR(MPORT_ERR_FATAL, "Out of memory");
+	}
+
+out:
+	elf_end(elf);
+	close(fd);
+	return ret;
 }
 
 int
 mport_shlib_analyse_elf(
     const char *path, /*@out@*/ char **provided, /*@out@*/ int *flags, stringlist_t *required)
+{
+	return mport_shlib_analyse_elf_for(MPORT_HOST_ELFCLASS, path, provided, flags, required);
+}
+
+/* As above, judging word size against a target of elfclass, not the host. */
+int
+mport_shlib_analyse_elf_for(int elfclass, const char *path, /*@out@*/ char **provided,
+    /*@out@*/ int *flags, stringlist_t *required)
 {
 	int fd;
 	Elf *elf;
@@ -381,6 +473,7 @@ mport_shlib_analyse_elf(
 	Elf_Data *data;
 	struct stat sb;
 	size_t i;
+	uint32_t osreldate;
 	int os;
 	int ret = MPORT_OK;
 
@@ -412,19 +505,18 @@ mport_shlib_analyse_elf(
 	 * OS: the ABI note first, then the header's OSABI (the MidnightBSD
 	 * toolchain tags every object ELFOSABI_FREEBSD), and otherwise Linux,
 	 * the same fallback the kernel's image activator applies.  Class: a
-	 * 32-bit object on a 64-bit host is a compat32 object; a 64-bit object
-	 * on a 32-bit host cannot run here and is skipped.
+	 * 32-bit object on a 64-bit target is a compat32 object; a 64-bit
+	 * object on a 32-bit target cannot run there and is skipped.
 	 */
-	os = elf_os_from_notes(elf);
+	elf_abi_from_notes(elf, ehdr.e_ident[EI_DATA], &os, &osreldate);
 	if (os == MPORT_SHLIB_LINUX || (os < 0 && ehdr.e_ident[EI_OSABI] != ELFOSABI_FREEBSD))
 		*flags |= MPORT_SHLIB_LINUX;
-#if defined(__LP64__)
-	if (ehdr.e_ident[EI_CLASS] == ELFCLASS32)
-		*flags |= MPORT_SHLIB_COMPAT_32;
-#else
-	if (ehdr.e_ident[EI_CLASS] == ELFCLASS64)
-		goto out;
-#endif
+	if (ehdr.e_ident[EI_CLASS] != elfclass) {
+		if (elfclass == ELFCLASS64 && ehdr.e_ident[EI_CLASS] == ELFCLASS32)
+			*flags |= MPORT_SHLIB_COMPAT_32;
+		else
+			goto out;
+	}
 
 	while ((scn = elf_nextscn(elf, scn)) != NULL) {
 		GElf_Shdr shdr;
@@ -496,6 +588,7 @@ mport_shlib_scan_new(void)
 {
 	mportShlibScan *scan = calloc(1, sizeof(*scan));
 	stringlist_t empty = tll_init();
+	const char *abi_file;
 	int i;
 
 	if (scan == NULL) {
@@ -526,6 +619,14 @@ mport_shlib_scan_new(void)
 		MPORT_OK ||
 	    compile_env_regexes("SHLIB_REQUIRE_IGNORE_REGEX", &scan->require_ignore_regex) !=
 		MPORT_OK) {
+		mport_shlib_scan_free(scan);
+		return NULL;
+	}
+
+	scan->elfclass = MPORT_HOST_ELFCLASS;
+	abi_file = getenv("ABI_FILE");
+	if (abi_file != NULL && abi_file[0] != '\0' &&
+	    mport_abi_file_read(abi_file, NULL, NULL, &scan->elfclass) != MPORT_OK) {
 		mport_shlib_scan_free(scan);
 		return NULL;
 	}
@@ -657,7 +758,8 @@ mport_shlib_scan_file(mportShlibScan *scan, const char *staged_path, const char 
 		return MPORT_OK;
 	}
 
-	if (mport_shlib_analyse_elf(object, &provided, &flags, &scan->required) != MPORT_OK)
+	if (mport_shlib_analyse_elf_for(
+		scan->elfclass, object, &provided, &flags, &scan->required) != MPORT_OK)
 		return mport_err_code();
 
 	if (provided == NULL)

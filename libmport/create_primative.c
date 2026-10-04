@@ -417,7 +417,14 @@ insert_meta(mportInstance *mport, sqlite3 *db, mportPackageMeta *pack, mportCrea
 	char sql[] =
 	    "INSERT INTO packages (pkg, version, origin, lang, prefix, comment, os_release, cpe, deprecated, expiration_date, no_provide_shlib, flavor, type, flatsize) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
-	char *os_release = mport_get_osrelease(mport);
+	char *os_release;
+
+	(void)mport_set_err(MPORT_OK, NULL);
+	if ((os_release = mport_get_osrelease(mport)) == NULL) {
+		if (mport_err_code() != MPORT_OK)
+			RETURN_CURRENT_ERROR;
+		RETURN_ERROR(MPORT_ERR_FATAL, "OS Release could not be determined");
+	}
 	if (pack->cpe == NULL) {
 		pack->cpe = malloc(1 * sizeof(char));
 		pack->cpe[0] = '\0';

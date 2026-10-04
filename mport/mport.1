@@ -241,9 +241,11 @@ and
 .Cm update
 refuse one whose release differs from the target, because libraries from
 another release may carry different symbols or shared library versions.
-The target release is the
+The target release is the one named by
+.Ev ABI_FILE
+when set, then the
 .Cm target_os
-setting when set, otherwise the running system.
+setting, otherwise the running system.
 Use this option, or set
 .Ev MPORT_ALLOW_OLD_RELEASE ,
 to install such a file anyway, for example software that is no longer
@@ -728,7 +730,9 @@ table of
 .It Cm target_os
 Override the operating system version used when fetching and installing
 packages.
-If unset,
+.Ev ABI_FILE ,
+when set, takes precedence.
+If neither is set,
 .Nm
 checks
 .Pa /bin/midnightbsd-version
@@ -763,6 +767,21 @@ Use
 to see additional settings supported by the local installation.
 .Sh ENVIRONMENT
 .Bl -tag -width ".Ev MPORT_ALLOW_OLD_RELEASE"
+.It Ev ABI_FILE
+Path to a binary built for the target system, such as
+.Pa /bin/sh
+in a cross-build sysroot or a jail.
+When set to a non-empty value, the target release is read from the
+MidnightBSD ABI note in that file instead of from the
+.Cm target_os
+setting or the running system, and is used everywhere the release matters:
+fetching the index and packages, installing, upgrading and creating
+packages.
+A file without a MidnightBSD ABI note, such as a Linux binary, leaves the
+release to
+.Cm target_os
+and the running system.
+A file that cannot be read or is not an ELF object is an error.
 .It Ev ASSUME_ALWAYS_YES
 If set to a non-empty value, answer yes to confirmation prompts.
 .It Ev MPORT_ALLOW_OLD_RELEASE
