@@ -174,6 +174,39 @@ rejects_bad_tmpdir_body()
 		-c "test package"
 }
 
+atf_test_case drops_duplicate_plist_entries
+drops_duplicate_plist_entries_head()
+{
+	atf_set "descr" "mport.create warns about and drops a file listed twice in the plist"
+	atf_set "require.progs" "sqlite3"
+}
+drops_duplicate_plist_entries_body()
+{
+	setup_tree
+	# the same file again, as USE_RC_SUBR adds an rc.d script a port also lists
+	printf "@(root,wheel,0444) share/testpkg/file.txt\n" >>plist
+	printf "/usr/local/share/testpkg/file.txt\n" >>plist
+
+	atf_check \
+		-s exit:0 \
+		-o match:"duplicate plist entry for /usr/local/share/testpkg/file.txt removed" \
+		-e empty \
+		"${MPORT_CREATE}" \
+		-n testpkg \
+		-v 1.0 \
+		-o "${PWD}/testpkg-1.0.mport" \
+		-s "${PWD}/root" \
+		-p "${PWD}/plist" \
+		-P /usr/local \
+		-O misc/testpkg \
+		-t misc \
+		-c "test package"
+
+	atf_check -s exit:0 tar -xf "${PWD}/testpkg-1.0.mport" +CONTENTS.db
+	atf_check -s exit:0 -o inline:"1|share/testpkg/file.txt\n" \
+		sqlite3 +CONTENTS.db "SELECT type, data FROM assets WHERE data LIKE '%file.txt'"
+}
+
 atf_test_case mport_version_runs
 mport_version_runs_head()
 {
@@ -210,4 +243,5 @@ atf_init_test_cases()
 	atf_add_test_case mport_version_runs
 	atf_add_test_case records_abi_file_release
 	atf_add_test_case rejects_unreadable_abi_file
+	atf_add_test_case drops_duplicate_plist_entries
 }
