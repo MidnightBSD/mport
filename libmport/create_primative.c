@@ -47,6 +47,7 @@
 
 static int create_stub_db(mportInstance *, sqlite3 **, const char *);
 
+static int drop_duplicate_assets(mportInstance *, mportAssetList *, mportPackageMeta *);
 static int insert_assetlist(sqlite3 *, mportAssetList *, mportPackageMeta *, mportCreateExtras *);
 
 static int insert_meta(mportInstance *, sqlite3 *, mportPackageMeta *, mportCreateExtras *);
@@ -80,6 +81,9 @@ mport_create_primative(mportInstance *mport, mportAssetList *assetlist, mportPac
 	sqlite3 *db = NULL;
 	char dirtmpl[MAXPATHLEN];
 	char *tmpdir;
+
+	if ((error_code = drop_duplicate_assets(mport, assetlist, pack)) != MPORT_OK)
+		return error_code;
 
 	tmpdir = getenv("TMPDIR");
 	if (tmpdir == NULL)
@@ -163,6 +167,134 @@ create_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir)
 		(void)sqlite3_close(*db);
 		*db = NULL;
 	}
+
+	return error_code;
+}
+
+/* a file asset's install path and its position in the plist */
+struct asset_key {
+	/*@only@*/ char *path;
+	size_t seq;
+	bool dup;
+};
+
+static bool
+is_file_asset(mportAssetListEntryType type)
+{
+	return (type == ASSET_FILE || type == ASSET_SAMPLE || type == ASSET_SHELL ||
+	    type == ASSET_FILE_OWNER_MODE || type == ASSET_SAMPLE_OWNER_MODE || type == ASSET_INFO);
+}
+
+static int
+cmp_asset_key_path(const void *a, const void *b)
+{
+	const struct asset_key *x = a;
+	const struct asset_key *y = b;
+	int c = strcmp(x->path, y->path);
+
+	if (c != 0)
+		return c;
+	return (x->seq > y->seq) - (x->seq < y->seq);
+}
+
+static int
+cmp_asset_key_seq(const void *a, const void *b)
+{
+	const struct asset_key *x = a;
+	const struct asset_key *y = b;
+
+	return (x->seq > y->seq) - (x->seq < y->seq);
+}
+
+/*
+ * A plist that names the same file twice (say, a port listing an rc.d script
+ * that USE_RC_SUBR also adds) archives it twice and registers two assets for
+ * one path, so delete trips over the second after removing the first.  Keep
+ * the first entry for each install path, warn about and drop the rest.
+ */
+static int
+drop_duplicate_assets(mportInstance *mport, mportAssetList *assetlist, mportPackageMeta *pack)
+{
+	mportAssetListEntry *e;
+	mportAssetList kept;
+	struct asset_key *keys = NULL;
+	struct asset_key *grown;
+	const char *cwd = pack->prefix;
+	char path[FILENAME_MAX];
+	size_t count = 0, capacity = 0, i;
+	int error_code = MPORT_OK;
+
+	/* STAILQ_FOREACH keeps the iterator non-null in the body; cppcheck can't
+	 * model the macro. */
+	/* cppcheck-suppress-begin uninitvar */
+	STAILQ_FOREACH (e, assetlist, next) {
+		if (e->type == ASSET_CWD)
+			cwd = e->data == NULL ? pack->prefix : e->data;
+
+		if (!is_file_asset(e->type) || e->data == NULL)
+			continue;
+
+		if (e->data[0] == '/')
+			error_code = checked_snprintf(path, sizeof(path), "%s", e->data);
+		else
+			error_code = checked_snprintf(
+			    path, sizeof(path), "%s/%s", cwd == NULL ? "" : cwd, e->data);
+		if (error_code != MPORT_OK)
+			goto done;
+
+		if (count == capacity) {
+			capacity = capacity == 0 ? 64 : capacity * 2;
+			grown = reallocarray(keys, capacity, sizeof(*keys));
+			if (grown == NULL) {
+				error_code = SET_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+				goto done;
+			}
+			keys = grown;
+		}
+
+		keys[count].path = strdup(path);
+		if (keys[count].path == NULL) {
+			error_code = SET_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+			goto done;
+		}
+		keys[count].seq = count;
+		keys[count].dup = false;
+		count++;
+	}
+	/* cppcheck-suppress-end uninitvar */
+
+	if (count < 2)
+		goto done;
+
+	qsort(keys, count, sizeof(*keys), cmp_asset_key_path);
+	for (i = 1; i < count; i++) {
+		if (strcmp(keys[i].path, keys[i - 1].path) == 0) {
+			keys[i].dup = true;
+			mport_call_msg_cb(mport,
+			    "Warning: %s: duplicate plist entry for %s removed", pack->name,
+			    keys[i].path);
+		}
+	}
+	qsort(keys, count, sizeof(*keys), cmp_asset_key_seq);
+
+	/* rebuild the list without the duplicates, in plist order */
+	STAILQ_INIT(&kept);
+	i = 0;
+	while ((e = STAILQ_FIRST(assetlist)) != NULL) {
+		STAILQ_REMOVE_HEAD(assetlist, next);
+		if (is_file_asset(e->type) && e->data != NULL && keys[i++].dup) {
+			free(e->data);
+			free(e);
+			continue;
+		}
+		STAILQ_INSERT_TAIL(&kept, e, next);
+	}
+	STAILQ_CONCAT(assetlist, &kept);
+
+done:
+	for (i = 0; i < count; i++)
+		free(keys[i].path);
+	free(keys);
 
 	return error_code;
 }
@@ -356,7 +488,8 @@ warn_ldconfig_mismatch(mportInstance *mport, mportAssetList *assetlist, mportPac
 		if (e->type == ASSET_LDCONFIG)
 			has_ldconfig = true;
 	}
-	tll_foreach(pack->shlibs_provided, it) {
+	tll_foreach(pack->shlibs_provided, it)
+	{
 		if (strchr(it->item, ':') == NULL)
 			provides_native = true;
 	}
