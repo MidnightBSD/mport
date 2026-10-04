@@ -23,7 +23,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"
-.Dd October 3, 2026
+.Dd October 4, 2026
 .Dt MPORT 1
 .Os
 .Sh NAME
@@ -194,6 +194,13 @@
 .Cm verify
 .Op Fl d
 .Op Fl r
+.Op Ar package ...
+.Pp
+.Nm
+.Cm version
+.Op Fl I | Fl P Ar ports-dir
+.Op Fl l Ar status
+.Op Fl L Ar status
 .Op Ar package ...
 .Pp
 .Nm
@@ -604,6 +611,57 @@ With
 .Fl r ,
 recompute and store checksums for the named packages.
 This is useful after intentional local modifications.
+.It Cm version Oo Fl I | Fl P Ar ports-dir Oc Oo Fl l Ar status Oc Oo Fl L Ar status Oc Op Ar package ...
+Compare each installed package, or only the named
+.Ar package
+arguments, with the newest version the package index offers and print the
+package name and version followed by a status character:
+.Bl -tag -width indent -compact
+.It Ql <
+the installed version is older
+.It Ql =
+the versions are equal
+.It Ql >
+the installed version is newer
+.It Ql \&?
+nothing to compare with: the package is not in the index or ports tree
+.It Ql \&!
+the comparison failed
+.El
+.Pp
+A package found in the index only by its origin, under another name,
+is reported as
+.Ql < .
+With
+.Fl P ,
+or when
+.Ev PORTSDIR
+is set, compare with the ports tree in
+.Ar ports-dir
+instead of the index, using the version
+.Xr make 1
+computes for
+.Va PKGVERSION
+in the directory named by each package's origin, with its flavor.
+This runs
+.Xr make 1
+once per package, so naming packages is much faster than checking all of
+them on a large tree.
+The index is not loaded or fetched in this mode.
+.Fl I
+compares with the index even when
+.Ev PORTSDIR
+is set.
+.Fl l
+shows only packages with the given status and
+.Fl L
+hides them.
+With
+.Fl q ,
+print only the package names and versions;
+with
+.Fl V ,
+also print the version compared with.
 .It Cm version Fl t Ar version1 Ar version2
 Compare two version strings and print
 .Ql <
@@ -737,6 +795,11 @@ HTTP by rewriting HTTPS download URLs to HTTP.
 .It Ev HANDLE_RC_SCRIPTS
 If set to a non-empty value, start or stop rc.d scripts included with the
 package.
+.It Ev PORTSDIR
+Location of a ports tree.
+If set to a non-empty value,
+.Cm version
+compares installed packages with that tree rather than the package index.
 .El
 .Sh EXAMPLES
 Search for a package:
