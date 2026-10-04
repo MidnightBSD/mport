@@ -1196,9 +1196,16 @@ MPORT_PUBLIC_API char *
 mport_get_osrelease(mportInstance *mport)
 {
 	char *version = NULL;
+	const char *abi_file = getenv("ABI_FILE");
 
-	// honor settings first
-	if (mport != NULL) {
+	// a cross build names a target binary; its ABI note wins.  A file
+	// without a MidnightBSD note leaves the release to the next source.
+	if (abi_file != NULL && abi_file[0] != '\0' &&
+	    mport_abi_file_read(abi_file, &version, NULL, NULL) != MPORT_OK)
+		return NULL;
+
+	// then the setting
+	if (version == NULL && mport != NULL) {
 		version = mport_setting_get(mport, MPORT_SETTING_TARGET_OS);
 	}
 
@@ -1221,6 +1228,18 @@ mport_get_osreleasedate(void)
 	int osreleasedate;
 	size_t len = sizeof(osreleasedate);
 	char *date = NULL;
+	const char *abi_file = getenv("ABI_FILE");
+	uint32_t tag;
+
+	if (abi_file != NULL && abi_file[0] != '\0') {
+		if (mport_abi_file_read(abi_file, NULL, &tag, NULL) != MPORT_OK)
+			return NULL;
+		if (tag != 0) {
+			if (asprintf(&date, "%u", tag) == -1)
+				return NULL;
+			return date;
+		}
+	}
 
 	if (sysctlbyname("kern.osreldate", &osreleasedate, &len, NULL, 0) < 0)
 		return NULL;

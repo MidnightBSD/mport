@@ -23,7 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd October 3, 2026
+.Dd October 4, 2026
 .Dt MPORT.CREATE 1
 .Os
 .Sh NAME
@@ -178,7 +178,7 @@ suffix, as
 .Xr pkg 8
 does on FreeBSD:
 .Dq libfoo.so.1:32
-for a 32-bit object on a 64-bit host,
+for a 32-bit object on a 64-bit target,
 .Dq libfoo.so.1:Linux
 for a Linux object and
 .Dq libfoo.so.1:Linux:32
@@ -211,7 +211,7 @@ out of the provided list but still cancels the package's own requirement
 for it.
 When unset, every library is provided.
 .It Ev SHLIB_PROVIDE_PATHS_COMPAT_32
-The same for 32-bit objects on a 64-bit host.
+The same for 32-bit objects on a 64-bit target.
 .It Ev SHLIB_PROVIDE_PATHS_COMPAT_LINUX
 The same for Linux objects.
 .It Ev SHLIB_PROVIDE_PATHS_COMPAT_LINUX_32
@@ -237,6 +237,30 @@ and when native shared libraries are provided but the plist has no
 .Cm @ldconfig ,
 since the run-time linker will not find them until ldconfig runs.
 Neither stops the package from being created.
+.Sh ENVIRONMENT
+.Bl -tag -width ".Ev ABI_FILE"
+.It Ev ABI_FILE
+Path to a binary built for the target system, for cross builds and jails
+where it differs from the build host.
+The ports collection sets it to
+.Pa ${CROSS_SYSROOT}/bin/sh
+when
+.Va CROSS_SYSROOT
+is set.
+The MidnightBSD ABI note in that file gives the release recorded in the
+package, ahead of the
+.Cm target_os
+setting and the running system, and the file's word size is the target's
+when the shared library scan decides which objects are 32-bit compat
+objects; a 64-bit object in a package for a 32-bit target is not
+scanned.
+A file without a MidnightBSD ABI note sets only the word size.
+A file that cannot be read or is not an ELF object stops the package from
+being created rather than recording the build host's release.
+.El
+.Pp
+The shared library scan also reads the variables listed under
+.Sx SHARED LIBRARIES .
 .Sh EXAMPLES
 Create a package bundle from a fake destdir:
 .Dl $ mport.create -n hello -v 1.0 -o hello-1.0.mport -s work/stage -p pkg-plist -P /usr/local -O misc/hello -t misc

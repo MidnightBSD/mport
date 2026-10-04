@@ -275,15 +275,23 @@ mport_generate_stub_schema(mportInstance *mport, sqlite3 *db)
 	insert_meta_values(db, "bundle_format_version", MPORT_BUNDLE_VERSION_STR);
 	RUN_SQL(db, "INSERT INTO meta VALUES (\"build_timestamp\", datetime('now'))");
 
+	/* keep a reason such as an unreadable ABI_FILE rather than replace it */
+	(void)mport_set_err(MPORT_OK, NULL);
 	ptr = mport_get_osrelease(mport);
-	if (ptr == NULL)
+	if (ptr == NULL) {
+		if (mport_err_code() != MPORT_OK)
+			RETURN_CURRENT_ERROR;
 		RETURN_ERROR(MPORT_ERR_FATAL, "OS Release could not be determined");
+	}
 	insert_meta_values(db, "os_release", ptr);
 	free(ptr);
 
 	ptr = mport_get_osreleasedate();
-	if (ptr == NULL)
+	if (ptr == NULL) {
+		if (mport_err_code() != MPORT_OK)
+			RETURN_CURRENT_ERROR;
 		RETURN_ERROR(MPORT_ERR_FATAL, "OS Release Date could not be determined");
+	}
 	insert_meta_values(db, "MidnightBSD_version", ptr);
 	free(ptr);
 	ptr = NULL;
