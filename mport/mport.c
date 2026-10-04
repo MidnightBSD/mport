@@ -59,6 +59,10 @@ static void reset_getopt(void);
 static void show_version(/*@null@*/ mportInstance *, int);
 
 static int loadIndex(/*@notnull@*/ mportInstance *);
+static int version_list(/*@notnull@*/ mportInstance *, /*@null@*/ const char *, char, char, int,
+    /*@notnull@*/ char *const *);
+static int version_print(/*@notnull@*/ mportInstance *, /*@null@*/ const char *,
+    /*@notnull@*/ mportPackageMeta *, char, char);
 
 static /*@only@*/ mportIndexEntry **lookupIndex(
     /*@notnull@*/ mportInstance *, /*@notnull@*/ const char *);
@@ -907,35 +911,72 @@ main(int argc, char *argv[])
 	} else if (!strcmp(cmd, "version")) {
 		int local_argc = argc;
 		char *const *local_argv = argv;
-		if (local_argc > 1) {
-			int ch2, tflag;
-			tflag = 0;
-			reset_getopt();
-			while ((ch2 = getopt(local_argc, local_argv, "t")) != -1) {
-				switch (ch2) {
-				case 't':
-					tflag = 1;
-					break;
-				}
-			}
-			local_argc -= optind;
-			local_argv += optind;
+		const char *portsdir = NULL;
+		const char *env_portsdir;
+		int ch2, tflag = 0, Iflag = 0;
+		char limit = '\0', exclude = '\0';
 
-			if (tflag) {
-				if (local_argv[0] == NULL) {
-					fprintf(stderr, "Usage: mport version -t <v1> <v2>\n");
-					return -2;
+		reset_getopt();
+		while ((ch2 = getopt(local_argc, local_argv, "IL:l:P:t")) != -1) {
+			switch (ch2) {
+			case 'I':
+				Iflag = 1;
+				break;
+			case 'L':
+			case 'l':
+				if (strlen(optarg) != 1 || strchr("<=>?!", optarg[0]) == NULL) {
+					warnx("Invalid status character '%s'", optarg);
+					mport_instance_free(mport);
+					usage();
 				}
-				if (local_argv[1] == NULL) {
-					fprintf(stderr, "Usage: mport version -t <v1> <v2>\n");
-					return -2;
-				}
-				resultCode = mport_version_cmp(local_argv[0], local_argv[1]);
-				printf("%c\n",
-				    resultCode == 0	 ? '=' :
-					resultCode == -1 ? '<' :
-							   '>');
+				if (ch2 == 'l')
+					limit = optarg[0];
+				else
+					exclude = optarg[0];
+				break;
+			case 'P':
+				portsdir = optarg;
+				break;
+			case 't':
+				tflag = 1;
+				break;
+			default:
+				mport_instance_free(mport);
+				usage();
 			}
+		}
+		local_argc -= optind;
+		local_argv += optind;
+
+		if (tflag) {
+			if (local_argv[0] == NULL) {
+				fprintf(stderr, "Usage: mport version -t <v1> <v2>\n");
+				return -2;
+			}
+			if (local_argv[1] == NULL) {
+				fprintf(stderr, "Usage: mport version -t <v1> <v2>\n");
+				return -2;
+			}
+			resultCode = mport_version_cmp(local_argv[0], local_argv[1]);
+			printf("%c\n", resultCode == 0 ? '=' : resultCode == -1 ? '<' : '>');
+		} else {
+			if (Iflag && portsdir != NULL) {
+				warnx("-I and -P are mutually exclusive");
+				mport_instance_free(mport);
+				usage();
+			}
+			if (!Iflag && portsdir == NULL) {
+				env_portsdir = getenv("PORTSDIR");
+				if (env_portsdir != NULL && env_portsdir[0] != '\0')
+					portsdir = env_portsdir;
+			}
+			if (portsdir != NULL && portsdir[0] == '\0') {
+				warnx("Empty ports directory");
+				mport_instance_free(mport);
+				usage();
+			}
+			resultCode =
+			    version_list(mport, portsdir, limit, exclude, local_argc, local_argv);
 		}
 	} else if (!strcmp(cmd, "which")) {
 		int local_argc = argc;
@@ -1038,6 +1079,8 @@ usage(void)
 	    "    import <file>               Import package list\n"
 	    "    export <file>               Export package list\n"
 	    "    shell                       Open SQLite shell for package database\n"
+	    "    version [-I|-P <dir>] [-l <c>] [-L <c>] [pkg ...]\n"
+	    "                                Compare installed packages with the index or ports\n"
 	    "    version -t <v1> <v2>        Compare two version strings\n");
 	exit(EXIT_FAILURE);
 }
@@ -1065,6 +1108,114 @@ loadIndex(/*@notnull@*/ mportInstance *mport)
 	else if (result != MPORT_OK)
 		errx(4, "Unable to load index %s", mport_err_string());
 	return result;
+}
+
+/*
+ * Compare installed packages with the index, or with the ports tree at
+ * portsdir when it is set, printing one status character per package in the
+ * form "version -t" uses, plus "?" when there is nothing to compare with and
+ * "!" when the comparison failed.
+ */
+static int
+version_list(/*@notnull@*/ mportInstance *mport, /*@null@*/ const char *portsdir, char limit,
+    char exclude, int argc, /*@notnull@*/ char *const *argv)
+{
+	mportPackageMeta **packs = NULL;
+	mportPackageMeta **p;
+	int resultCode = MPORT_OK;
+	int tempResultCode;
+	int i;
+
+	/* A ports tree comparison must work on an offline build host. */
+	if (portsdir == NULL)
+		loadIndex(mport);
+
+	if (argc == 0) {
+		if (mport_pkgmeta_list(mport, &packs) != MPORT_OK) {
+			warnx("%s", mport_err_string());
+			mport_pkgmeta_vec_free(packs);
+			return (MPORT_ERR_FATAL);
+		}
+		for (p = packs; p != NULL && *p != NULL; p++) {
+			tempResultCode = version_print(mport, portsdir, *p, limit, exclude);
+			if (tempResultCode != MPORT_OK)
+				resultCode = tempResultCode;
+		}
+		mport_pkgmeta_vec_free(packs);
+		return (resultCode);
+	}
+
+	for (i = 0; i < argc; i++) {
+		packs = lookup_package(mport, argv[i]);
+		if (packs == NULL) {
+			resultCode = MPORT_ERR_WARN;
+			continue;
+		}
+		for (p = packs; *p != NULL; p++) {
+			tempResultCode = version_print(mport, portsdir, *p, limit, exclude);
+			if (tempResultCode != MPORT_OK)
+				resultCode = tempResultCode;
+		}
+		mport_pkgmeta_vec_free(packs);
+	}
+
+	return (resultCode);
+}
+
+static int
+version_print(/*@notnull@*/ mportInstance *mport, /*@null@*/ const char *portsdir,
+    /*@notnull@*/ mportPackageMeta *pack, char limit, char exclude)
+{
+	char *pkgname = NULL;
+	char *remote = NULL;
+	char *namever = NULL;
+	char *detail = NULL;
+	const char *source = portsdir != NULL ? "port" : "index";
+	char status;
+	int cmp;
+	int ret;
+
+	if (portsdir != NULL)
+		ret = mport_ports_version_get(mport, portsdir, pack, &remote);
+	else
+		ret = mport_index_version_get(mport, pack, &pkgname, &remote);
+
+	if (ret != MPORT_OK) {
+		status = '!';
+		ret = asprintf(&detail, "%s", mport_err_string());
+	} else if (remote == NULL) {
+		status = '?';
+		ret = asprintf(&detail, "not in the %s", portsdir != NULL ? "ports tree" : "index");
+	} else if (pkgname != NULL && strcmp(pkgname, pack->name) != 0) {
+		/* only the origin matched: the index carries a replacement */
+		status = '<';
+		ret = asprintf(&detail, "index has %s-%s", pkgname, remote);
+	} else {
+		cmp = mport_version_cmp(pack->version, remote);
+		status = cmp < 0 ? '<' : cmp > 0 ? '>' : '=';
+		ret = asprintf(&detail, "%s has %s", source, remote);
+	}
+	free(pkgname);
+	free(remote);
+
+	if (ret == -1 || asprintf(&namever, "%s-%s", pack->name, pack->version) == -1) {
+		free(detail);
+		warnx("Out of memory.");
+		return (MPORT_ERR_FATAL);
+	}
+
+	if ((limit == '\0' || status == limit) && (exclude == '\0' || status != exclude)) {
+		if (mport->verbosity == MPORT_VQUIET)
+			printf("%s\n", namever);
+		else if (mport->verbosity == MPORT_VVERBOSE)
+			printf("%-40s %c   %s\n", namever, status, detail);
+		else
+			printf("%-40s %c\n", namever, status);
+	}
+
+	free(namever);
+	free(detail);
+	return (status == '!' ? MPORT_ERR_WARN : MPORT_OK);
 }
 
 static mportIndexEntry **

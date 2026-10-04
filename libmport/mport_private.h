@@ -327,6 +327,7 @@ int mport_script_run_child(mportInstance *, int, int *, int, const char *);
 /* Binaries we use */
 #define MPORT_MTREE_BIN "/usr/sbin/mtree"
 #define MPORT_CHROOT_BIN "/usr/sbin/chroot"
+#define MPORT_MAKE_BIN "/usr/bin/make"
 
 #define MPORT_URL_MAX 512
 
