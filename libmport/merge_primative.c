@@ -30,6 +30,9 @@
 
 #include <archive.h>
 #include <archive_entry.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -54,6 +57,7 @@ static int archive_metafiles(mportInstance *, mportBundleWrite *, sqlite3 *, str
 static int archive_package_files(
     mportInstance *, mportBundleWrite *, sqlite3 *, struct table_entry **);
 static int extract_stub_db(const char *, const char *);
+static int make_temp_outfile(const char *, char *, size_t);
 
 static struct table_entry *find_in_table(struct table_entry **, const char *);
 static int insert_into_table(struct table_entry **, const char *, const char *);
@@ -99,7 +103,8 @@ mport_merge_primative(mportInstance *mport, const char **filenames, const char *
 	char dirtmpl[MAXPATHLEN];
 	char *tmpdir;
 	char *madedir = NULL;
-	bool made_outfile = false;
+	char tmpout[MAXPATHLEN];
+	bool made_tmpout = false;
 	int ret = MPORT_OK;
 
 	tmpdir = getenv("TMPDIR");
@@ -142,11 +147,18 @@ mport_merge_primative(mportInstance *mport, const char **filenames, const char *
 		ret = SET_ERROR(MPORT_ERR_FATAL, "Couldn't alloca bundle struct.");
 		goto DONE;
 	}
-	if (mport_bundle_write_init(bundle, outfile) != MPORT_OK) {
+	/* build the bundle beside outfile and rename it into place when it is
+	 * complete, so a failed or concurrent merge never exposes a partial
+	 * bundle or removes an existing one */
+	if (make_temp_outfile(outfile, tmpout, sizeof(tmpout)) != MPORT_OK) {
 		ret = mport_err_code();
 		goto DONE;
 	}
-	made_outfile = true;
+	made_tmpout = true;
+	if (mport_bundle_write_init(bundle, tmpout) != MPORT_OK) {
+		ret = mport_err_code();
+		goto DONE;
+	}
 
 	DIAG("Adding %s", dbfile)
 
@@ -174,6 +186,12 @@ mport_merge_primative(mportInstance *mport, const char **filenames, const char *
 	ret = mport_bundle_write_finish(bundle);
 	bundle = NULL; /* finish frees the bundle on success and failure */
 
+	if (ret == MPORT_OK && rename(tmpout, outfile) != 0)
+		ret = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't rename %s to %s: %s", tmpout, outfile,
+		    strerror(errno));
+	else if (ret == MPORT_OK)
+		made_tmpout = false;
+
 DONE:
 	if (bundle != NULL)
 		(void)mport_bundle_write_finish(bundle);
@@ -182,8 +200,8 @@ DONE:
 	free_table(table);
 	free(dbfile);
 	/* don't leave a truncated bundle behind for someone to install */
-	if (ret != MPORT_OK && made_outfile)
-		(void)unlink(outfile);
+	if (made_tmpout)
+		(void)unlink(tmpout);
 	/* attempt removal of the created tmpdir, ignore errors. */
 	if (madedir != NULL)
 		mport_rmtree(madedir);
@@ -553,6 +571,29 @@ DONE:
 	sqlite3_finalize(files);
 	sqlite3_finalize(stmt);
 	return ret;
+}
+
+/* create an empty, uniquely named file next to outfile and put its name in
+ * tmpout; created like the final bundle would be (0666 less the umask) */
+static int
+make_temp_outfile(const char *outfile, char *tmpout, size_t len)
+{
+	int fd;
+
+	for (int tries = 0; tries < 100; tries++) {
+		if (snprintf(tmpout, len, "%s.%08x", outfile, arc4random()) >= (int)len)
+			RETURN_ERRORX(MPORT_ERR_FATAL, "Output filename too long: %s", outfile);
+
+		if ((fd = open(tmpout, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0666)) != -1) {
+			(void)close(fd);
+			return MPORT_OK;
+		}
+		if (errno != EEXIST)
+			RETURN_ERRORX(
+			    MPORT_ERR_FATAL, "Couldn't create %s: %s", tmpout, strerror(errno));
+	}
+
+	RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't create a temporary file next to %s", outfile);
 }
 
 /* get the stub database file out of filename and place it at destfile */

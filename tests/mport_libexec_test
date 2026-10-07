@@ -188,6 +188,8 @@ merge_combines_packages_body()
 	a=$(grep -n '^share/pkga/f$' listing | cut -d: -f1)
 	b=$(grep -n '^share/pkgb/f$' listing | cut -d: -f1)
 	atf_check -s exit:0 test "${a}" -lt "${b}"
+	# the bundle is built under a temporary name and renamed into place
+	atf_check -s exit:0 -o inline:"out.mport\n" sh -c "ls croot | grep '^out\.mport'"
 }
 
 atf_test_case merge_skips_package_without_files
@@ -244,6 +246,26 @@ merge_rejects_truncated_bundle_body()
 	atf_check -s not-exit:0 -o empty -e match:"archive ends before 'share/pkgc/other'" \
 		env TMPDIR=/tmp "${MPORT_MERGE}" -c "${PWD}/croot" -o /out.mport /pkga.mport /trunc.mport
 	atf_check -s not-exit:0 test -e croot/out.mport
+}
+
+atf_test_case merge_failure_keeps_existing_output
+merge_failure_keeps_existing_output_head()
+{
+	atf_set "descr" "a failed mport.merge leaves an existing output file untouched"
+	atf_set "require.user" "root"
+}
+merge_failure_keeps_existing_output_body()
+{
+	setup_merge_tree
+	make_merge_pkg pkga share/pkga/f
+	cp croot/pkga.mport croot/again.mport
+	printf 'previous bundle\n' >croot/out.mport
+
+	atf_check -s not-exit:0 -o empty -e match:"Package pkga is in both" \
+		env TMPDIR=/tmp "${MPORT_MERGE}" -c "${PWD}/croot" -o /out.mport \
+		/pkga.mport /again.mport
+	atf_check -s exit:0 -o inline:"previous bundle\n" cat croot/out.mport
+	atf_check -s exit:0 -o inline:"out.mport\n" sh -c "ls croot | grep '^out\.mport'"
 }
 
 atf_test_case merge_rejects_linked_stub
@@ -347,6 +369,7 @@ atf_init_test_cases()
 	atf_add_test_case merge_skips_package_without_files
 	atf_add_test_case merge_rejects_duplicate_package
 	atf_add_test_case merge_rejects_truncated_bundle
+	atf_add_test_case merge_failure_keeps_existing_output
 	atf_add_test_case merge_rejects_linked_stub
 	atf_add_test_case merge_requires_inputs
 }

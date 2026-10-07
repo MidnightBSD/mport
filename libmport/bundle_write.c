@@ -250,7 +250,8 @@ mport_bundle_write_add_entry(
     mportBundleWrite *bundle, mportBundleRead *inbundle, struct archive_entry *entry)
 {
 	char buff[BUFF_SIZE];
-	size_t size, bytes_to_write;
+	la_int64_t size;
+	la_ssize_t got;
 
 	if (archive_write_header(bundle->archive, entry) != ARCHIVE_OK)
 		RETURN_ERROR(MPORT_ERR_FATAL, archive_error_string(bundle->archive));
@@ -258,16 +259,19 @@ mport_bundle_write_add_entry(
 	size = archive_entry_size(entry);
 
 	while (size > 0) {
-		if (archive_read_data(inbundle->archive, buff, sizeof(buff)) < ARCHIVE_OK)
+		got = archive_read_data(inbundle->archive, buff,
+		    size < (la_int64_t)sizeof(buff) ? (size_t)size : sizeof(buff));
+		if (got < 0)
 			RETURN_ERROR(MPORT_ERR_FATAL, archive_error_string(inbundle->archive));
+		if (got == 0)
+			RETURN_ERRORX(MPORT_ERR_FATAL, "Unexpected end of data for %s",
+			    archive_entry_pathname(entry));
 
-		/* don't write the whole buffer if it isn't full */
-		bytes_to_write = size < sizeof(buff) ? size : sizeof(buff);
-
-		if (archive_write_data(bundle->archive, buff, bytes_to_write) < 0)
+		/* copy only what was read; a short read is not a full buffer */
+		if (archive_write_data(bundle->archive, buff, (size_t)got) < 0)
 			RETURN_ERROR(MPORT_ERR_FATAL, archive_error_string(bundle->archive));
 
-		size -= bytes_to_write;
+		size -= got;
 	}
 
 	return MPORT_OK;
