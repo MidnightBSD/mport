@@ -565,10 +565,12 @@ extract_stub_db(const char *filename, const char *destfile)
 	if (a == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate read archive struct");
 
-	if (archive_read_support_format_tar(a) != ARCHIVE_OK)
-		RETURN_ERROR(MPORT_ERR_FATAL, archive_error_string(a));
-	if (archive_read_support_filter_xz(a))
-		RETURN_ERROR(MPORT_ERR_FATAL, archive_error_string(a));
+	if (archive_read_support_format_tar(a) != ARCHIVE_OK ||
+	    archive_read_support_filter_xz(a) != ARCHIVE_OK) {
+		SET_ERROR(MPORT_ERR_FATAL, archive_error_string(a));
+		archive_read_free(a);
+		RETURN_CURRENT_ERROR;
+	}
 
 	if (archive_read_open_filename(a, filename, 10240) != ARCHIVE_OK) {
 		SET_ERRORX(
@@ -604,8 +606,9 @@ extract_stub_db(const char *filename, const char *destfile)
 		RETURN_CURRENT_ERROR;
 	}
 
+	/* a's error string is gone once it is freed */
 	if (archive_read_free(a) != ARCHIVE_OK)
-		RETURN_ERROR(MPORT_ERR_FATAL, archive_error_string(a));
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't close %s", filename);
 
 	return MPORT_OK;
 }
