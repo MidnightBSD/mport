@@ -50,8 +50,9 @@ struct table_entry {
 
 static int build_stub_db(
     mportInstance *, sqlite3 **, const char *, const char *, const char **, struct table_entry **);
-static int archive_metafiles(mportBundleWrite *, sqlite3 *, struct table_entry **);
-static int archive_package_files(mportBundleWrite *, sqlite3 *, struct table_entry **);
+static int archive_metafiles(mportInstance *, mportBundleWrite *, sqlite3 *, struct table_entry **);
+static int archive_package_files(
+    mportInstance *, mportBundleWrite *, sqlite3 *, struct table_entry **);
 static int extract_stub_db(const char *, const char *);
 
 static struct table_entry *find_in_table(struct table_entry **, const char *);
@@ -98,6 +99,7 @@ mport_merge_primative(mportInstance *mport, const char **filenames, const char *
 	char dirtmpl[MAXPATHLEN];
 	char *tmpdir;
 	char *madedir = NULL;
+	bool made_outfile = false;
 	int ret = MPORT_OK;
 
 	tmpdir = getenv("TMPDIR");
@@ -144,6 +146,7 @@ mport_merge_primative(mportInstance *mport, const char **filenames, const char *
 		ret = mport_err_code();
 		goto DONE;
 	}
+	made_outfile = true;
 
 	DIAG("Adding %s", dbfile)
 
@@ -154,14 +157,14 @@ mport_merge_primative(mportInstance *mport, const char **filenames, const char *
 
 	DIAG("Adding metafiles")
 	/* add all the meta files in the correct order */
-	if (archive_metafiles(bundle, db, table) != MPORT_OK) {
+	if (archive_metafiles(mport, bundle, db, table) != MPORT_OK) {
 		ret = mport_err_code();
 		goto DONE;
 	}
 
 	DIAG("Adding realfiles")
 	/* add all the other files */
-	if (archive_package_files(bundle, db, table) != MPORT_OK) {
+	if (archive_package_files(mport, bundle, db, table) != MPORT_OK) {
 		ret = mport_err_code();
 		goto DONE;
 	}
@@ -178,6 +181,9 @@ DONE:
 		sqlite3_close(db);
 	free_table(table);
 	free(dbfile);
+	/* don't leave a truncated bundle behind for someone to install */
+	if (ret != MPORT_OK && made_outfile)
+		(void)unlink(outfile);
 	/* attempt removal of the created tmpdir, ignore errors. */
 	if (madedir != NULL)
 		mport_rmtree(madedir);
@@ -194,13 +200,15 @@ static int
 build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char *dbfile,
     const char **filenames, struct table_entry **table)
 {
-	char *tmpdbfile;
+	char tmpdbfile[MAXPATHLEN];
 	const char *name;
 	const char *file = NULL;
+	struct table_entry *dup;
 	int made_table = 0, ret;
 	sqlite3_stmt *stmt;
 
-	if (asprintf(&tmpdbfile, "%s/%s", tmpdir, "pkg.db") == -1)
+	if (snprintf(tmpdbfile, sizeof(tmpdbfile), "%s/%s", tmpdir, "pkg.db") >=
+	    (int)sizeof(tmpdbfile))
 		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't make stub db tempfile.");
 
 	if (sqlite3_open(dbfile, db) != SQLITE_OK)
@@ -255,6 +263,14 @@ build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char
 
 			if (ret == SQLITE_ROW) {
 				name = sqlite3_column_text(stmt, 0);
+				/* its assets would be merged twice; refuse rather than pick one */
+				if ((dup = find_in_table(table, name)) != NULL) {
+					SET_ERRORX(MPORT_ERR_FATAL,
+					    "Package %s is in both %s and %s", name, dup->file,
+					    file);
+					sqlite3_finalize(stmt);
+					goto rollback;
+				}
 				if (insert_into_table(table, name, file) != MPORT_OK) {
 					sqlite3_finalize(stmt);
 					goto rollback;
@@ -336,34 +352,24 @@ build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char
 }
 
 static int
-archive_metafiles(mportBundleWrite *bundle, sqlite3 *db, struct table_entry **table)
+archive_metafiles(
+    mportInstance *mport, mportBundleWrite *bundle, sqlite3 *db, struct table_entry **table)
 {
-	sqlite3_stmt *stmt;
-	int ret, sret;
+	sqlite3_stmt *stmt = NULL;
+	int ret = MPORT_OK, sret;
 	char *filename;
 	const char *pkgname;
+	const char *path;
 	struct table_entry *match = NULL;
 	mportBundleRead *inbundle = NULL;
 	struct archive_entry *entry;
-
-	ret = MPORT_OK;
 
 	if (mport_db_prepare(db, &stmt, "SELECT pkg FROM packages") != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
 	}
 
-	while (1) {
-		sret = sqlite3_step(stmt);
-
-		if (sret == SQLITE_DONE) {
-			goto DONE;
-		} else if (sret != SQLITE_ROW) {
-			ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-			goto DONE;
-		}
-
-		/* at this point, ret must be SQLITE_ROW */
+	while ((sret = sqlite3_step(stmt)) == SQLITE_ROW) {
 		pkgname = sqlite3_column_text(stmt, 0);
 		match = find_in_table(table, pkgname);
 
@@ -376,22 +382,26 @@ archive_metafiles(mportBundleWrite *bundle, sqlite3 *db, struct table_entry **ta
 		filename = match->file;
 
 		if ((inbundle = mport_bundle_read_new()) == NULL) {
-			SET_ERROR(MPORT_ERR_FATAL, "Couldn't allocate bundle");
+			ret = SET_ERROR(MPORT_ERR_FATAL, "Couldn't allocate bundle");
 			goto DONE;
 		}
 
 		if (mport_bundle_read_init(inbundle, filename) != MPORT_OK) {
-			ret = mport_bundle_read_finish(NULL, inbundle);
+			ret = mport_err_code();
 			goto DONE;
 		}
 
 		/* skip the sub db */
 		if (mport_bundle_read_next_entry(inbundle, &entry) != MPORT_OK) {
-			ret = mport_bundle_read_finish(NULL, inbundle);
+			ret = mport_err_code();
+			goto DONE;
+		}
+		if (entry == NULL) {
+			ret = SET_ERRORX(
+			    MPORT_ERR_FATAL, "Corrupt bundle %s: archive is empty", filename);
 			goto DONE;
 		}
 		if (archive_read_data_skip(inbundle->archive) != ARCHIVE_OK) {
-			ret = mport_bundle_read_finish(NULL, inbundle);
 			ret = SET_ERRORX(MPORT_ERR_FATAL, "Unable to read %s: %s", filename,
 			    archive_error_string(inbundle->archive));
 			goto DONE;
@@ -399,40 +409,53 @@ archive_metafiles(mportBundleWrite *bundle, sqlite3 *db, struct table_entry **ta
 
 		while (1) {
 			if (mport_bundle_read_next_entry(inbundle, &entry) != MPORT_OK) {
-				ret = mport_bundle_read_finish(NULL, inbundle);
+				ret = mport_err_code();
 				goto DONE;
 			}
 
-			if (*(archive_entry_pathname(entry)) != '+')
+			/* a package without data files ends after its metafiles */
+			if (entry == NULL)
+				break;
+			path = archive_entry_pathname(entry);
+			if (path == NULL || *path != '+')
 				break;
 
-			DIAG("Adding %s", archive_entry_pathname(entry))
+			DIAG("Adding %s", path)
 
-			if ((ret = mport_bundle_write_add_entry(bundle, inbundle, entry)) !=
-			    MPORT_OK) {
+			if (mport_bundle_write_add_entry(bundle, inbundle, entry) != MPORT_OK) {
 				DIAG("bundle add entry failed")
-				ret = mport_bundle_read_finish(NULL, inbundle);
+				ret = mport_err_code();
 				goto DONE;
 			}
 		}
 
-		ret = mport_bundle_read_finish(NULL, inbundle);
+		ret = mport_bundle_read_finish(mport, inbundle);
+		inbundle = NULL;
+		if (ret != MPORT_OK)
+			goto DONE;
 	}
 
+	if (sret != SQLITE_DONE)
+		ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
+
 DONE:
+	if (inbundle != NULL)
+		(void)mport_bundle_read_finish(mport, inbundle);
 	sqlite3_finalize(stmt);
 	return ret;
 }
 
 static int
-archive_package_files(mportBundleWrite *bundle, sqlite3 *db, struct table_entry **table)
+archive_package_files(
+    mportInstance *mport, mportBundleWrite *bundle, sqlite3 *db, struct table_entry **table)
 {
-	sqlite3_stmt *stmt, *files;
-	int ret;
+	sqlite3_stmt *stmt = NULL, *files = NULL;
+	int ret = MPORT_OK, sret, fret;
 	struct table_entry *cur;
 	const char *pkgname;
 	const char *file;
-	mportBundleRead *inbundle;
+	const char *path;
+	mportBundleRead *inbundle = NULL;
 	struct archive_entry *entry;
 
 	if (mport_db_prepare(db, &stmt, "SELECT pkg FROM packages") != MPORT_OK) {
@@ -440,102 +463,96 @@ archive_package_files(mportBundleWrite *bundle, sqlite3 *db, struct table_entry 
 		RETURN_CURRENT_ERROR;
 	}
 
-	while (1) {
-		ret = sqlite3_step(stmt);
-
-		if (ret == SQLITE_DONE)
-			break;
-
-		if (ret != SQLITE_ROW) {
-			SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-			sqlite3_finalize(stmt);
-			RETURN_CURRENT_ERROR;
-		}
-
+	while ((sret = sqlite3_step(stmt)) == SQLITE_ROW) {
 		pkgname = sqlite3_column_text(stmt, 0);
 		cur = find_in_table(table, pkgname);
 
 		if (cur == NULL) {
-			sqlite3_finalize(stmt);
-			RETURN_ERRORX(MPORT_ERR_FATAL,
+			ret = SET_ERRORX(MPORT_ERR_FATAL,
 			    "Couldn't find package '%s' in bundle hash table", pkgname);
+			goto DONE;
 		}
 
-		file = cur->file;
-
-		if ((inbundle = mport_bundle_read_new()) == NULL)
-			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
-
-		if (mport_bundle_read_init(inbundle, file) != MPORT_OK) {
-			mport_bundle_read_finish(NULL, inbundle);
-			RETURN_CURRENT_ERROR;
-		}
-
-		if (mport_bundle_read_skip_metafiles(inbundle) != MPORT_OK) {
-			mport_bundle_read_finish(NULL, inbundle);
-			sqlite3_finalize(stmt);
-			RETURN_CURRENT_ERROR;
-		}
-
+		/* the same asset types mport.create archives, in the same order */
 		if (mport_db_prepare(db, &files,
-			"SELECT data FROM assets WHERE pkg=%Q AND (type=%i or type=%i or type=%i)",
-			pkgname, ASSET_FILE, ASSET_SAMPLE, ASSET_SAMPLE_OWNER_MODE) != MPORT_OK) {
-			mport_bundle_read_finish(NULL, inbundle);
-			sqlite3_finalize(stmt);
-			RETURN_CURRENT_ERROR;
+			"SELECT data FROM assets WHERE pkg=%Q AND type IN (%i, %i, %i, %i, %i, %i)",
+			pkgname, ASSET_FILE, ASSET_SAMPLE, ASSET_SHELL, ASSET_FILE_OWNER_MODE,
+			ASSET_SAMPLE_OWNER_MODE, ASSET_INFO) != MPORT_OK) {
+			ret = mport_err_code();
+			goto DONE;
 		}
 
-		while (1) {
-			int fret = sqlite3_step(files);
-
-			if (fret == SQLITE_DONE) {
-				sqlite3_finalize(files);
-				break;
-			} else if (fret != SQLITE_ROW) {
-				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-				sqlite3_finalize(stmt);
-				sqlite3_finalize(files);
-				mport_bundle_read_finish(NULL, inbundle);
-				RETURN_CURRENT_ERROR;
+		/* a package without data files (e.g. a meta-port) has nothing to copy */
+		if ((fret = sqlite3_step(files)) == SQLITE_ROW) {
+			if ((inbundle = mport_bundle_read_new()) == NULL) {
+				ret = SET_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+				goto DONE;
 			}
 
-			file = sqlite3_column_text(files, 0);
-
-			if (mport_bundle_read_next_entry(inbundle, &entry) != MPORT_OK) {
-				mport_bundle_read_finish(NULL, inbundle);
-				sqlite3_finalize(stmt);
-				sqlite3_finalize(files);
-				RETURN_CURRENT_ERROR;
+			if (mport_bundle_read_init(inbundle, cur->file) != MPORT_OK ||
+			    mport_bundle_read_skip_metafiles(inbundle) != MPORT_OK) {
+				ret = mport_err_code();
+				goto DONE;
 			}
 
-			if (strcmp(file, archive_entry_pathname(entry)) != 0) {
-				SET_ERRORX(MPORT_ERR_FATAL,
-				    "Plist to archive mismatch in package %s: found '%s', expected '%s'",
-				    pkgname, archive_entry_pathname(entry), file);
-				mport_bundle_read_finish(NULL, inbundle);
-				sqlite3_finalize(stmt);
-				sqlite3_finalize(files);
-				RETURN_CURRENT_ERROR;
-			}
+			do {
+				file = sqlite3_column_text(files, 0);
 
-			DIAG("Adding realfile: %s", archive_entry_pathname(entry));
+				if (mport_bundle_read_next_entry(inbundle, &entry) != MPORT_OK) {
+					ret = mport_err_code();
+					goto DONE;
+				}
 
-			if (mport_bundle_write_add_entry(bundle, inbundle, entry) != MPORT_OK) {
-				mport_bundle_read_finish(NULL, inbundle);
-				sqlite3_finalize(stmt);
-				sqlite3_finalize(files);
-				RETURN_CURRENT_ERROR;
-			}
+				if (entry == NULL) {
+					ret = SET_ERRORX(MPORT_ERR_FATAL,
+					    "Corrupt bundle %s: archive ends before '%s'",
+					    cur->file, file);
+					goto DONE;
+				}
+
+				path = archive_entry_pathname(entry);
+				if (file == NULL || path == NULL || strcmp(file, path) != 0) {
+					ret = SET_ERRORX(MPORT_ERR_FATAL,
+					    "Plist to archive mismatch in package %s: found '%s', expected '%s'",
+					    pkgname, path == NULL ? "(null)" : path,
+					    file == NULL ? "(null)" : file);
+					goto DONE;
+				}
+
+				DIAG("Adding realfile: %s", path);
+
+				if (mport_bundle_write_add_entry(bundle, inbundle, entry) !=
+				    MPORT_OK) {
+					ret = mport_err_code();
+					goto DONE;
+				}
+			} while ((fret = sqlite3_step(files)) == SQLITE_ROW);
+
+			ret = mport_bundle_read_finish(mport, inbundle);
+			inbundle = NULL;
+			if (ret != MPORT_OK)
+				goto DONE;
+		}
+
+		if (fret != SQLITE_DONE) {
+			ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
+			goto DONE;
 		}
 
 		/* we're done with this package, onto the next one */
 		sqlite3_finalize(files);
-		mport_bundle_read_finish(NULL, inbundle);
+		files = NULL;
 	}
 
-	sqlite3_finalize(stmt);
+	if (sret != SQLITE_DONE)
+		ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 
-	return MPORT_OK;
+DONE:
+	if (inbundle != NULL)
+		(void)mport_bundle_read_finish(mport, inbundle);
+	sqlite3_finalize(files);
+	sqlite3_finalize(stmt);
+	return ret;
 }
 
 /* get the stub database file out of filename and place it at destfile */
@@ -570,6 +587,13 @@ extract_stub_db(const char *filename, const char *destfile)
 		archive_read_free(a);
 		RETURN_ERROR(
 		    MPORT_ERR_FATAL, "Invalid bundle file: stub database is not the first file");
+	}
+
+	/* a link here would make the merge read whatever file it points at */
+	if (archive_entry_filetype(entry) != AE_IFREG || archive_entry_hardlink(entry) != NULL) {
+		archive_read_free(a);
+		RETURN_ERRORX(MPORT_ERR_FATAL,
+		    "Invalid bundle file %s: stub database is not a regular file", filename);
 	}
 
 	archive_entry_set_pathname(entry, destfile);
