@@ -206,6 +206,10 @@ build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char
 	if (sqlite3_open(dbfile, db) != SQLITE_OK)
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(*db));
 
+	/* the stub databases ATTACHed below come from the bundles being merged */
+	if (mport_db_harden(*db) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+
 	if (mport_generate_stub_schema(mport, *db) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
@@ -331,6 +335,8 @@ build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(*db));
 	if (sqlite3_open_v2(dbfile, db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK)
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(*db));
+	if (mport_db_harden(*db) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
 
 	return MPORT_OK;
 }
