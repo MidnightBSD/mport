@@ -96,7 +96,7 @@ typedef struct {
 	mport_select_cb select_cb;
 } mportInstance;
 
-mportInstance *mport_instance_new(void);
+/*@null@*/ mportInstance *mport_instance_new(void);
 int mport_instance_init(
     mportInstance *, const char *, const char *, bool noIndex, mportVerbosity verbosity);
 int mport_instance_free(mportInstance *);

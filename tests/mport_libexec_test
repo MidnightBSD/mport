@@ -121,6 +121,19 @@ init_reports_bad_chroot_body()
 		"${MPORT_INIT}" -c "${PWD}/missing-root"
 }
 
+atf_test_case init_rejects_bad_usage
+init_rejects_bad_usage_head()
+{
+	atf_set "descr" "mport.init reports usage for unknown flags and extra arguments"
+}
+init_rejects_bad_usage_body()
+{
+	atf_check -s exit:2 -o empty -e match:"Usage: mport.init" \
+		"${MPORT_INIT}" -x
+	atf_check -s exit:2 -o empty -e match:"Usage: mport.init" \
+		"${MPORT_INIT}" extra
+}
+
 atf_test_case update_reports_bad_chroot
 update_reports_bad_chroot_head()
 {
@@ -201,6 +214,7 @@ atf_init_test_cases()
 	atf_add_test_case frontends_reject_missing_required_args
 	atf_add_test_case list_rejects_extra_args
 	atf_add_test_case init_reports_bad_chroot
+	atf_add_test_case init_rejects_bad_usage
 	atf_add_test_case update_reports_bad_chroot
 	atf_add_test_case delete_ignores_missing_registered_dir
 }

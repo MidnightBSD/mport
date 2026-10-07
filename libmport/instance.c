@@ -55,11 +55,17 @@ mport_allow_old_release_env(void)
 	return value != NULL && value[0] != '\0';
 }
 
-MPORT_PUBLIC_API mportInstance *
+MPORT_PUBLIC_API /*@null@*/ mportInstance *
 mport_instance_new(void)
 {
+	mportInstance *mport = calloc(1, sizeof(mportInstance));
 
-	return (mportInstance *)calloc(1, sizeof(mportInstance));
+	/* no root directory is open until mport_instance_init() succeeds;
+	 * calloc's 0 would make mport_instance_free() close stdin */
+	if (mport != NULL)
+		mport->rootfd = -1;
+
+	return mport;
 }
 
 /**
@@ -450,7 +456,8 @@ mport_instance_free(mportInstance *mport)
 		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
 	}
 
-	close(mport->rootfd);
+	if (mport->rootfd >= 0)
+		close(mport->rootfd);
 	free(mport->root);
 	mport->root = NULL;
 
