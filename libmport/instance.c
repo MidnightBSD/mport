@@ -142,6 +142,13 @@ mport_instance_init(mportInstance *mport, const char *root, const char *outputPa
 	 * wait happens before any row changes. */
 	(void)sqlite3_busy_timeout(mport->db, MPORT_DB_BUSY_TIMEOUT_MS);
 
+	/* under -c the registry belongs to whoever controls the chroot */
+	if (mport_db_harden(mport->db) != MPORT_OK) {
+		sqlite3_close(mport->db);
+		mport->db = NULL;
+		RETURN_CURRENT_ERROR;
+	}
+
 	if (sqlite3_create_function(mport->db, "mport_version_cmp", 2, SQLITE_ANY, NULL,
 		&mport_version_cmp_sqlite, NULL, NULL) != SQLITE_OK) {
 		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));

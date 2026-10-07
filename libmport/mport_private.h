@@ -89,6 +89,7 @@ int mport_set_database_version(sqlite3 *);
 /* Various database convenience functions */
 int mport_attach_stub_db(sqlite3 *, const char *);
 int mport_detach_stub_db(sqlite3 *);
+int mport_db_harden(sqlite3 *);
 int mport_db_do(sqlite3 *, const char *, ...);
 int mport_db_prepare(sqlite3 *, sqlite3_stmt **, const char *, ...);
 int mport_db_count(sqlite3 *, int *, const char *, ...);

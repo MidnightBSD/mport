@@ -48,6 +48,23 @@ static int mport_upgrade_master_schema_13to14(sqlite3 *);
 
 static int insert_meta_values(sqlite3 *db, char *key, char *value);
 
+/* mport_db_harden(sqlite3 *db)
+ *
+ * Registry, index and bundle databases are not trusted: refuse to run
+ * functions from SQL stored in their schemas (triggers, views) and block
+ * SQL that can corrupt the database file.  Call right after opening a
+ * connection; databases ATTACHed to it later are covered too.
+ */
+int
+mport_db_harden(sqlite3 *db)
+{
+	if (sqlite3_db_config(db, SQLITE_DBCONFIG_TRUSTED_SCHEMA, 0, (int *)NULL) != SQLITE_OK ||
+	    sqlite3_db_config(db, SQLITE_DBCONFIG_DEFENSIVE, 1, (int *)NULL) != SQLITE_OK)
+		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
+
+	return MPORT_OK;
+}
+
 /* mport_db_do(sqlite3 *db, const char *sql, ...)
  *
  * A wrapper for executing a single sql query.  Takes a sqlite3 struct
