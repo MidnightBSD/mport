@@ -58,6 +58,8 @@ static int archive_package_files(
     mportInstance *, mportBundleWrite *, sqlite3 *, struct table_entry **);
 static int extract_stub_db(const char *, const char *);
 static int make_temp_outfile(const char *, char *, size_t);
+static void finish_input_bundle_preserving_error(
+    /*@notnull@*/ mportInstance *, /*@only@*/ /*@notnull@*/ mportBundleRead *, int);
 
 static struct table_entry *find_in_table(struct table_entry **, const char *);
 static int insert_into_table(struct table_entry **, const char *, const char *);
@@ -375,6 +377,20 @@ build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char
 	return MPORT_OK;
 }
 
+/* Closing a failed input bundle can replace the error that caused the merge
+ * to stop.  Keep the first error for the caller. */
+static void
+finish_input_bundle_preserving_error(/*@notnull@*/ mportInstance *mport,
+    /*@only@*/ /*@notnull@*/ mportBundleRead *bundle, int error_code)
+/*@requires error_code != MPORT_OK @*/
+{
+	char original_error[MPORT_ERROR_MESSAGE_MAX];
+
+	(void)strlcpy(original_error, mport_err_string(), sizeof(original_error));
+	(void)mport_bundle_read_finish(mport, bundle);
+	(void)mport_set_err(error_code, original_error);
+}
+
 static int
 archive_metafiles(
     mportInstance *mport, mportBundleWrite *bundle, sqlite3 *db, struct table_entry **table)
@@ -464,7 +480,7 @@ archive_metafiles(
 
 DONE:
 	if (inbundle != NULL)
-		(void)mport_bundle_read_finish(mport, inbundle);
+		finish_input_bundle_preserving_error(mport, inbundle, ret);
 	sqlite3_finalize(stmt);
 	return ret;
 }
@@ -573,7 +589,7 @@ archive_package_files(
 
 DONE:
 	if (inbundle != NULL)
-		(void)mport_bundle_read_finish(mport, inbundle);
+		finish_input_bundle_preserving_error(mport, inbundle, ret);
 	sqlite3_finalize(files);
 	sqlite3_finalize(stmt);
 	return ret;
