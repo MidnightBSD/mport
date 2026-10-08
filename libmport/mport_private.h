@@ -240,7 +240,7 @@ mportPackageMessage *mport_pkg_message_from_ucl(
     mportInstance *, const ucl_object_t *, mportPackageMessage *);
 
 #define RETURN_CURRENT_ERROR return mport_err_code()
-#define MPORT_ERROR_MESSAGE_MAX 256
+#define MPORT_ERROR_MESSAGE_MAX 1024
 #define RETURN_ERROR(code, msg) \
 	return mport_set_errx((code), "Error at %s:(%d): %s", __FILE__, __LINE__, (msg))
 #define SET_ERROR(code, msg) \
