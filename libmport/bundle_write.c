@@ -138,8 +138,9 @@ mport_bundle_write_finish(mportBundleWrite *bundle)
 	if (bundle == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "mport bundle is missing");
 
+	/* the archive's error string is gone once it is freed */
 	if (archive_write_free(bundle->archive) != ARCHIVE_OK)
-		ret = SET_ERROR(MPORT_ERR_FATAL, strdup(archive_error_string(bundle->archive)));
+		ret = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't finish writing %s", bundle->filename);
 
 	free_linktable(bundle->links);
 
