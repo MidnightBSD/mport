@@ -73,7 +73,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (outfile == NULL)
+	if (outfile == NULL || argc == 0)
 		usage();
 
 	if (chroot_path != NULL) {
