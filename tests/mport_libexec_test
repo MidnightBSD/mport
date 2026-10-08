@@ -293,17 +293,49 @@ merge_accepts_merged_bundle_body()
 		tar -tf croot/out.mport
 }
 
+atf_test_case merge_skips_identical_bundle
+merge_skips_identical_bundle_head()
+{
+	atf_set "descr" "mport.merge keeps one copy of a bundle given twice or byte-identical"
+	atf_set "require.user" "root"
+}
+merge_skips_identical_bundle_body()
+{
+	setup_merge_tree
+	make_merge_pkg pkga share/pkga/f
+	make_merge_pkg pkgb share/pkgb/f
+	cp croot/pkga.mport croot/again.mport
+
+	atf_check -s exit:0 -o empty -e empty \
+		env TMPDIR=/tmp "${MPORT_MERGE}" -c "${PWD}/croot" -o /out.mport \
+		/pkga.mport /pkgb.mport /pkga.mport /again.mport
+	atf_check -s exit:0 -o inline:"+CONTENTS.db\nshare/pkga/f\nshare/pkgb/f\n" \
+		tar -tf croot/out.mport
+	tar -xf croot/out.mport -C croot +CONTENTS.db
+	atf_check -s exit:0 -o inline:"pkga\npkgb\n" \
+		sqlite3 croot/+CONTENTS.db "SELECT pkg FROM packages ORDER BY pkg;"
+}
+
+# make_differing_copy name: build croot/again.mport, a copy of package
+# <name> whose bundle differs from croot/<name>.mport
+make_differing_copy()
+{
+	make_merge_pkg "$1" "" -D "pkgz:misc/pkgz:>=1.0"
+	mv "croot/$1.mport" croot/again.mport
+	make_merge_pkg "$1" ""
+}
+
 atf_test_case merge_rejects_duplicate_package
 merge_rejects_duplicate_package_head()
 {
-	atf_set "descr" "mport.merge refuses a package given twice and leaves no output"
+	atf_set "descr" "mport.merge refuses a package in two differing bundles and leaves no output"
 	atf_set "require.user" "root"
 }
 merge_rejects_duplicate_package_body()
 {
 	setup_merge_tree
-	make_merge_pkg pkga share/pkga/f
-	cp croot/pkga.mport croot/again.mport
+	printf 'share/pkga/f\n' >plist.pkga
+	make_differing_copy pkga
 
 	atf_check -s not-exit:0 -o empty -e match:"Package pkga is in both" \
 		env TMPDIR=/tmp "${MPORT_MERGE}" -c "${PWD}/croot" -o /out.mport /pkga.mport /again.mport
@@ -390,8 +422,8 @@ merge_failure_keeps_existing_output_head()
 merge_failure_keeps_existing_output_body()
 {
 	setup_merge_tree
-	make_merge_pkg pkga share/pkga/f
-	cp croot/pkga.mport croot/again.mport
+	printf 'share/pkga/f\n' >plist.pkga
+	make_differing_copy pkga
 	printf 'previous bundle\n' >croot/out.mport
 
 	atf_check -s not-exit:0 -o empty -e match:"Package pkga is in both" \
@@ -504,6 +536,7 @@ atf_init_test_cases()
 	atf_add_test_case merge_combines_packages
 	atf_add_test_case merge_skips_package_without_files
 	atf_add_test_case merge_accepts_merged_bundle
+	atf_add_test_case merge_skips_identical_bundle
 	atf_add_test_case merge_rejects_duplicate_package
 	atf_add_test_case merge_rejects_truncated_bundle
 	atf_add_test_case merge_rejects_extra_data_file
