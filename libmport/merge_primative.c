@@ -522,62 +522,77 @@ archive_package_files(
 			goto DONE;
 		}
 
-		/* a package without data files (e.g. a meta-port) has nothing to copy */
-		if ((fret = sqlite3_step(files)) == SQLITE_ROW) {
-			if ((inbundle = mport_bundle_read_new()) == NULL) {
-				ret = SET_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+		/* read the bundle even for a package without data files (e.g. a
+		 * meta-port), so a data file without an asset row is caught */
+		if ((inbundle = mport_bundle_read_new()) == NULL) {
+			ret = SET_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+			goto DONE;
+		}
+
+		if (mport_bundle_read_init(inbundle, cur->file) != MPORT_OK) {
+			ret = mport_err_code();
+			goto DONE;
+		}
+
+		/* skip the stub database and metafiles; entry is the first data
+		 * file, or NULL at the end of the archive */
+		do {
+			if (mport_bundle_read_next_entry(inbundle, &entry) != MPORT_OK) {
+				ret = mport_err_code();
+				goto DONE;
+			}
+			path = entry == NULL ? NULL : archive_entry_pathname(entry);
+		} while (path != NULL && *path == '+');
+
+		while ((fret = sqlite3_step(files)) == SQLITE_ROW) {
+			file = sqlite3_column_text(files, 0);
+
+			if (entry == NULL) {
+				ret = SET_ERRORX(MPORT_ERR_FATAL,
+				    "Corrupt bundle %s: archive ends before '%s'", cur->file, file);
 				goto DONE;
 			}
 
-			if (mport_bundle_read_init(inbundle, cur->file) != MPORT_OK ||
-			    mport_bundle_read_skip_metafiles(inbundle) != MPORT_OK) {
+			path = archive_entry_pathname(entry);
+			if (file == NULL || path == NULL || strcmp(file, path) != 0) {
+				ret = SET_ERRORX(MPORT_ERR_FATAL,
+				    "Plist to archive mismatch in package %s: found '%s', expected '%s'",
+				    pkgname, path == NULL ? "(null)" : path,
+				    file == NULL ? "(null)" : file);
+				goto DONE;
+			}
+
+			DIAG("Adding realfile: %s", path);
+
+			if (mport_bundle_write_add_entry(bundle, inbundle, entry) != MPORT_OK) {
 				ret = mport_err_code();
 				goto DONE;
 			}
 
-			do {
-				file = sqlite3_column_text(files, 0);
-
-				if (mport_bundle_read_next_entry(inbundle, &entry) != MPORT_OK) {
-					ret = mport_err_code();
-					goto DONE;
-				}
-
-				if (entry == NULL) {
-					ret = SET_ERRORX(MPORT_ERR_FATAL,
-					    "Corrupt bundle %s: archive ends before '%s'",
-					    cur->file, file);
-					goto DONE;
-				}
-
-				path = archive_entry_pathname(entry);
-				if (file == NULL || path == NULL || strcmp(file, path) != 0) {
-					ret = SET_ERRORX(MPORT_ERR_FATAL,
-					    "Plist to archive mismatch in package %s: found '%s', expected '%s'",
-					    pkgname, path == NULL ? "(null)" : path,
-					    file == NULL ? "(null)" : file);
-					goto DONE;
-				}
-
-				DIAG("Adding realfile: %s", path);
-
-				if (mport_bundle_write_add_entry(bundle, inbundle, entry) !=
-				    MPORT_OK) {
-					ret = mport_err_code();
-					goto DONE;
-				}
-			} while ((fret = sqlite3_step(files)) == SQLITE_ROW);
-
-			ret = mport_bundle_read_finish(mport, inbundle);
-			inbundle = NULL;
-			if (ret != MPORT_OK)
+			if (mport_bundle_read_next_entry(inbundle, &entry) != MPORT_OK) {
+				ret = mport_err_code();
 				goto DONE;
+			}
 		}
 
 		if (fret != SQLITE_DONE) {
 			ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 			goto DONE;
 		}
+
+		/* every data file must belong to an asset row, or it would be
+		 * silently left out of the merged bundle */
+		if (entry != NULL) {
+			path = archive_entry_pathname(entry);
+			ret = SET_ERRORX(MPORT_ERR_FATAL, "Unexpected file '%s' in %s",
+			    path == NULL ? "(null)" : path, cur->file);
+			goto DONE;
+		}
+
+		ret = mport_bundle_read_finish(mport, inbundle);
+		inbundle = NULL;
+		if (ret != MPORT_OK)
+			goto DONE;
 
 		/* we're done with this package, onto the next one */
 		sqlite3_finalize(files);
