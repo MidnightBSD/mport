@@ -44,6 +44,7 @@
  * filename, and boolean is_in_db */
 struct table_entry {
 	char *file;
+	int input; /* index of file among the inputs */
 	short is_in_db;
 	char *name;
 	struct table_entry *next;
@@ -69,7 +70,7 @@ static void finish_input_bundle_preserving_error(
     /*@notnull@*/ mportInstance *, /*@only@*/ /*@notnull@*/ mportBundleRead *, int);
 
 static struct table_entry *find_in_table(struct table_entry **, const char *);
-static int insert_into_table(struct table_entry **, const char *, const char *);
+static int insert_into_table(struct table_entry **, const char *, const char *, int);
 static uint32_t SuperFastHash(const char *);
 static void free_table(struct table_entry **);
 
@@ -231,7 +232,8 @@ build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char
 	const char *name;
 	const char *file = NULL;
 	struct table_entry *dup;
-	int made_table = 0, ret;
+	int made_table = 0, ret, input;
+	bool same, skip;
 	sqlite3_stmt *stmt;
 
 	if (snprintf(tmpdbfile, sizeof(tmpdbfile), "%s/%s", tmpdir, "pkg.db") >=
@@ -248,7 +250,7 @@ build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char
 	if (mport_generate_stub_schema(mport, *db) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	for (file = *filenames; file != NULL; file = *(++filenames)) {
+	for (input = 0, file = *filenames; file != NULL; input++, file = *(++filenames)) {
 		DIAG("Visiting %s", file)
 		if (extract_stub_db(file, tmpdbfile) != MPORT_OK)
 			RETURN_CURRENT_ERROR;
@@ -289,20 +291,37 @@ build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char
 			goto rollback;
 		}
 
+		skip = false;
 		while (1) {
 			ret = sqlite3_step(stmt);
 
 			if (ret == SQLITE_ROW) {
 				name = sqlite3_column_text(stmt, 0);
-				/* its assets would be merged twice; refuse rather than pick one */
 				if ((dup = find_in_table(table, name)) != NULL) {
+					/* a byte-identical copy of an earlier input adds
+					 * nothing; its first package is already a dup */
+					if (dup->input != input) {
+						if (mport_same_file_contents(
+							dup->file, file, &same) != MPORT_OK) {
+							sqlite3_finalize(stmt);
+							goto rollback;
+						}
+						if (same) {
+							DIAG("Skipping %s, identical to %s", file,
+							    dup->file)
+							skip = true;
+							break;
+						}
+					}
+					/* its assets would be merged twice; refuse rather
+					 * than pick one */
 					SET_ERRORX(MPORT_ERR_FATAL,
 					    "Package %s is in both %s and %s", name, dup->file,
 					    file);
 					sqlite3_finalize(stmt);
 					goto rollback;
 				}
-				if (insert_into_table(table, name, file) != MPORT_OK) {
+				if (insert_into_table(table, name, file, input) != MPORT_OK) {
 					sqlite3_finalize(stmt);
 					goto rollback;
 				}
@@ -316,6 +335,14 @@ build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char
 		}
 
 		sqlite3_finalize(stmt);
+
+		if (skip) {
+			if (mport_db_do(*db, "ROLLBACK TRANSACTION") != MPORT_OK)
+				RETURN_CURRENT_ERROR;
+			if (mport_db_do(*db, "DETACH subbundle") != MPORT_OK)
+				RETURN_CURRENT_ERROR;
+			continue;
+		}
 
 		if (mport_db_do(*db, "COMMIT TRANSACTION") != MPORT_OK)
 			goto rollback;
@@ -758,7 +785,7 @@ extract_stub_db(const char *filename, const char *destfile)
 
 /* insert into a name => file pair into the given hash table. */
 static int
-insert_into_table(struct table_entry **table, const char *name, const char *file)
+insert_into_table(struct table_entry **table, const char *name, const char *file, int input)
 {
 	struct table_entry *node, *cur;
 	int hash = SuperFastHash(name) % TABLE_SIZE;
@@ -768,6 +795,7 @@ insert_into_table(struct table_entry **table, const char *name, const char *file
 
 	node->name = strdup(name);
 	node->file = strdup(file);
+	node->input = input;
 	node->is_in_db = 0;
 	node->next = NULL;
 

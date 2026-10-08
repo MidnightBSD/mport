@@ -262,6 +262,31 @@ mport_hash_file(const char *filename)
 	return SHA256_File(filename, NULL);
 }
 
+/* mport_same_file_contents(a, b, &same)
+ *
+ * Set same to whether files a and b have the same contents, compared by
+ * SHA256 hash.
+ */
+int
+mport_same_file_contents(/*@notnull@*/ const char *a, /*@notnull@*/ const char *b,
+    /*@out@*/ bool *same)
+{
+	char *ha, *hb;
+
+	if ((ha = mport_hash_file(a)) == NULL)
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't hash %s: %s", a, strerror(errno));
+	if ((hb = mport_hash_file(b)) == NULL) {
+		free(ha);
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't hash %s: %s", b, strerror(errno));
+	}
+
+	*same = strcmp(ha, hb) == 0;
+	free(ha);
+	free(hb);
+
+	return MPORT_OK;
+}
+
 uid_t
 mport_get_uid(const char *username)
 {
