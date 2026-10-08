@@ -484,10 +484,14 @@ warn_ldconfig_mismatch(mportInstance *mport, mportAssetList *assetlist, mportPac
 	bool provides_native = false;
 	const char *paths = getenv("SHLIB_PROVIDE_PATHS_NATIVE");
 
+	/* STAILQ_FOREACH keeps the iterator non-null in the body; cppcheck can't
+	 * model the macro. */
+	/* cppcheck-suppress-begin uninitvar */
 	STAILQ_FOREACH (e, assetlist, next) {
 		if (e->type == ASSET_LDCONFIG)
 			has_ldconfig = true;
 	}
+	/* cppcheck-suppress-end uninitvar */
 	tll_foreach(pack->shlibs_provided, it)
 	{
 		if (strchr(it->item, ':') == NULL)
