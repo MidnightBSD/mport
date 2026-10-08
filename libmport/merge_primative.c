@@ -51,11 +51,18 @@ struct table_entry {
 
 #define TABLE_SIZE 128
 
+/* the asset types mport.create archives as data files */
+#define DATA_ASSET_TYPES_SQL "type IN (%i, %i, %i, %i, %i, %i)"
+#define DATA_ASSET_TYPES                                                                       \
+	ASSET_FILE, ASSET_SAMPLE, ASSET_SHELL, ASSET_FILE_OWNER_MODE, ASSET_SAMPLE_OWNER_MODE, \
+	    ASSET_INFO
+
 static int build_stub_db(
     mportInstance *, sqlite3 **, const char *, const char *, const char **, struct table_entry **);
 static int archive_metafiles(mportInstance *, mportBundleWrite *, sqlite3 *, struct table_entry **);
 static int archive_package_files(
     mportInstance *, mportBundleWrite *, sqlite3 *, struct table_entry **);
+static int count_bundle_data_files(sqlite3 *, struct table_entry **, const char *, int *);
 static int extract_stub_db(const char *, const char *);
 static int make_temp_outfile(const char *, char *, size_t);
 static void finish_input_bundle_preserving_error(
@@ -490,7 +497,7 @@ archive_package_files(
     mportInstance *mport, mportBundleWrite *bundle, sqlite3 *db, struct table_entry **table)
 {
 	sqlite3_stmt *stmt = NULL, *files = NULL;
-	int ret = MPORT_OK, sret, fret;
+	int ret = MPORT_OK, sret, fret, own, total;
 	struct table_entry *cur;
 	const char *pkgname;
 	const char *file;
@@ -515,9 +522,15 @@ archive_package_files(
 
 		/* the same asset types mport.create archives, in the same order */
 		if (mport_db_prepare(db, &files,
-			"SELECT data FROM assets WHERE pkg=%Q AND type IN (%i, %i, %i, %i, %i, %i)",
-			pkgname, ASSET_FILE, ASSET_SAMPLE, ASSET_SHELL, ASSET_FILE_OWNER_MODE,
-			ASSET_SAMPLE_OWNER_MODE, ASSET_INFO) != MPORT_OK) {
+			"SELECT data FROM assets WHERE pkg=%Q AND " DATA_ASSET_TYPES_SQL, pkgname,
+			DATA_ASSET_TYPES) != MPORT_OK) {
+			ret = mport_err_code();
+			goto DONE;
+		}
+
+		/* an input bundle can hold several packages (e.g. an earlier
+		 * merge's output); count the data files of all of them */
+		if (count_bundle_data_files(db, table, cur->file, &total) != MPORT_OK) {
 			ret = mport_err_code();
 			goto DONE;
 		}
@@ -544,6 +557,7 @@ archive_package_files(
 			path = entry == NULL ? NULL : archive_entry_pathname(entry);
 		} while (path != NULL && *path == '+');
 
+		own = 0;
 		while ((fret = sqlite3_step(files)) == SQLITE_ROW) {
 			file = sqlite3_column_text(files, 0);
 
@@ -568,6 +582,7 @@ archive_package_files(
 				ret = mport_err_code();
 				goto DONE;
 			}
+			own++;
 
 			if (mport_bundle_read_next_entry(inbundle, &entry) != MPORT_OK) {
 				ret = mport_err_code();
@@ -578,6 +593,20 @@ archive_package_files(
 		if (fret != SQLITE_DONE) {
 			ret = SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
 			goto DONE;
+		}
+
+		/* the rest belong to the other packages in this bundle, which
+		 * are archived on their own turn */
+		for (int i = own; i < total; i++) {
+			if (entry == NULL) {
+				ret = SET_ERRORX(MPORT_ERR_FATAL,
+				    "Corrupt bundle %s: archive ends early", cur->file);
+				goto DONE;
+			}
+			if (mport_bundle_read_next_entry(inbundle, &entry) != MPORT_OK) {
+				ret = mport_err_code();
+				goto DONE;
+			}
 		}
 
 		/* every data file must belong to an asset row, or it would be
@@ -608,6 +637,40 @@ DONE:
 	sqlite3_finalize(files);
 	sqlite3_finalize(stmt);
 	return ret;
+}
+
+/* set count to the number of data file asset rows of the packages that came
+ * from the input bundle file */
+static int
+count_bundle_data_files(sqlite3 *db, struct table_entry **table, const char *file, int *count)
+{
+	sqlite3_stmt *stmt = NULL;
+	struct table_entry *e;
+
+	*count = 0;
+	for (int i = 0; i < TABLE_SIZE; i++) {
+		for (e = table[i]; e != NULL; e = e->next) {
+			if (strcmp(e->file, file) != 0)
+				continue;
+
+			if (mport_db_prepare(db, &stmt,
+				"SELECT COUNT(*) FROM assets WHERE pkg=%Q AND " DATA_ASSET_TYPES_SQL,
+				e->name, DATA_ASSET_TYPES) != MPORT_OK) {
+				sqlite3_finalize(stmt);
+				RETURN_CURRENT_ERROR;
+			}
+			if (sqlite3_step(stmt) != SQLITE_ROW) {
+				SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
+				sqlite3_finalize(stmt);
+				RETURN_CURRENT_ERROR;
+			}
+			*count += sqlite3_column_int(stmt, 0);
+			sqlite3_finalize(stmt);
+			stmt = NULL;
+		}
+	}
+
+	return MPORT_OK;
 }
 
 /* create an empty, uniquely named file next to outfile and put its name in
