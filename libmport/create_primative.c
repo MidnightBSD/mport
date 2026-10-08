@@ -947,7 +947,8 @@ archive_files(
 	if (archive_assetlistfiles(bundle, pack, extra, assetlist) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	mport_bundle_write_finish(bundle);
+	if (mport_bundle_write_finish(bundle) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
 
 	return MPORT_OK;
 }

@@ -207,6 +207,33 @@ drops_duplicate_plist_entries_body()
 		sqlite3 +CONTENTS.db "SELECT type, data FROM assets WHERE data LIKE '%file.txt'"
 }
 
+atf_test_case reports_bundle_write_failure
+reports_bundle_write_failure_head()
+{
+	atf_set "descr" "mport.create fails when the bundle cannot be finished (full disk)"
+}
+reports_bundle_write_failure_body()
+{
+	[ -c /dev/full ] || atf_skip "/dev/full is not available"
+
+	setup_tree
+
+	atf_check \
+		-s not-exit:0 \
+		-o empty \
+		-e match:"Couldn't finish writing /dev/full" \
+		"${MPORT_CREATE}" \
+		-n testpkg \
+		-v 1.0 \
+		-o /dev/full \
+		-s "${PWD}/root" \
+		-p "${PWD}/plist" \
+		-P /usr/local \
+		-O misc/testpkg \
+		-t misc \
+		-c "test package"
+}
+
 atf_test_case mport_version_runs
 mport_version_runs_head()
 {
@@ -244,4 +271,5 @@ atf_init_test_cases()
 	atf_add_test_case records_abi_file_release
 	atf_add_test_case rejects_unreadable_abi_file
 	atf_add_test_case drops_duplicate_plist_entries
+	atf_add_test_case reports_bundle_write_failure
 }
