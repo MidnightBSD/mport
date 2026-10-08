@@ -271,6 +271,28 @@ merge_skips_package_without_files_body()
 	atf_check -s exit:0 -o inline:"+CONTENTS.db\nshare/pkga/f\n" tar -tf croot/out.mport
 }
 
+atf_test_case merge_accepts_merged_bundle
+merge_accepts_merged_bundle_head()
+{
+	atf_set "descr" "mport.merge accepts a merged bundle holding a package without data files"
+	atf_set "require.user" "root"
+}
+merge_accepts_merged_bundle_body()
+{
+	setup_merge_tree
+	make_merge_pkg pkga share/pkga/f
+	: >plist.meta
+	make_merge_pkg meta ""
+	make_merge_pkg pkgb share/pkgb/f
+
+	atf_check -s exit:0 -o empty -e empty \
+		env TMPDIR=/tmp "${MPORT_MERGE}" -c "${PWD}/croot" -o /combo.mport /pkga.mport /meta.mport
+	atf_check -s exit:0 -o empty -e empty \
+		env TMPDIR=/tmp "${MPORT_MERGE}" -c "${PWD}/croot" -o /out.mport /combo.mport /pkgb.mport
+	atf_check -s exit:0 -o inline:"+CONTENTS.db\nshare/pkga/f\nshare/pkgb/f\n" \
+		tar -tf croot/out.mport
+}
+
 atf_test_case merge_rejects_duplicate_package
 merge_rejects_duplicate_package_head()
 {
@@ -306,6 +328,56 @@ merge_rejects_truncated_bundle_body()
 
 	atf_check -s not-exit:0 -o empty -e match:"archive ends before 'share/pkgc/other'" \
 		env TMPDIR=/tmp "${MPORT_MERGE}" -c "${PWD}/croot" -o /out.mport /pkga.mport /trunc.mport
+	atf_check -s not-exit:0 test -e croot/out.mport
+}
+
+atf_test_case merge_rejects_extra_data_file
+merge_rejects_extra_data_file_head()
+{
+	atf_set "descr" "mport.merge refuses a bundle with a data file that has no asset row"
+	atf_set "require.user" "root"
+}
+merge_rejects_extra_data_file_body()
+{
+	setup_merge_tree
+	make_merge_pkg pkga share/pkga/f
+	make_merge_pkg pkgc share/pkgc/plain
+	mkdir extra
+	tar -xf croot/pkgc.mport -C extra
+	tar -tf croot/pkgc.mport >order
+	printf 'stray\n' >extra/share/pkgc/stray
+	echo share/pkgc/stray >>order
+	tar -cJf croot/extra.mport -C extra -T "${PWD}/order"
+
+	atf_check -s not-exit:0 -o empty \
+		-e match:"Unexpected file 'share/pkgc/stray' in /extra.mport" \
+		env TMPDIR=/tmp "${MPORT_MERGE}" -c "${PWD}/croot" -o /out.mport /pkga.mport /extra.mport
+	atf_check -s not-exit:0 test -e croot/out.mport
+}
+
+atf_test_case merge_rejects_data_file_in_package_without_files
+merge_rejects_data_file_in_package_without_files_head()
+{
+	atf_set "descr" "mport.merge refuses a data file in a bundle whose package has no data files"
+	atf_set "require.user" "root"
+}
+merge_rejects_data_file_in_package_without_files_body()
+{
+	setup_merge_tree
+	make_merge_pkg pkga share/pkga/f
+	: >plist.meta
+	make_merge_pkg meta ""
+	mkdir extra
+	tar -xf croot/meta.mport -C extra
+	tar -tf croot/meta.mport >order
+	mkdir -p extra/share/meta
+	printf 'stray\n' >extra/share/meta/stray
+	echo share/meta/stray >>order
+	tar -cJf croot/extra.mport -C extra -T "${PWD}/order"
+
+	atf_check -s not-exit:0 -o empty \
+		-e match:"Unexpected file 'share/meta/stray' in /extra.mport" \
+		env TMPDIR=/tmp "${MPORT_MERGE}" -c "${PWD}/croot" -o /out.mport /pkga.mport /extra.mport
 	atf_check -s not-exit:0 test -e croot/out.mport
 }
 
@@ -431,8 +503,11 @@ atf_init_test_cases()
 	atf_add_test_case install_accepts_package_without_lang
 	atf_add_test_case merge_combines_packages
 	atf_add_test_case merge_skips_package_without_files
+	atf_add_test_case merge_accepts_merged_bundle
 	atf_add_test_case merge_rejects_duplicate_package
 	atf_add_test_case merge_rejects_truncated_bundle
+	atf_add_test_case merge_rejects_extra_data_file
+	atf_add_test_case merge_rejects_data_file_in_package_without_files
 	atf_add_test_case merge_failure_keeps_existing_output
 	atf_add_test_case merge_rejects_linked_stub
 	atf_add_test_case merge_requires_inputs

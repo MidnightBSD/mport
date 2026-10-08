@@ -187,7 +187,6 @@ int mport_bundle_read_init_fd(/*@notnull@*/ mportBundleRead *, int);
 int mport_bundle_read_finish(mportInstance *, mportBundleRead *);
 int mport_bundle_read_prep_for_install(mportInstance *, mportBundleRead *);
 int mport_bundle_read_extract_metafiles(mportBundleRead *, char **);
-int mport_bundle_read_skip_metafiles(mportBundleRead *);
 int mport_bundle_read_next_entry(mportBundleRead *, struct archive_entry **);
 int mport_bundle_read_extract_next_file(mportBundleRead *, struct archive_entry *);
 int mport_bundle_read_install_pkg(mportInstance *, mportBundleRead *, mportPackageMeta *);
