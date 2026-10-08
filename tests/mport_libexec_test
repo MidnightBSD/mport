@@ -153,6 +153,61 @@ delete_ignores_missing_registered_dir_head()
 }
 delete_ignores_missing_registered_dir_body()
 {
+	setup_gperf_registry
+
+	atf_check -s exit:0 -o ignore -e empty \
+		"${MPORT_DELETE}" -c "${PWD}/root" -f -n gperf
+
+	atf_check -s exit:0 -o inline:"0\n" -e empty \
+		sqlite3 root/var/db/mport/master.db \
+		"SELECT count(*) FROM packages WHERE pkg='gperf';"
+}
+
+atf_test_case delete_accepts_registry_row_without_lang
+delete_accepts_registry_row_without_lang_head()
+{
+	atf_set "descr" "mport.delete reads an installed package whose lang is NULL"
+	atf_set "require.user" "root"
+}
+delete_accepts_registry_row_without_lang_body()
+{
+	setup_gperf_registry
+	sqlite3 root/var/db/mport/master.db "UPDATE packages SET lang=NULL WHERE pkg='gperf';"
+
+	atf_check -s exit:0 -o ignore -e empty \
+		"${MPORT_DELETE}" -c "${PWD}/root" -f -n gperf
+
+	atf_check -s exit:0 -o inline:"0\n" -e empty \
+		sqlite3 root/var/db/mport/master.db \
+		"SELECT count(*) FROM packages WHERE pkg='gperf';"
+}
+
+atf_test_case install_accepts_package_without_lang
+install_accepts_package_without_lang_head()
+{
+	atf_set "descr" "mport.install installs a package created without -l"
+	atf_set "require.user" "root"
+}
+install_accepts_package_without_lang_body()
+{
+	setup_fake_tree
+	mkdir -p croot/tmp croot/var/db/mport croot/usr/local
+	atf_check -s exit:0 -o ignore -e ignore \
+		"${MPORT_CREATE}" -n testpkg -v 1.0 -o "${PWD}/croot/tmp/testpkg-1.0.mport" \
+		-s "${PWD}/root" -p "${PWD}/plist" -P /usr/local -O misc/testpkg -t misc \
+		-c "test package"
+
+	atf_check -s exit:0 -o ignore -e empty \
+		"${MPORT_INSTALL}" -O -c "${PWD}/croot" /tmp/testpkg-1.0.mport
+	atf_check -s exit:0 -o inline:"hello\n" cat croot/usr/local/share/testpkg/file.txt
+	atf_check -s exit:0 -o inline:"''\n" -e empty \
+		sqlite3 croot/var/db/mport/master.db \
+		"SELECT quote(lang) FROM packages WHERE pkg='testpkg';"
+}
+
+# a registry with one package, gperf, registered under root/
+setup_gperf_registry()
+{
 	mkdir -p root/var/db/mport root/usr/local/share/licenses
 
 	sqlite3 root/var/db/mport/master.db \
@@ -166,13 +221,6 @@ delete_ignores_missing_registered_dir_body()
 		"CREATE TABLE annotation (pkg text NOT NULL, tag TEXT NOT NULL, val TEXT NOT NULL, PRIMARY KEY (pkg, tag));" \
 		"INSERT INTO packages (pkg, version, origin, prefix, lang, options, status, comment, os_release, cpe, locked, deprecated, expiration_date, no_provide_shlib, flavor, automatic, install_date, type, flatsize) VALUES ('gperf', '3.1', 'devel/gperf', '/usr/local', '', '', 'clean', '', '3.2', '', 0, '', 0, 0, '', 0, 0, 0, 682000);" \
 		"INSERT INTO assets (pkg, type, data, checksum, owner, grp, mode) VALUES ('gperf', 24, '/usr/local/share/licenses/gperf-3.1', NULL, NULL, NULL, NULL);"
-
-	atf_check -s exit:0 -o ignore -e empty \
-		"${MPORT_DELETE}" -c "${PWD}/root" -f -n gperf
-
-	atf_check -s exit:0 -o inline:"0\n" -e empty \
-		sqlite3 root/var/db/mport/master.db \
-		"SELECT count(*) FROM packages WHERE pkg='gperf';"
 }
 
 atf_test_case merge_combines_packages
@@ -379,6 +427,8 @@ atf_init_test_cases()
 	atf_add_test_case init_rejects_bad_usage
 	atf_add_test_case update_reports_bad_chroot
 	atf_add_test_case delete_ignores_missing_registered_dir
+	atf_add_test_case delete_accepts_registry_row_without_lang
+	atf_add_test_case install_accepts_package_without_lang
 	atf_add_test_case merge_combines_packages
 	atf_add_test_case merge_skips_package_without_files
 	atf_add_test_case merge_rejects_duplicate_package

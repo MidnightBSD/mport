@@ -619,12 +619,15 @@ populate_meta_from_stmt(mportPackageMeta *pack, sqlite3 *db, sqlite3_stmt *stmt)
 	if ((pack->origin = strdup(tmp)) == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
 
-	/* Copy lang to pack->lang */
-	if ((tmp = sqlite3_column_text(stmt, 3)) == NULL)
-		RETURN_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(db));
-
-	if ((pack->lang = strdup(tmp)) == NULL)
-		RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+	/* Copy lang to pack->lang; the column is nullable and mport.create
+	 * leaves it NULL when no -l is given */
+	if ((tmp = sqlite3_column_text(stmt, 3)) == NULL) {
+		if ((pack->lang = strdup("")) == NULL)
+			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+	} else {
+		if ((pack->lang = strdup(tmp)) == NULL)
+			RETURN_ERROR(MPORT_ERR_FATAL, "Out of memory.");
+	}
 
 	/* Copy prefix to pack->prefix */
 	if ((tmp = sqlite3_column_text(stmt, 4)) == NULL)
