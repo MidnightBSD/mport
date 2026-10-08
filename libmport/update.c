@@ -54,7 +54,7 @@ mport_update(mportInstance *mport, const char *packageName)
 	mportIndexEntry *indexEntry = NULL;
 	mportPackageMeta **packs_meta = NULL;
 	/*@null@*/ mportIndexMovedEntry **movedEntries = NULL;
-	char *replacement_path = NULL;
+	/*@null@*/ char *replacement_path = NULL;
 	char expiry[32];
 	mportAutomatic automatic = MPORT_EXPLICIT;
 	int result;
@@ -103,12 +103,14 @@ mport_update(mportInstance *mport, const char *packageName)
 					return SET_ERROR(
 					    MPORT_ERR_FATAL, "Downloaded package path is missing");
 				}
+				free(replacement_path);
+				replacement_path = NULL;
 				(*packs_meta)->action = MPORT_ACTION_UPGRADE;
 				ret = mport_delete_primative(mport, *packs_meta, 1);
 				if (ret == MPORT_OK)
-					ret = mport_install_primative(
-					    mport, replacement_path, NULL, automatic);
-				free(replacement_path);
+					ret = mport_install_single(mport,
+					    (*movedEntries)->moved_to_pkgname, NULL, NULL,
+					    automatic);
 				free_moved_entries(movedEntries);
 				mport_pkgmeta_vec_free(packs_meta);
 				return ret;
