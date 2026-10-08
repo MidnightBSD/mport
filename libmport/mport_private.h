@@ -113,6 +113,7 @@ bool mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack);
 /* Utils */
 bool mport_starts_with(const char *, const char *);
 char *mport_hash_file(const char *);
+int mport_same_file_contents(const char *, const char *, bool *);
 int mport_verify_hash_fd(int, /*@notnull@*/ const char *);
 char *mport_extract_hash_from_file(const char *);
 int mport_copy_file(const char *, const char *);

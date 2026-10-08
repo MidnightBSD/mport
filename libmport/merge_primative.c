@@ -65,7 +65,6 @@ static int archive_package_files(
     mportInstance *, mportBundleWrite *, sqlite3 *, struct table_entry **);
 static int count_bundle_data_files(sqlite3 *, struct table_entry **, const char *, int *);
 static int extract_stub_db(const char *, const char *);
-static int same_file_contents(const char *, const char *, bool *);
 static int make_temp_outfile(const char *, char *, size_t);
 static void finish_input_bundle_preserving_error(
     /*@notnull@*/ mportInstance *, /*@only@*/ /*@notnull@*/ mportBundleRead *, int);
@@ -302,8 +301,8 @@ build_stub_db(mportInstance *mport, sqlite3 **db, const char *tmpdir, const char
 					/* a byte-identical copy of an earlier input adds
 					 * nothing; its first package is already a dup */
 					if (dup->input != input) {
-						if (same_file_contents(dup->file, file, &same) !=
-						    MPORT_OK) {
+						if (mport_same_file_contents(
+							dup->file, file, &same) != MPORT_OK) {
 							sqlite3_finalize(stmt);
 							goto rollback;
 						}
@@ -780,26 +779,6 @@ extract_stub_db(const char *filename, const char *destfile)
 	/* a's error string is gone once it is freed */
 	if (archive_read_free(a) != ARCHIVE_OK)
 		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't close %s", filename);
-
-	return MPORT_OK;
-}
-
-/* set same to whether files a and b have the same contents */
-static int
-same_file_contents(const char *a, const char *b, bool *same)
-{
-	char *ha, *hb;
-
-	if ((ha = mport_hash_file(a)) == NULL)
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't hash %s: %s", a, strerror(errno));
-	if ((hb = mport_hash_file(b)) == NULL) {
-		free(ha);
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Couldn't hash %s: %s", b, strerror(errno));
-	}
-
-	*same = strcmp(ha, hb) == 0;
-	free(ha);
-	free(hb);
 
 	return MPORT_OK;
 }
