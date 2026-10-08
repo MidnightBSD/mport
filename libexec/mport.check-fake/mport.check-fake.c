@@ -70,6 +70,7 @@ diag(const char *fmt, ...)
 #endif
 
 static void usage(void);
+static void strip_trailing_slashes(/*@notnull@*/ char *path);
 static void truncate_at_whitespace(/*@notnull@*/ char *path);
 static int check_fake(/*@notnull@*/ mportAssetList *, /*@notnull@*/ const char *,
     /*@notnull@*/ const char *,
@@ -91,6 +92,16 @@ static int check_missing_from_plist(/*@null@*/ const char *path,
 static void check_for_missing_files(/*@notnull@*/ const char *destdir,
     /*@notnull@*/ const char *prefix,
     /*@notnull@*/ mportAssetList *assetlist);
+
+/* Drop trailing slashes, leaving a bare "/" alone. */
+static void
+strip_trailing_slashes(char *path)
+{
+	size_t len = strlen(path);
+
+	while (len > 1 && path[len - 1] == '/')
+		path[--len] = '\0';
+}
 
 /*
  * Sample assets may carry both a source and a destination in a single data
@@ -140,6 +151,12 @@ main(int argc, char *argv[])
 			prefix = optarg;
 			break;
 		case 'd':
+			/*
+			 * Paths are built as destdir + "/..." and the symlink check
+			 * compares targets against destdir as a prefix, so a
+			 * trailing slash would leave "/stage//x" unmatched.
+			 */
+			strip_trailing_slashes(optarg);
 			destdir = optarg;
 			break;
 		case 'f':
@@ -529,6 +546,11 @@ grep_file(const char *filename, const char *destdir)
 /*
  * Collapse "//", "/./" and "/../" in an absolute path in place.  Purely
  * lexical: nothing is looked up, and ".." at the root stays at the root.
+ * In particular ".." is applied to the literal preceding component without
+ * following symlinks, so a target like "link/../x" is validated as the
+ * literal path, which may differ from what the kernel resolves once the
+ * link is installed.  Doing better would mean walking both the stage tree
+ * and the live system; a spurious or missed WARN is the only consequence.
  */
 static void
 normalize_path(char *path)

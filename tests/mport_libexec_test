@@ -134,6 +134,15 @@ check_fake_rejects_symlink_into_destdir_body()
 		-f "${PWD}/plist" \
 		-d "${PWD}/root" \
 		-p /usr/local
+
+	# a trailing slash on -d must not hide the match
+	atf_check -s not-exit:0 \
+		-o match:"leak points into the fake destdir" \
+		-e empty \
+		"${MPORT_CHECK_FAKE}" \
+		-f "${PWD}/plist" \
+		-d "${PWD}/root/" \
+		-p /usr/local
 }
 
 atf_test_case check_fake_cwd_rebases_following_entries
