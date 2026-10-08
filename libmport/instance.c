@@ -341,20 +341,25 @@ mport_set_select_cb(mportInstance *mport, mport_select_cb cb)
  * @brief Calls the message callback function with a formatted message.
  *
  * This function formats a message using the provided format string and arguments,
- * then calls the message callback function stored in the mportInstance.
+ * then calls the instance's message callback, or the default callback when
+ * the instance or its callback is NULL.
  *
- * @param mport Pointer to the mportInstance containing the message callback.
+ * @param mport Optional mportInstance containing the message callback.
  * @param fmt Format string for the message.
  * @param ... Variable arguments to be formatted according to fmt.
  *
  * @return MPORT_OK on success, MPORT_ERR_WARN if message formatting fails.
  */
 MPORT_PUBLIC_API int
-mport_call_msg_cb(mportInstance *mport, const char *fmt, ...)
+mport_call_msg_cb(/*@null@*/ mportInstance *mport, /*@notnull@*/ const char *fmt, ...)
 {
 	va_list args;
+	/*@only@*/ char *msg = NULL;
+	mport_msg_cb cb = mport_default_msg_cb;
 
-	char *msg;
+	if (mport != NULL && mport->msg_cb != NULL)
+		cb = mport->msg_cb;
+
 	va_start(args, fmt);
 	(void)vasprintf(&msg, fmt, args);
 	va_end(args);
@@ -362,7 +367,7 @@ mport_call_msg_cb(mportInstance *mport, const char *fmt, ...)
 	if (msg == NULL)
 		RETURN_ERROR(MPORT_ERR_WARN, "Unable to format message");
 
-	(mport->msg_cb)(msg);
+	cb(msg);
 
 	free(msg);
 	msg = NULL;

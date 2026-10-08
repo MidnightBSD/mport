@@ -102,7 +102,7 @@ int mport_instance_init(
 int mport_instance_free(mportInstance *);
 
 /* Run the callbacks. will display messages, etc */
-int mport_call_msg_cb(mportInstance *, const char *, ...);
+int mport_call_msg_cb(/*@null@*/ mportInstance *, /*@notnull@*/ const char *, ...);
 int mport_call_progress_init_cb(mportInstance *, const char *, ...);
 bool mport_call_confirm_cb(
     mportInstance *mport, const char *msg, const char *yes, const char *no, int def);
