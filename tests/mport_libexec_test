@@ -63,6 +63,58 @@ check_fake_reports_missing_file_body()
 		-p /usr/local
 }
 
+atf_test_case check_fake_continues_after_dir
+check_fake_continues_after_dir_head()
+{
+	atf_set "descr" "mport.check-fake keeps checking entries after a @dir line"
+}
+check_fake_continues_after_dir_body()
+{
+	setup_fake_tree
+	printf "@dir share/testpkg\nshare/testpkg/missing.txt\n" >>plist
+
+	atf_check -s not-exit:0 \
+		-o match:"share/testpkg/missing.txt not installed" \
+		-o match:"Fake failed" \
+		-e empty \
+		"${MPORT_CHECK_FAKE}" \
+		-f "${PWD}/plist" \
+		-d "${PWD}/root" \
+		-p /usr/local
+}
+
+atf_test_case check_fake_cwd_rebases_following_entries
+check_fake_cwd_rebases_following_entries_head()
+{
+	atf_set "descr" "mport.check-fake resolves entries after @cwd against the new directory"
+}
+check_fake_cwd_rebases_following_entries_body()
+{
+	setup_fake_tree
+	mkdir -p root/usr/local/etc
+	printf "hello\n" >root/usr/local/etc/present.conf
+	printf "@cwd /usr/local/etc\npresent.conf\n@cwd\nshare/testpkg/file.txt\n" >>plist
+
+	atf_check -s exit:0 \
+		-o match:"Fake succeeded" \
+		-e empty \
+		"${MPORT_CHECK_FAKE}" \
+		-f "${PWD}/plist" \
+		-d "${PWD}/root" \
+		-p /usr/local
+
+	# An entry that only exists under the old cwd must now be reported.
+	printf "@cwd /usr/local/etc\nshare/testpkg/file.txt\n" >plist
+
+	atf_check -s not-exit:0 \
+		-o match:"share/testpkg/file.txt not installed" \
+		-e empty \
+		"${MPORT_CHECK_FAKE}" \
+		-f "${PWD}/plist" \
+		-d "${PWD}/root" \
+		-p /usr/local
+}
+
 atf_test_case check_fake_requires_options
 check_fake_requires_options_head()
 {
@@ -524,6 +576,8 @@ atf_init_test_cases()
 	atf_add_test_case version_cmp_requires_two_args
 	atf_add_test_case check_fake_succeeds
 	atf_add_test_case check_fake_reports_missing_file
+	atf_add_test_case check_fake_continues_after_dir
+	atf_add_test_case check_fake_cwd_rebases_following_entries
 	atf_add_test_case check_fake_requires_options
 	atf_add_test_case frontends_reject_missing_required_args
 	atf_add_test_case list_rejects_extra_args

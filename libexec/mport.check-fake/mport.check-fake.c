@@ -267,7 +267,7 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 				(void)strlcpy(cwd, e->data, FILENAME_MAX);
 			}
 
-			break;
+			continue;
 		}
 
 		if (e->data != NULL) {
@@ -304,7 +304,7 @@ check_fake(mportAssetList *assetlist, const char *destdir, const char *prefix, c
 				}
 			}
 
-			break;
+			continue;
 		}
 
 		if (e->data != NULL &&
