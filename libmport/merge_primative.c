@@ -608,6 +608,7 @@ extract_stub_db(const char *filename, const char *destfile)
 {
 	struct archive *a = archive_read_new();
 	struct archive_entry *entry;
+	/*@observer@*/ /*@null@*/ const char *path;
 
 	if (a == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Couldn't allocate read archive struct");
@@ -632,7 +633,8 @@ extract_stub_db(const char *filename, const char *destfile)
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (strcmp(archive_entry_pathname(entry), MPORT_STUB_DB_FILE) != 0) {
+	path = archive_entry_pathname(entry);
+	if (path == NULL || strcmp(path, MPORT_STUB_DB_FILE) != 0) {
 		archive_read_free(a);
 		RETURN_ERROR(
 		    MPORT_ERR_FATAL, "Invalid bundle file: stub database is not the first file");
