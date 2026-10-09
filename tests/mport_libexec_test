@@ -83,6 +83,68 @@ check_fake_continues_after_dir_body()
 		-p /usr/local
 }
 
+atf_test_case check_fake_accepts_symlinks_resolved_at_install
+check_fake_accepts_symlinks_resolved_at_install_head()
+{
+	atf_set "descr" "mport.check-fake accepts symlinks whose targets exist once installed"
+}
+check_fake_accepts_symlinks_resolved_at_install_body()
+{
+	setup_fake_tree
+	mkdir -p root/usr/local/share/testpkg/rules root/var/lib/xkb
+	printf "base\n" >root/usr/local/share/testpkg/rules/base
+	# relative link to a sibling staged file (meson -Dxorg-rules-symlinks style)
+	ln -s base root/usr/local/share/testpkg/rules/xorg
+	# absolute link to a file this package stages
+	ln -s /usr/local/share/testpkg/rules/base root/usr/local/share/testpkg/absinside
+	# absolute link to a directory this package declares with @dir (issue #106)
+	ln -s /var/lib/xkb root/usr/local/share/testpkg/compiled
+	# relative link that climbs out of the stage tree to a base-system path
+	ln -s ../../../../etc root/usr/local/share/testpkg/escape
+	printf "share/testpkg/rules/base\nshare/testpkg/rules/xorg\n" >>plist
+	printf "share/testpkg/absinside\nshare/testpkg/compiled\nshare/testpkg/escape\n" >>plist
+	printf "@dir /var/lib/xkb\n" >>plist
+
+	atf_check -s exit:0 \
+		-o match:"Fake succeeded" \
+		-o not-match:"WARN" \
+		-e empty \
+		"${MPORT_CHECK_FAKE}" \
+		-f "${PWD}/plist" \
+		-d "${PWD}/root" \
+		-p /usr/local
+}
+
+atf_test_case check_fake_rejects_symlink_into_destdir
+check_fake_rejects_symlink_into_destdir_head()
+{
+	atf_set "descr" "mport.check-fake fails a symlink whose target names the stage directory"
+}
+check_fake_rejects_symlink_into_destdir_body()
+{
+	setup_fake_tree
+	ln -s "${PWD}/root/usr/local/share/testpkg/file.txt" root/usr/local/share/testpkg/leak
+	printf "share/testpkg/leak\n" >>plist
+
+	atf_check -s not-exit:0 \
+		-o match:"leak points into the fake destdir" \
+		-o match:"Fake failed" \
+		-e empty \
+		"${MPORT_CHECK_FAKE}" \
+		-f "${PWD}/plist" \
+		-d "${PWD}/root" \
+		-p /usr/local
+
+	# a trailing slash on -d must not hide the match
+	atf_check -s not-exit:0 \
+		-o match:"leak points into the fake destdir" \
+		-e empty \
+		"${MPORT_CHECK_FAKE}" \
+		-f "${PWD}/plist" \
+		-d "${PWD}/root/" \
+		-p /usr/local
+}
+
 atf_test_case check_fake_cwd_rebases_following_entries
 check_fake_cwd_rebases_following_entries_head()
 {
@@ -108,6 +170,27 @@ check_fake_cwd_rebases_following_entries_body()
 
 	atf_check -s not-exit:0 \
 		-o match:"share/testpkg/file.txt not installed" \
+		-e empty \
+		"${MPORT_CHECK_FAKE}" \
+		-f "${PWD}/plist" \
+		-d "${PWD}/root" \
+		-p /usr/local
+}
+
+atf_test_case check_fake_warns_on_dangling_symlink
+check_fake_warns_on_dangling_symlink_head()
+{
+	atf_set "descr" "mport.check-fake warns, without failing, about a symlink to nothing"
+}
+check_fake_warns_on_dangling_symlink_body()
+{
+	setup_fake_tree
+	ln -s /nonexistent/mport-check-fake-test root/usr/local/share/testpkg/dangling
+	printf "share/testpkg/dangling\n" >>plist
+
+	atf_check -s exit:0 \
+		-o match:"WARN: .*dangling points to /nonexistent/mport-check-fake-test, which is neither staged nor installed" \
+		-o match:"Fake succeeded" \
 		-e empty \
 		"${MPORT_CHECK_FAKE}" \
 		-f "${PWD}/plist" \
@@ -578,6 +661,9 @@ atf_init_test_cases()
 	atf_add_test_case check_fake_reports_missing_file
 	atf_add_test_case check_fake_continues_after_dir
 	atf_add_test_case check_fake_cwd_rebases_following_entries
+	atf_add_test_case check_fake_accepts_symlinks_resolved_at_install
+	atf_add_test_case check_fake_rejects_symlink_into_destdir
+	atf_add_test_case check_fake_warns_on_dangling_symlink
 	atf_add_test_case check_fake_requires_options
 	atf_add_test_case frontends_reject_missing_required_args
 	atf_add_test_case list_rejects_extra_args
