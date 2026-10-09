@@ -373,6 +373,10 @@ check_depends(mportInstance *mport, mportPackageMeta *pack)
 				ok = mport_version_require_check(inst_version, depend_version);
 
 				if (ok > 0) {
+					SET_ERRORX(MPORT_ERR_FATAL,
+					    "%s depends on %s with an invalid version requirement '%s': %s",
+					    pack->name, depend_pkg, depend_version,
+					    mport_err_string());
 					sqlite3_finalize(lookup);
 					sqlite3_finalize(stmt);
 					free(system_os_release);

@@ -8,13 +8,15 @@
 
 #include "../libmport/mport.h"
 
-/* Internal libmport symbol (declared in mport_private.h). */
+/* Internal libmport symbols (declared in mport_private.h). */
 void mport_version_cmp_sqlite(sqlite3_context *, int, sqlite3_value **);
+int mport_version_require_check(const char *, const char *);
+int mport_set_err(int, const char *);
 
 /* Splint does not understand ATF's generated test-case wrappers. */
 /*@-boundsread -boundswrite -compdef -compdestroy -dependenttrans -fullinitblock@*/
 /*@-mustfreefresh -noeffect -nullpass -nullret -nullstate -paramuse@*/
-/*@-retvalint -retvalother -type -unrecog@*/
+/*@-retvalint -retvalother -type -unrecog -nullassign@*/
 
 static sqlite3 *
 open_db_with_cmp(void)
@@ -202,6 +204,88 @@ ATF_TC_BODY(version_cmp_large_numbers, tc)
 	ATF_REQUIRE_EQ(0, mport_version_cmp("1.0_-1", "1.0"));
 }
 
+ATF_TC(require_check_single);
+ATF_TC_HEAD(require_check_single, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "mport_version_require_check() honours each single operator");
+}
+ATF_TC_BODY(require_check_single, tc)
+{
+	ATF_REQUIRE_EQ(0, mport_version_require_check("1.0", ">=1.0"));
+	ATF_REQUIRE_EQ(0, mport_version_require_check("1.1", ">=1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("0.9", ">=1.0"));
+	ATF_REQUIRE_EQ(0, mport_version_require_check("1.1", ">1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("1.0", ">1.0"));
+	ATF_REQUIRE_EQ(0, mport_version_require_check("1.0", "<=1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("1.1", "<=1.0"));
+	ATF_REQUIRE_EQ(0, mport_version_require_check("0.9", "<1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("1.0", "<1.0"));
+	ATF_REQUIRE_EQ(0, mport_version_require_check("1.0", "=1.0"));
+	ATF_REQUIRE_EQ(0, mport_version_require_check("1.0", "==1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("2.0", "==1.0"));
+	/* the common "any version" forms in the registry */
+	ATF_REQUIRE_EQ(0, mport_version_require_check("1.0", ">0"));
+	ATF_REQUIRE_EQ(0, mport_version_require_check("0", ">=0"));
+	/* revisions and epochs pass through to mport_version_cmp() */
+	ATF_REQUIRE_EQ(0, mport_version_require_check("2.17.1_1,1", ">=2.17.1,1"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("2.17.1_1", ">=2.17.1,1"));
+}
+
+ATF_TC(require_check_compound);
+ATF_TC_HEAD(require_check_compound, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "mport_version_require_check() ANDs every bound of a compound requirement");
+}
+ATF_TC_BODY(require_check_compound, tc)
+{
+	ATF_REQUIRE_EQ(0, mport_version_require_check("1.0", ">=1.0<4.0"));
+	ATF_REQUIRE_EQ(0, mport_version_require_check("2.0", ">=1.0<4.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("0.5", ">=1.0<4.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("4.0", ">=1.0<4.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("5.0", ">=1.0<4.0"));
+
+	ATF_REQUIRE_EQ(0, mport_version_require_check("2.0", ">1.0<=4.0"));
+	ATF_REQUIRE_EQ(0, mport_version_require_check("4.0", ">1.0<=4.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("1.0", ">1.0<=4.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("4.1", ">1.0<=4.0"));
+
+	/* bound order does not matter */
+	ATF_REQUIRE_EQ(0, mport_version_require_check("2.0", "<4.0>=1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("0.5", "<4.0>=1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("5.0", "<4.0>=1.0"));
+
+	/* whitespace between bounds is tolerated */
+	ATF_REQUIRE_EQ(0, mport_version_require_check("2.0", ">=1.0 <4.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("0.5", ">=1.0 <4.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("5.0", " >= 1.0 < 4.0 "));
+
+	/* more than two bounds */
+	ATF_REQUIRE_EQ(0, mport_version_require_check("2.0", ">=1.0<4.0<3.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_require_check("3.5", ">=1.0<4.0<3.0"));
+}
+
+ATF_TC(require_check_malformed);
+ATF_TC_HEAD(require_check_malformed, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "mport_version_require_check() rejects malformed requirements and sets an error");
+}
+ATF_TC_BODY(require_check_malformed, tc)
+{
+	const char *bad[] = { "", " ", "1.0", "|", ">", ">=", "<=1.0>", ">=1.0<", "1.0<2.0",
+		"=>1.0", NULL };
+	const char **r;
+
+	for (r = bad; *r != NULL; r++) {
+		mport_set_err(MPORT_OK, NULL);
+		ATF_REQUIRE_MSG(
+		    mport_version_require_check("1.0", *r) > 0, "'%s' was not rejected", *r);
+		ATF_REQUIRE_MSG(mport_err_code() != MPORT_OK, "'%s' set no error code", *r);
+	}
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, version_cmp_null_first);
@@ -213,6 +297,9 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, version_cmp_separators);
 	ATF_TP_ADD_TC(tp, version_cmp_epoch_revision);
 	ATF_TP_ADD_TC(tp, version_cmp_large_numbers);
+	ATF_TP_ADD_TC(tp, require_check_single);
+	ATF_TP_ADD_TC(tp, require_check_compound);
+	ATF_TP_ADD_TC(tp, require_check_malformed);
 
 	return atf_no_error();
 }
