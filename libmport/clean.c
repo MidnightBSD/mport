@@ -144,6 +144,10 @@ mport_clean_oldpackages(mportInstance *mport)
 			} else {
 				deleted++;
 			}
+			/* mport_index_search allocates a (possibly empty) vector even
+			   when nothing matched; free it here. */
+			mport_index_entry_free_vec(indexEntry);
+			indexEntry = NULL;
 		} else {
 			int fd;
 			struct stat st;
@@ -269,9 +273,9 @@ mport_clean_oldmtree(mportInstance *mport)
 
 		if (packs == NULL || *packs == NULL) {
 			if (remove_tree_at(dfd, de->d_name) != 0) {
-				error_code = SET_ERRORX(MPORT_ERR_FATAL,
-				    "Could not delete file %s/%s: %s", MPORT_INST_INFRA_DIR,
-				    de->d_name, strerror(errno));
+				error_code =
+				    SET_ERRORX(MPORT_ERR_FATAL, "Could not delete file %s/%s: %s",
+					MPORT_INST_INFRA_DIR, de->d_name, strerror(errno));
 				mport_call_msg_cb(mport, "%s\n", mport_err_string());
 			} else {
 				deleted++;
@@ -280,7 +284,6 @@ mport_clean_oldmtree(mportInstance *mport)
 			mport_pkgmeta_vec_free(packs);
 			packs = NULL;
 		}
-
 	}
 
 	closedir(d);
@@ -296,39 +299,35 @@ mport_clean_tempfiles(mportInstance *mport)
 	int error_code = MPORT_OK;
 
 	int deleted = 0;
+	int dfd;
 	struct dirent *de;
-	DIR *d = opendir(_PATH_TMP);
+	DIR *d;
 
+	dfd = open(_PATH_TMP, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+	d = dfd == -1 ? NULL : fdopendir(dfd);
 	if (d == NULL) {
-		error_code = SET_ERRORX(MPORT_ERR_FATAL, "Couldn't open directory %s: %s",
-		    MPORT_INST_INFRA_DIR, strerror(errno));
+		if (dfd != -1)
+			close(dfd);
+		error_code = SET_ERRORX(
+		    MPORT_ERR_FATAL, "Couldn't open directory %s: %s", _PATH_TMP, strerror(errno));
 		return error_code;
 	}
 
 	while ((de = readdir(d)) != NULL) {
-		char *path;
 		if (strcmp(".", de->d_name) == 0 || strcmp("..", de->d_name) == 0)
 			continue;
 
 		if (!mport_starts_with("mport.", de->d_name))
 			continue;
 
-		if (asprintf(&path, "%s%s", _PATH_TMP, de->d_name) == -1) {
-			continue;
-		}
-
-		int result = unlink(path);
-
-		if (result != 0) {
-			error_code = SET_ERRORX(
-			    MPORT_ERR_FATAL, "Could not delete file %s: %s", path, strerror(errno));
+		if (remove_tree_at(dfd, de->d_name) != 0) {
+			error_code =
+			    SET_ERRORX(MPORT_ERR_FATAL, "Could not delete temporary path %s%s: %s",
+				_PATH_TMP, de->d_name, strerror(errno));
 			mport_call_msg_cb(mport, "%s\n", mport_err_string());
 		} else {
 			deleted++;
 		}
-
-		free(path);
-		path = NULL;
 	}
 
 	closedir(d);
