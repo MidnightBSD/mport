@@ -140,191 +140,96 @@ mport_version_cmp_sqlite(sqlite3_context *context, int argc, sqlite3_value **arg
 }
 
 /* Returns 0 if baseline meets the given requirement, -1 if the requirement
- * was not met, and a value greater than 0 on error.  some examples:
+ * was not met, and a value greater than 0 on error (with the error set).
+ * A requirement is one or more operator/version pairs that must all hold:
  *
- * mport_version_require_check("0.2.1", ">=2.0") == 0
- * mport_version_require_check("4.1.2", ">5.1")  == -1
- * mport_version_require_check("3.1.4", "|")     > 0
- * multi example:
- * mport_version_require_check("0.2.1", ">=1.4.0<1.5")
+ * mport_version_require_check("0.2.1", ">=2.0")       == -1
+ * mport_version_require_check("4.1.2", ">5.1")        == -1
+ * mport_version_require_check("2.0",   ">=1.0<4.0")   == 0
+ * mport_version_require_check("4.0",   ">=1.0<4.0")   == -1
+ * mport_version_require_check("3.1.4", "|")           > 0
+ *
+ * Operators are <, <=, >, >=, = and ==.  Whitespace between pairs is
+ * ignored; the version text itself may not contain <, > or =.
  */
 int
 mport_version_require_check(const char *baseline, const char *require)
 {
-	int ret = 0;
+	const char *p;
 
-	bool multi = false;
-	int greater[2] = { -1, -1 };
-	int less[2] = { -1, -1 };
-	int equal[2] = { -1, -1 };
-	size_t version_size = strlen(require);
-
-	if (version_size < 2) {
-		return 1; // impossible to validate
+	if (baseline == NULL || require == NULL) {
+		RETURN_ERROR(MPORT_ERR_FATAL, "Version requirement is null");
 	}
 
-	for (size_t i = 0; i < version_size; i++) {
-		if (require[i] == '>') {
-			if (greater[0] == -1) {
-				greater[0] = i;
-			} else {
-				greater[1] = i;
-			}
-		} else if (require[i] == '<') {
-			if (less[0] == -1) {
-				less[0] = i;
-			} else {
-				less[1] = i;
-			}
-		} else if (require[i] == '=') {
-			if (equal[0] == -1) {
-				equal[0] = i;
-			} else {
-				equal[1] = i;
-			}
-		}
+	p = require;
+	while (isspace((unsigned char)*p))
+		p++;
+
+	if (*p == '\0') {
+		RETURN_ERRORX(MPORT_ERR_FATAL, "Malformed version requirement: '%s'", require);
 	}
 
-#ifdef DEBUG
-	printf(" g0 %d g1 %d l0 %d l1 %d eq0 %d\n", greater[0], greater[1], less[0], less[1],
-	    equal[0]);
-#endif
+	while (*p != '\0') {
+		char op = *p;
+		bool orequal = false;
+		const char *start, *end;
+		char *version;
+		int cmp;
+		bool ok;
 
-	if (greater[0] == -1 && less[0] == -1 && equal[0] == -1) {
-		RETURN_ERRORX(MPORT_ERR_FATAL, "Malformed version requirement: %s", require);
-	}
-
-	if (greater[1] > -1 || less[1] > -1 || equal[1] > -1 || (greater[0] > -1 && less[0] > -1)) {
-		multi = true;
-#ifdef DEBUG
-		printf("multi enabled\n");
-#endif
-	}
-
-	if (!multi) {
-		if (require[0] == '<') {
-			if (require[1] == '=') {
-				ret = (mport_version_cmp(baseline, &require[2]) <= 0) ? 0 : -1;
-			} else {
-				ret = (mport_version_cmp(baseline, &require[1]) < 0) ? 0 : -1;
-			}
-		} else if (require[0] == '>') {
-			if (require[1] == '=') {
-				ret = (mport_version_cmp(baseline, &require[2]) >= 0) ? 0 : -1;
-			} else {
-				ret = (mport_version_cmp(baseline, &require[1]) > 0) ? 0 : -1;
-			}
-		} else {
+		if (op != '<' && op != '>' && op != '=') {
 			RETURN_ERRORX(
-			    MPORT_ERR_FATAL, "Malformed version requirement: %s", require);
+			    MPORT_ERR_FATAL, "Malformed version requirement: '%s'", require);
 		}
-	} else {
-		char *s = strdup(require);
-		if (s == NULL) {
+		p++;
+		if (*p == '=') {
+			orequal = true;
+			p++;
+		}
+		if (op == '=')
+			orequal = true;
+
+		while (isspace((unsigned char)*p))
+			p++;
+
+		/* the version runs up to the next operator or the end */
+		start = p;
+		p += strcspn(p, "<>=");
+		end = p;
+
+		/* trim trailing whitespace off the version */
+		while (end > start && isspace((unsigned char)end[-1]))
+			end--;
+
+		if (end == start) {
+			RETURN_ERRORX(
+			    MPORT_ERR_FATAL, "Malformed version requirement: '%s'", require);
+		}
+
+		version = strndup(start, (size_t)(end - start));
+		if (version == NULL) {
 			RETURN_ERROR(MPORT_ERR_FATAL, "Memory allocation failed");
 		}
 
-		if (less[1] > 0) {
-			// second one is less than e.g. <1.5
-			s[less[1]] = '\0';
-			if (s[less[1] + 1] == '=') {
-				ret = (mport_version_cmp(baseline, &s[less[1] + 2]) <= 0) ? 0 : -1;
-				if (ret == -1) {
-					free(s);
-					s = NULL;
-					return (ret);
-				}
-			} else {
-				ret = (mport_version_cmp(baseline, &s[less[1] + 1]) < 0) ? 0 : -1;
-				if (ret == -1) {
-					free(s);
-					s = NULL;
-					return (ret);
-				}
-			}
-		} else if (less[0] > greater[0]) {
-			// second one is less than e.g. <1.5
-			s[less[0]] = '\0';
-			if (s[less[0] + 1] == '=') {
-				ret = (mport_version_cmp(baseline, &s[less[0] + 2]) <= 0) ? 0 : -1;
-				if (ret == -1) {
-					free(s);
-					s = NULL;
-					return (ret);
-				}
-			} else {
-				ret = (mport_version_cmp(baseline, &s[less[0] + 1]) < 0) ? 0 : -1;
-				if (ret == -1) {
-					free(s);
-					s = NULL;
-					return (ret);
-				}
-			}
-		} else if (greater[1] > 0) {
-			// second one is greater
-			s[greater[1]] = '\0';
-			if (s[greater[1] + 1] == '=') {
-				ret =
-				    (mport_version_cmp(baseline, &s[greater[1] + 2]) >= 0) ? 0 : -1;
-				if (ret == -1) {
-					free(s);
-					s = NULL;
-					return (ret);
-				}
-			} else {
-				ret =
-				    (mport_version_cmp(baseline, &s[greater[1] + 1]) > 0) ? 0 : -1;
-				if (ret == -1) {
-					free(s);
-					s = NULL;
-					return (ret);
-				}
-			}
-		} else if (greater[0] > less[0]) {
-			// second one is greater
-			s[greater[0]] = '\0';
-			if (s[greater[0] + 1] == '=') {
-				ret =
-				    (mport_version_cmp(baseline, &s[greater[0] + 2]) >= 0) ? 0 : -1;
-				if (ret == -1) {
-					free(s);
-					s = NULL;
-					return (ret);
-				}
-			} else {
-				ret =
-				    (mport_version_cmp(baseline, &s[greater[0] + 1]) > 0) ? 0 : -1;
-				if (ret == -1) {
-					free(s);
-					s = NULL;
-					return (ret);
-				}
-			}
-		}
+		cmp = mport_version_cmp(baseline, version);
+		free(version);
+		version = NULL;
 
-		if (greater[0] > 0) {
-			s[greater[0]] = '\0';
-			ret = (mport_version_cmp(baseline, &s[greater[0] + 1]) > 0) ? 0 : -1;
-			if (ret == -1) {
-				free(s);
-				s = NULL;
-				return (ret);
-			}
-		} else if (less[0] > 0) {
-			s[less[0]] = '\0';
-			ret = (mport_version_cmp(baseline, &s[less[0] + 1]) < 0) ? 0 : -1;
-			if (ret == -1) {
-				free(s);
-				s = NULL;
-				return (ret);
-			}
-		}
+		if (op == '<')
+			ok = orequal ? (cmp <= 0) : (cmp < 0);
+		else if (op == '>')
+			ok = orequal ? (cmp >= 0) : (cmp > 0);
+		else
+			ok = (cmp == 0);
 
-		free(s);
-		s = NULL;
+		if (!ok)
+			return (-1);
+
+		while (isspace((unsigned char)*p))
+			p++;
 	}
 
-	return (ret);
+	return (0);
 }
 
 static int
