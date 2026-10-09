@@ -386,10 +386,10 @@ cmp_versions(char *a, char *b)
 			while (*a == '.' || *a == '+')
 				a++;
 
-			if (isdigit(*a)) {
+			if (isdigit((unsigned char)*a)) {
 				a_sub = (int)strtol(a, &a, 10);
 			} else {
-				a_sub = (int)*a;
+				a_sub = (int)(unsigned char)*a;
 				a++;
 			}
 		} else {
@@ -400,10 +400,10 @@ cmp_versions(char *a, char *b)
 			while (*b == '.' || *b == '+')
 				b++;
 
-			if (isdigit(*b)) {
+			if (isdigit((unsigned char)*b)) {
 				b_sub = (int)strtol(b, &b, 10);
 			} else {
-				b_sub = (int)*b;
+				b_sub = (int)(unsigned char)*b;
 				b++;
 			}
 		} else {
