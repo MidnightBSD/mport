@@ -29,6 +29,7 @@
 #include <sys/cdefs.h>
 
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
@@ -38,13 +39,23 @@
 
 struct version {
 	char *version;
-	int revision;
-	int epoch;
+	long long revision;
+	long long epoch;
+};
+
+/* One dot-separated component of a version: a number, an optional letter
+ * and an optional patch level after the letter, e.g. "2b3" is { 2, b, 3 }. */
+struct version_component {
+	long long n; /* numeric part; -1 when missing, -2 for '*' */
+	int a; /* letter rank; 0 when missing */
+	long long pl; /* patch level after the letter; -1 when missing */
 };
 
 static int parse_version(const char *, struct version *);
-static int cmp_versions(char *, char *);
-static int cmp_ints(int, int);
+static long long parse_number(const char *);
+static const char *get_component(const char *, struct version_component *);
+static int cmp_versions(const char *, const char *);
+static int cmp_ints(long long, long long);
 
 /* mport_version_cmp(version1, version2)
  *
@@ -349,14 +360,14 @@ parse_version(const char *in, struct version *v)
 		v->epoch = 0;
 	} else {
 		*comma = '\0';
-		v->epoch = (int)strtol(comma + 1, NULL, 10);
+		v->epoch = parse_number(comma + 1);
 	}
 
 	if (underscore == NULL) {
 		v->revision = 0;
 	} else {
 		*underscore = '\0';
-		v->revision = (int)strtol(underscore + 1, NULL, 10);
+		v->revision = parse_number(underscore + 1);
 	}
 
 	v->version = s;
@@ -364,8 +375,22 @@ parse_version(const char *in, struct version *v)
 	return MPORT_OK;
 }
 
+/* Parse a non-negative epoch or revision.  A value that does not start with
+ * a digit (including a leading sign) counts as 0.  A value too large for a
+ * long long saturates at LLONG_MAX rather than wrapping or truncating, so it
+ * still sorts above every representable number. */
+static long long
+parse_number(const char *s)
+{
+
+	if (!isdigit((unsigned char)*s))
+		return 0;
+
+	return strtoll(s, NULL, 10);
+}
+
 static int
-cmp_ints(int a, int b)
+cmp_ints(long long a, long long b)
 {
 
 	if (a == b)
@@ -376,44 +401,157 @@ cmp_ints(int a, int b)
 	return 1;
 }
 
-static int
-cmp_versions(char *a, char *b)
+/*
+ * Version ordering follows the FreeBSD ports convention implemented by
+ * pkg(8) (libpkg/pkg_version.c, Oliver Eikemeier):
+ *
+ * - components are separated by dots; characters outside [a-zA-Z0-9.+*]
+ *   are also separators, and consecutive separators collapse (10..1 = 10.1)
+ * - a component is number, letter, patch level; missing separators are
+ *   inserted (10a1b2 = 10a1.b2)
+ * - missing components are 0 (10 = 10.0 = 10.0.0)
+ * - a letter after a number sorts after the bare number (10 < 10a < 10b)
+ * - a component that starts with a letter has number -1, so it sorts before
+ *   the bare number (10.a < 10)
+ * - the words "pl", "snap", "alpha", "beta", "pre" and "rc" start a new
+ *   component, so 10rc1 = 10.rc1 < 10; "pl" sorts before every other letter
+ *   and the rest sort as their first letter (pl < alpha < beta < pre < rc)
+ * - other words use only their first letter, case-insensitively
+ *   (1.d2 = 1.dev2 = 1.Development2)
+ * - '*' is the smallest possible component (2.* < 2pl1 < 3)
+ * - '+' separates blocks that are compared after everything before them
+ */
+static const struct stage {
+	const char *name;
+	size_t namelen;
+	int value;
+} stages[] = {
+	{ "pl", 2, 0 },
+#define ABASE 2 /* last special early-sorted prefix + 1 */
+	{ "snap", 4, 's' - 'a' + ABASE },
+	{ "alpha", 5, 'a' - 'a' + ABASE },
+	{ "beta", 4, 'b' - 'a' + ABASE },
+	{ "pre", 3, 'p' - 'a' + ABASE },
+	{ "rc", 2, 'r' - 'a' + ABASE },
+};
+
+/* Read the next component starting at pos and return a pointer past it and
+ * any trailing separators.  Always advances when *pos is not NUL or '+'. */
+static const char *
+get_component(const char *pos, struct version_component *component)
 {
-	int a_sub, b_sub, result = 0;
+	bool hasstage = false;
+	bool haspatchlevel = false;
 
-	while (*a || *b) {
-		if (*a) {
-			while (*a == '.' || *a == '+')
-				a++;
+	/* number */
+	if (isdigit((unsigned char)*pos)) {
+		char *endptr;
 
-			if (isdigit((unsigned char)*a)) {
-				a_sub = (int)strtol(a, &a, 10);
-			} else {
-				a_sub = (int)(unsigned char)*a;
-				a++;
+		component->n = strtoll(pos, &endptr, 10);
+		pos = endptr;
+	} else if (*pos == '*') {
+		component->n = -2;
+		do {
+			pos++;
+		} while (*pos != '\0' && *pos != '+');
+	} else {
+		component->n = -1;
+		hasstage = true;
+	}
+
+	/* letter */
+	if (isalpha((unsigned char)*pos)) {
+		int c = tolower((unsigned char)*pos);
+
+		haspatchlevel = true;
+		if (isalpha((unsigned char)pos[1])) {
+			for (size_t i = 0; i < sizeof(stages) / sizeof(stages[0]); i++) {
+				const struct stage *stage = &stages[i];
+
+				if (strncasecmp(pos, stage->name, stage->namelen) == 0 &&
+				    !isalpha((unsigned char)pos[stage->namelen])) {
+					if (hasstage) {
+						/* stage word becomes the letter */
+						component->a = stage->value;
+						pos += stage->namelen;
+					} else {
+						/* number then stage word: split here */
+						component->a = 0;
+						haspatchlevel = false;
+					}
+					c = 0;
+					break;
+				}
 			}
-		} else {
-			a_sub = 0;
 		}
-
-		if (*b) {
-			while (*b == '.' || *b == '+')
-				b++;
-
-			if (isdigit((unsigned char)*b)) {
-				b_sub = (int)strtol(b, &b, 10);
-			} else {
-				b_sub = (int)(unsigned char)*b;
-				b++;
-			}
-		} else {
-			b_sub = 0;
+		if (c != 0) {
+			/* use the first letter and skip the rest of the word */
+			component->a = c - 'a' + ABASE;
+			do {
+				pos++;
+			} while (isalpha((unsigned char)*pos));
 		}
+	} else {
+		component->a = 0;
+		haspatchlevel = false;
+	}
 
-		result = cmp_ints(a_sub, b_sub);
+	/* patch level */
+	if (haspatchlevel) {
+		if (isdigit((unsigned char)*pos)) {
+			char *endptr;
 
-		if (result != 0)
-			break;
+			component->pl = strtoll(pos, &endptr, 10);
+			pos = endptr;
+		} else {
+			component->pl = -1;
+		}
+	} else {
+		component->pl = 0;
+	}
+
+	/* trailing separators */
+	while (*pos != '\0' && !isdigit((unsigned char)*pos) && !isalpha((unsigned char)*pos) &&
+	    *pos != '+' && *pos != '*')
+		pos++;
+
+	return pos;
+}
+
+static int
+cmp_versions(const char *a, const char *b)
+{
+	int result = 0;
+
+	while (result == 0 && (*a != '\0' || *b != '\0')) {
+		struct version_component ca = { 0, 0, 0 };
+		struct version_component cb = { 0, 0, 0 };
+		bool block_a = false;
+		bool block_b = false;
+
+		if (*a != '\0' && *a != '+')
+			a = get_component(a, &ca);
+		else
+			block_a = true;
+
+		if (*b != '\0' && *b != '+')
+			b = get_component(b, &cb);
+		else
+			block_b = true;
+
+		if (block_a && block_b) {
+			/* both sides are at a '+' or at the end: step past it */
+			if (*a != '\0')
+				a++;
+			if (*b != '\0')
+				b++;
+		} else if (ca.n != cb.n) {
+			result = cmp_ints(ca.n, cb.n);
+		} else if (ca.a != cb.a) {
+			result = cmp_ints(ca.a, cb.a);
+		} else if (ca.pl != cb.pl) {
+			result = cmp_ints(ca.pl, cb.pl);
+		}
 	}
 
 	return (result);

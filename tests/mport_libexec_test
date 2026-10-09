@@ -13,6 +13,10 @@ version_cmp_orders_versions_body()
 		"${MPORT_VERSION_CMP}" 1.0 1.1
 	atf_check -s exit:0 -o inline:">\n" -e empty \
 		"${MPORT_VERSION_CMP}" 2.0 1.9
+	atf_check -s exit:0 -o inline:"<\n" -e empty \
+		"${MPORT_VERSION_CMP}" 1.0rc1 1.0
+	atf_check -s exit:0 -o inline:">\n" -e empty \
+		"${MPORT_VERSION_CMP}" 1.0a 1.0
 }
 
 atf_test_case version_cmp_requires_two_args

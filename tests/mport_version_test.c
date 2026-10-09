@@ -113,12 +113,106 @@ ATF_TC_BODY(version_cmp_non_null, tc)
 	sqlite3_close(db);
 }
 
+ATF_TC(version_cmp_letter_suffix);
+ATF_TC_HEAD(version_cmp_letter_suffix, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "a letter after a number is a post-release; a letter starting a component is not");
+}
+ATF_TC_BODY(version_cmp_letter_suffix, tc)
+{
+	ATF_REQUIRE_EQ(1, mport_version_cmp("1.0a", "1.0"));
+	ATF_REQUIRE_EQ(1, mport_version_cmp("1.0b", "1.0a"));
+	ATF_REQUIRE_EQ(1, mport_version_cmp("1.0.2a", "1.0.2"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0.a1", "1.0"));
+	ATF_REQUIRE_EQ(0, mport_version_cmp("1.d2", "1.dev2"));
+	ATF_REQUIRE_EQ(0, mport_version_cmp("1.dev2", "1.Development2"));
+	ATF_REQUIRE_EQ(0, mport_version_cmp("10a1b2", "10a1.b2"));
+}
+
+ATF_TC(version_cmp_prerelease_keywords);
+ATF_TC_HEAD(version_cmp_prerelease_keywords, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "pl, snap, alpha, beta, pre and rc sort below the release, in pkg(8) order");
+}
+ATF_TC_BODY(version_cmp_prerelease_keywords, tc)
+{
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0rc1", "1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0.rc1", "1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0pre1", "1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0snap1", "1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0rc1", "1.0rc2"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0rc1", "1.0a"));
+	ATF_REQUIRE_EQ(1, mport_version_cmp("1.0", "1.0rc9"));
+	/* examples from pkg_version.c */
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("10pl11", "10alpha3"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0alpha1", "1.0beta1"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0beta1", "1.0pre1"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0pre1", "1.0rc1"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("2.*", "2pl1"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("2pl1", "2alpha3"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("2alpha3", "2.9f7"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("2.9f7", "3"));
+}
+
+ATF_TC(version_cmp_separators);
+ATF_TC_HEAD(version_cmp_separators, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "missing components are 0, repeated dots collapse, '+' starts a trailing block");
+}
+ATF_TC_BODY(version_cmp_separators, tc)
+{
+	ATF_REQUIRE_EQ(0, mport_version_cmp("1.0", "1.0.0"));
+	ATF_REQUIRE_EQ(0, mport_version_cmp("10..1", "10.1"));
+	ATF_REQUIRE_EQ(1, mport_version_cmp("1.0+1", "1.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0+1", "1.0.1"));
+}
+
+ATF_TC(version_cmp_epoch_revision);
+ATF_TC_HEAD(version_cmp_epoch_revision, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "epoch outranks version, which outranks revision");
+}
+ATF_TC_BODY(version_cmp_epoch_revision, tc)
+{
+	ATF_REQUIRE_EQ(1, mport_version_cmp("1.0,1", "2.0"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0", "1.0_1"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0_1", "1.1"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("3.0.0", "3.0.0_2"));
+}
+
+ATF_TC(version_cmp_large_numbers);
+ATF_TC_HEAD(version_cmp_large_numbers, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "numbers beyond 32 bits are not truncated and overflow saturates instead of wrapping");
+}
+ATF_TC_BODY(version_cmp_large_numbers, tc)
+{
+	/* 4294967297 == 2^32 + 1, which truncates to 1 in an int */
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1", "4294967297"));
+	ATF_REQUIRE_EQ(1, mport_version_cmp("1.0_4294967297", "1.0_1"));
+	ATF_REQUIRE_EQ(1, mport_version_cmp("1.0,4294967297", "1.0,1"));
+	/* larger than LLONG_MAX: saturates, so it still sorts above */
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0", "99999999999999999999"));
+	ATF_REQUIRE_EQ(-1, mport_version_cmp("1.0_1", "1.0_99999999999999999999"));
+	/* a signed revision is not a number; it reads as revision 0 */
+	ATF_REQUIRE_EQ(0, mport_version_cmp("1.0_-1", "1.0"));
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, version_cmp_null_first);
 	ATF_TP_ADD_TC(tp, version_cmp_null_second);
 	ATF_TP_ADD_TC(tp, version_cmp_null_both);
 	ATF_TP_ADD_TC(tp, version_cmp_non_null);
+	ATF_TP_ADD_TC(tp, version_cmp_letter_suffix);
+	ATF_TP_ADD_TC(tp, version_cmp_prerelease_keywords);
+	ATF_TP_ADD_TC(tp, version_cmp_separators);
+	ATF_TP_ADD_TC(tp, version_cmp_epoch_revision);
+	ATF_TP_ADD_TC(tp, version_cmp_large_numbers);
 
 	return atf_no_error();
 }
