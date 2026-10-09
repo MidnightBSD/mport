@@ -604,6 +604,9 @@ installed_link_target(
 	const char *link_path;
 	int n;
 
+	/* A bare "/" destdir adds no prefix; file is already the installed path. */
+	if (destlen == 1 && destdir[0] == '/')
+		destlen = 0;
 	if (strncmp(file, destdir, destlen) != 0)
 		return false;
 	link_path = file + destlen;
