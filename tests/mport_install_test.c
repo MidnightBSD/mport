@@ -131,8 +131,8 @@ create_package_version(
 	(void)snprintf(buf, sizeof(buf), "%s/usr/local/share/%s/catalog.mk", stage, name);
 	write_file(buf, "catalog\n");
 
-	(void)snprintf(plist, sizeof(plist), "share/%s/catalog.mk\n@dir share/%s/emptydir\n",
-	    name, name);
+	(void)snprintf(
+	    plist, sizeof(plist), "share/%s/catalog.mk\n@dir share/%s/emptydir\n", name, name);
 	(void)snprintf(buf, sizeof(buf), "%s/plist-%s-%s", test_root, name, version);
 	write_file(buf, plist);
 
@@ -499,8 +499,7 @@ ATF_TC_WITH_CLEANUP(dir_asset_through_symlinked_parent);
 ATF_TC_HEAD(dir_asset_through_symlinked_parent, tc)
 {
 	atf_tc_set_md_var(tc, "require.user", "root");
-	atf_tc_set_md_var(
-	    tc, "descr", "a @dir asset below a symlinked parent directory installs");
+	atf_tc_set_md_var(tc, "descr", "a @dir asset below a symlinked parent directory installs");
 }
 ATF_TC_BODY(dir_asset_through_symlinked_parent, tc)
 {
@@ -618,7 +617,8 @@ ATF_TC_BODY(forced_add_leaves_installed_dependency_alone, tc)
 
 	/* a reinstall of testdep would put "catalog" back and would need the
 	 * sibling file, so change the one and remove the other */
-	(void)strlcpy(dep_path, test_path(PKG_PREFIX "/share/testdep/catalog.mk"), sizeof(dep_path));
+	(void)strlcpy(
+	    dep_path, test_path(PKG_PREFIX "/share/testdep/catalog.mk"), sizeof(dep_path));
 	write_file(dep_path, "modified\n");
 	ATF_REQUIRE_EQ(0, unlink(depfile));
 
@@ -703,7 +703,8 @@ ATF_TC_WITH_CLEANUP(local_only_add_ignores_sibling_dependencies);
 ATF_TC_HEAD(local_only_add_ignores_sibling_dependencies, tc)
 {
 	atf_tc_set_md_var(tc, "require.user", "root");
-	atf_tc_set_md_var(tc, "descr", "noDepends installs the named package file and nothing else");
+	atf_tc_set_md_var(
+	    tc, "descr", "noDepends installs the named package file and nothing else");
 }
 ATF_TC_BODY(local_only_add_ignores_sibling_dependencies, tc)
 {
@@ -879,8 +880,8 @@ ATF_TC_WITH_CLEANUP(bundle_from_other_release_is_refused_unless_allowed);
 ATF_TC_HEAD(bundle_from_other_release_is_refused_unless_allowed, tc)
 {
 	atf_tc_set_md_var(tc, "require.user", "root");
-	atf_tc_set_md_var(tc, "descr",
-	    "a package file from another os_release is refused without the override");
+	atf_tc_set_md_var(
+	    tc, "descr", "a package file from another os_release is refused without the override");
 }
 ATF_TC_BODY(bundle_from_other_release_is_refused_unless_allowed, tc)
 {
@@ -901,8 +902,7 @@ ATF_TC_BODY(bundle_from_other_release_is_refused_unless_allowed, tc)
 	mport->offline = true;
 	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
 	ATF_REQUIRE_MSG(strstr(mport_err_string(), "0.0-OLD") != NULL, "%s", mport_err_string());
-	ATF_REQUIRE_MSG(
-	    strstr(mport_err_string(), "older") != NULL, "%s", mport_err_string());
+	ATF_REQUIRE_MSG(strstr(mport_err_string(), "older") != NULL, "%s", mport_err_string());
 	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
 	ATF_REQUIRE_EQ(-1, access(test_path(PKG_FILE_ABS), F_OK));
 
@@ -1135,8 +1135,8 @@ ATF_TC_BODY(create_records_shared_library_provision, tc)
 
 	extra = mport_createextras_new();
 	ATF_REQUIRE(extra != NULL);
-	(void)strlcpy(extra->pkg_filename, test_path("/libpkg-1.0.mport"),
-	    sizeof(extra->pkg_filename));
+	(void)strlcpy(
+	    extra->pkg_filename, test_path("/libpkg-1.0.mport"), sizeof(extra->pkg_filename));
 	(void)strlcpy(extra->sourcedir, test_path("/stage-libpkg"), sizeof(extra->sourcedir));
 
 	ATF_REQUIRE_MSG(mport_create_primative(mport, assetlist, pack, extra) == MPORT_OK, "%s",
@@ -1262,13 +1262,15 @@ ATF_TC_BODY(old_release_dependency_with_superseded_libraries_is_accepted, tc)
 		"VALUES ('newq', '2.0', 'misc/newq', '/usr/local', '', 'clean', %Q, '', 0)",
 		system_os_release));
 	ATF_REQUIRE_EQ(MPORT_OK,
-	    mport_db_do(mport->db, "INSERT INTO shlibs_provided (pkg, name) VALUES ('newq', 'libq.so.1')"));
+	    mport_db_do(
+		mport->db, "INSERT INTO shlibs_provided (pkg, name) VALUES ('newq', 'libq.so.1')"));
 	ATF_REQUIRE(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) != MPORT_OK);
 	ATF_REQUIRE_EQ(0, count_pkg(mport, PKG_NAME));
 
 	/* both superseded: accepted */
 	ATF_REQUIRE_EQ(MPORT_OK,
-	    mport_db_do(mport->db, "INSERT INTO shlibs_provided (pkg, name) VALUES ('newq', 'libr.so.2')"));
+	    mport_db_do(
+		mport->db, "INSERT INTO shlibs_provided (pkg, name) VALUES ('newq', 'libr.so.2')"));
 	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
 	    "%s", mport_err_string());
 	ATF_REQUIRE_EQ(1, count_pkg(mport, PKG_NAME));
@@ -1452,11 +1454,82 @@ ATF_TC_CLEANUP(install_from_verified_fd, tc)
 	cleanup_test_root();
 }
 
+/*
+ * Installing from a descriptor hands libarchive a duplicate.  Every install
+ * must give that duplicate back, and it must never be inherited by hook
+ * subprocesses, or long dependency transactions run out of descriptors.
+ */
+ATF_TC_WITH_CLEANUP(fd_install_releases_duplicate_descriptor);
+ATF_TC_HEAD(fd_install_releases_duplicate_descriptor, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "fd-based bundle reads close their close-on-exec duplicate on finish");
+}
+ATF_TC_BODY(fd_install_releases_duplicate_descriptor, tc)
+{
+	mportInstance *mport;
+	mportBundleRead *bundle;
+	const char *pkgfile;
+	int fd, probe, baseline, i;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkgfile = create_test_package(mport);
+	fd = open(pkgfile, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+	ATF_REQUIRE(fd >= 0);
+
+	/* The lowest free descriptor is the baseline; any leak raises it. */
+	baseline = dup(fd);
+	ATF_REQUIRE(baseline >= 0);
+	ATF_REQUIRE_EQ(0, close(baseline));
+
+	bundle = mport_bundle_read_new();
+	ATF_REQUIRE(bundle != NULL);
+	ATF_REQUIRE_EQ(-1, bundle->archive_fd);
+	ATF_REQUIRE_MSG(
+	    mport_bundle_read_init_fd(bundle, fd) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE(bundle->archive_fd >= 0);
+	ATF_REQUIRE(bundle->archive_fd != fd);
+	ATF_REQUIRE_EQ(FD_CLOEXEC, fcntl(bundle->archive_fd, F_GETFD) & FD_CLOEXEC);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_bundle_read_finish(mport, bundle));
+
+	probe = dup(fd);
+	ATF_REQUIRE_EQ(baseline, probe);
+	ATF_REQUIRE_EQ(0, close(probe));
+
+	for (i = 0; i < 8; i++) {
+		bundle = mport_bundle_read_new();
+		ATF_REQUIRE(bundle != NULL);
+		ATF_REQUIRE_MSG(
+		    mport_bundle_read_init_fd(bundle, fd) == MPORT_OK, "%s", mport_err_string());
+		ATF_REQUIRE_EQ(MPORT_OK, mport_bundle_read_finish(mport, bundle));
+	}
+	ATF_REQUIRE_MSG(mport_install_primative_fd(mport, fd, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+
+	probe = dup(fd);
+	ATF_REQUIRE_EQ(baseline, probe);
+	ATF_REQUIRE_EQ(0, close(probe));
+	ATF_REQUIRE_EQ(0, close(fd));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(fd_install_releases_duplicate_descriptor, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, install_replaces_previous_os_release);
 	ATF_TP_ADD_TC(tp, install_same_os_release_is_rejected);
 	ATF_TP_ADD_TC(tp, install_from_verified_fd);
+	ATF_TP_ADD_TC(tp, fd_install_releases_duplicate_descriptor);
 	ATF_TP_ADD_TC(tp, force_reinstall_over_orphaned_rows);
 	ATF_TP_ADD_TC(tp, failed_install_registers_nothing);
 	ATF_TP_ADD_TC(tp, dir_asset_through_symlinked_parent);
