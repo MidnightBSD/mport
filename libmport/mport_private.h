@@ -174,6 +174,7 @@ typedef struct {
 	char *tmpdir;
 	struct archive_entry *firstreal;
 	short stub_attached;
+	int archive_fd; /* close-on-exec duplicate handed to libarchive; -1 if none */
 } mportBundleRead;
 
 mportBundleWrite *mport_bundle_write_new(void);
@@ -182,7 +183,7 @@ int mport_bundle_write_finish(mportBundleWrite *);
 int mport_bundle_write_add_file(mportBundleWrite *, const char *, const char *);
 int mport_bundle_write_add_entry(mportBundleWrite *, mportBundleRead *, struct archive_entry *);
 
-mportBundleRead *mport_bundle_read_new(void);
+/*@null@*/ mportBundleRead *mport_bundle_read_new(void);
 int mport_bundle_read_init(mportBundleRead *, const char *);
 int mport_bundle_read_init_fd(/*@notnull@*/ mportBundleRead *, int);
 int mport_bundle_read_finish(mportInstance *, mportBundleRead *);
