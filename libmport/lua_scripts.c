@@ -213,6 +213,10 @@ mport_lua_script_run(mportInstance *mport, mportPackageMeta *pkg, mport_lua_scri
 			SET_ERROR(MPORT_ERR_FATAL, "socket pair failed");
 			goto cleanup;
 		}
+		/* the script's print() flushes stdout in the child; do not let it
+		 * flush a copy of our own pending output as well */
+		(void)fflush(stdout);
+		(void)fflush(stderr);
 		pid_t pid = fork();
 		if (pid == 0) {
 			close(cur_pipe[0]);
