@@ -681,6 +681,10 @@ trigger_run_script(mportInstance *mport, const char *name, const mportTriggerScr
 	if (get_socketpair(cur_pipe) == -1)
 		RETURN_ERROR(MPORT_ERR_FATAL, "socket pair failed");
 
+	/* the script's print() flushes stdout in the child; do not let it
+	 * flush a copy of our own pending output as well */
+	(void)fflush(stdout);
+	(void)fflush(stderr);
 	pid = fork();
 	if (pid == 0) {
 		lua_State *L;
