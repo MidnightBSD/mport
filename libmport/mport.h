@@ -66,6 +66,9 @@ typedef int (*mport_select_cb)(const char *, mportIndexEntry **, int);
 
 typedef tll(char *) stringlist_t;
 
+/* per-run trigger bookkeeping; private to libmport (see triggers.c) */
+struct _mportTriggerState;
+
 /* Mport Instance (an installed copy of the mport system) */
 #define MPORT_INST_HAVE_INDEX 1
 #define MPORT_LOCAL_PKG_PATH "/var/db/mport/downloads"
@@ -94,6 +97,7 @@ typedef struct {
 	mport_progress_free_cb progress_free_cb;
 	mport_confirm_cb confirm_cb;
 	mport_select_cb select_cb;
+	struct _mportTriggerState *triggers; /* directories touched and cleanups queued this run */
 } mportInstance;
 
 /*@null@*/ mportInstance *mport_instance_new(void);
@@ -445,6 +449,10 @@ int mport_clean_database(mportInstance *);
 int mport_clean_oldpackages(mportInstance *);
 int mport_clean_oldmtree(mportInstance *);
 int mport_clean_tempfiles(mportInstance *);
+
+/* Triggers: run the per-transaction triggers matched by everything installed or
+ * removed through this instance so far, then forget those paths. */
+int mport_triggers_execute(mportInstance *);
 
 /* Setting */
 char *mport_setting_get(mportInstance *, const char *);

@@ -1006,6 +1006,13 @@ main(int argc, char *argv[])
 		usage();
 	}
 
+	/* per-transaction triggers for everything this run installed or removed */
+	if (mport_triggers_execute(mport) != MPORT_OK) {
+		warnx("%s", mport_err_string());
+		if (resultCode == MPORT_OK)
+			resultCode = mport_err_code();
+	}
+
 	mport_instance_free(mport);
 	exit(resultCode);
 }
