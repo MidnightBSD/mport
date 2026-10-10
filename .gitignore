@@ -58,6 +58,7 @@ tests/mport_fetch_test
 tests/mport_index_test
 tests/mport_install_test
 tests/mport_shlib_test
+tests/mport_trigger_test
 tests/mport_osrelease_test
 tests/mport_pkgmeta_test
 tests/mport_precheck_test

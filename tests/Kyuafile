@@ -14,5 +14,6 @@ atf_test_program{name="mport_shlib_test", }
 atf_test_program{name="mport_osrelease_test", }
 atf_test_program{name="mport_pkgmeta_test", }
 atf_test_program{name="mport_precheck_test", }
+atf_test_program{name="mport_trigger_test", }
 atf_test_program{name="mport_util_test", }
 atf_test_program{name="mport_version_test", }
