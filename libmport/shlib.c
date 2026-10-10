@@ -390,13 +390,16 @@ elf_abi_from_notes(Elf *elf, unsigned char encoding, /*@out@*/ int *os,
 /*
  * Read the target ABI from a binary, as ABI_FILE names one for cross builds:
  * *osrelease is the release ("4.1") and *osreldate the raw tag from a
- * MidnightBSD ABI note, or NULL and 0 when the file has none, and *elfclass
- * its word size.  Any output may be NULL.  A file that cannot be read or is
- * not ELF is an error: guessing would record the build host's ABI.
+ * MidnightBSD ABI note, or NULL and 0 when the file has none, *elfclass
+ * its word size, and *arch the package architecture name for its machine
+ * type ("amd64", "i386", "aarch64"), or NULL for one without a port.  Any
+ * output may be NULL.  A file that cannot be read or is not ELF is an error:
+ * guessing would record the build host's ABI.
  */
 int
 mport_abi_file_read(/*@notnull@*/ const char *path, /*@null@*/ /*@out@*/ char **osrelease,
-    /*@null@*/ /*@out@*/ uint32_t *osreldate, /*@null@*/ /*@out@*/ int *elfclass)
+    /*@null@*/ /*@out@*/ uint32_t *osreldate, /*@null@*/ /*@out@*/ int *elfclass,
+    /*@null@*/ /*@out@*/ const char **arch)
 {
 	int fd;
 	Elf *elf;
@@ -412,6 +415,8 @@ mport_abi_file_read(/*@notnull@*/ const char *path, /*@null@*/ /*@out@*/ char **
 		*osreldate = 0;
 	if (elfclass != NULL)
 		*elfclass = ELFCLASSNONE;
+	if (arch != NULL)
+		*arch = NULL;
 
 	if (elf_version(EV_CURRENT) == EV_NONE)
 		RETURN_ERRORX(
@@ -437,6 +442,8 @@ mport_abi_file_read(/*@notnull@*/ const char *path, /*@null@*/ /*@out@*/ char **
 	elf_abi_from_notes(elf, ehdr.e_ident[EI_DATA], &os, &tag);
 	if (elfclass != NULL)
 		*elfclass = ehdr.e_ident[EI_CLASS];
+	if (arch != NULL)
+		*arch = mport_arch_from_elf_machine(ehdr.e_machine);
 	if (osreldate != NULL)
 		*osreldate = tag;
 	if (osrelease != NULL && tag != 0 &&
@@ -626,7 +633,7 @@ mport_shlib_scan_new(void)
 	scan->elfclass = MPORT_HOST_ELFCLASS;
 	abi_file = getenv("ABI_FILE");
 	if (abi_file != NULL && abi_file[0] != '\0' &&
-	    mport_abi_file_read(abi_file, NULL, NULL, &scan->elfclass) != MPORT_OK) {
+	    mport_abi_file_read(abi_file, NULL, NULL, &scan->elfclass, NULL) != MPORT_OK) {
 		mport_shlib_scan_free(scan);
 		return NULL;
 	}
@@ -883,8 +890,8 @@ stub_has_table(mportInstance *mport, const char *table)
 	int count = 0;
 
 	if (mport_db_count(mport->db, &count,
-		"SELECT count(*) FROM stub.sqlite_master WHERE type='table' AND name=%Q", table) !=
-	    MPORT_OK)
+		"SELECT count(*) FROM stub.sqlite_master WHERE type='table' AND name=%Q",
+		table) != MPORT_OK)
 		return false;
 	return count > 0;
 }
@@ -923,8 +930,8 @@ load_names(mportInstance *mport, const char *table, const char *pkgname, stringl
 	sqlite3_stmt *stmt = NULL;
 	int rc;
 
-	if (mport_db_prepare(mport->db, &stmt,
-		"SELECT name FROM %s WHERE pkg=%Q ORDER BY name", table, pkgname) != MPORT_OK) {
+	if (mport_db_prepare(mport->db, &stmt, "SELECT name FROM %s WHERE pkg=%Q ORDER BY name",
+		table, pkgname) != MPORT_OK) {
 		sqlite3_finalize(stmt);
 		RETURN_CURRENT_ERROR;
 	}
@@ -1007,8 +1014,7 @@ mport_shlib_in_base(const char *name)
 	static const char *const compat32[] = { "/usr/lib32", NULL };
 	static const char *const linux64[] = { "/compat/linux/lib64", "/compat/linux/usr/lib64",
 		NULL };
-	static const char *const linux32[] = { "/compat/linux/lib", "/compat/linux/usr/lib",
-		NULL };
+	static const char *const linux32[] = { "/compat/linux/lib", "/compat/linux/usr/lib", NULL };
 	const char *const *dirs = native;
 	const char *colon;
 	char plain[PATH_MAX];
@@ -1157,8 +1163,9 @@ mport_shlibs_warn_missing(mportInstance *mport, mportPackageMeta *pkg)
 
 		if (name == NULL || mport_shlib_in_base(name))
 			continue;
-		mport_call_msg_cb(mport, "Warning: %s-%s needs %s, which no installed package provides",
-		    pkg->name, pkg->version, name);
+		mport_call_msg_cb(mport,
+		    "Warning: %s-%s needs %s, which no installed package provides", pkg->name,
+		    pkg->version, name);
 		missing++;
 	}
 	sqlite3_finalize(stmt);
@@ -1174,7 +1181,7 @@ stub_attached(mportInstance *mport)
 	bool attached;
 
 	attached = sqlite3_prepare_v2(mport->db, "SELECT 1 FROM stub.sqlite_master LIMIT 1", -1,
-			&stmt, NULL) == SQLITE_OK;
+		       &stmt, NULL) == SQLITE_OK;
 	sqlite3_finalize(stmt);
 	return attached;
 }

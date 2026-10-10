@@ -108,6 +108,33 @@ smoke_vector_paths_body()
 		"${MPORT_BIN}" -U search mport
 }
 
+atf_test_case config_abi_derived
+config_abi_derived_head()
+{
+	atf_set "descr" "config get ABI/ALTABI print bare pkg-style values and cannot be set (registry required)"
+}
+config_abi_derived_body()
+{
+	if [ ! -f /var/db/mport/master.db ]; then
+		atf_skip "no local package registry at /var/db/mport/master.db"
+	fi
+
+	atf_check -s exit:0 -o match:'^MidnightBSD:[0-9]+\.[0-9]+:(amd64|i386)$' \
+		"${MPORT_BIN}" config get ABI
+	atf_check -s exit:0 -o match:'^midnightbsd:[0-9]+\.[0-9]+:x86:(64|32)$' \
+		"${MPORT_BIN}" config get ALTABI
+	atf_check -s exit:0 -o match:'^ABI=MidnightBSD:' -o match:'^ALTABI=midnightbsd:' \
+		"${MPORT_BIN}" config list
+	atf_check -s exit:1 -o empty -e match:'ABI is derived' \
+		"${MPORT_BIN}" config set ABI MidnightBSD:9.9:amd64
+	atf_check -s exit:1 -o empty -e match:'ALTABI is derived' \
+		"${MPORT_BIN}" config set ALTABI midnightbsd:9.9:x86:64
+
+	# an unreadable ABI_FILE is reported by name
+	atf_check -s exit:1 -o empty -e match:'ABI_FILE /nonexistent' \
+		env ABI_FILE=/nonexistent "${MPORT_BIN}" config get ABI
+}
+
 atf_test_case verify_skips_untrusted_chroot_mtree
 verify_skips_untrusted_chroot_mtree_head()
 {
@@ -177,5 +204,6 @@ atf_init_test_cases()
 	atf_add_test_case global_option_before_subcommand
 	atf_add_test_case global_option_before_info
 	atf_add_test_case smoke_vector_paths
+	atf_add_test_case config_abi_derived
 	atf_add_test_case verify_skips_untrusted_chroot_mtree
 }

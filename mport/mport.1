@@ -364,6 +364,11 @@ List all available configuration settings.
 .It Cm config get Ar setting
 Display the value of
 .Ar setting .
+The derived settings
+.Cm ABI
+and
+.Cm ALTABI
+print their bare value, suitable for scripts.
 .It Cm config set Ar setting Ar value
 Set
 .Ar setting
@@ -760,6 +765,28 @@ If set to
 or
 .Dq false ,
 do not run them.
+.It Cm ABI
+The target package ABI in the form used by
+.Fx
+.Nm pkg ,
+for example
+.Dq MidnightBSD:4.0:amd64 .
+The release is the target release described under
+.Cm target_os
+and the architecture is that of the binary named by
+.Ev ABI_FILE
+when set, otherwise the running system.
+This setting is derived and cannot be set.
+.It Cm ALTABI
+The target package ABI in the legacy
+.Fx
+.Nm pkg
+spelling, with the operating system in lower case and the architecture as an
+ELF machine type, for example
+.Dq midnightbsd:4.0:x86:64 .
+Like
+.Cm ABI ,
+it is derived and cannot be set.
 .El
 .Pp
 Use
@@ -781,6 +808,11 @@ A file without a MidnightBSD ABI note, such as a Linux binary, leaves the
 release to
 .Cm target_os
 and the running system.
+The file's machine type also gives the architecture reported by the
+.Cm ABI
+and
+.Cm ALTABI
+settings.
 A file that cannot be read or is not an ELF object is an error.
 .It Ev ASSUME_ALWAYS_YES
 If set to a non-empty value, answer yes to confirmation prompts.
