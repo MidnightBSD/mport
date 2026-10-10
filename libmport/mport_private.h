@@ -220,7 +220,9 @@ int mport_shlib_analyse_elf(/*@notnull@*/ const char *, /*@out@*/ char **, /*@ou
 int mport_shlib_analyse_elf_for(int, /*@notnull@*/ const char *, /*@out@*/ char **,
     /*@out@*/ int *, /*@notnull@*/ stringlist_t *);
 int mport_abi_file_read(/*@notnull@*/ const char *, /*@null@*/ /*@out@*/ char **,
-    /*@null@*/ /*@out@*/ uint32_t *, /*@null@*/ /*@out@*/ int *);
+    /*@null@*/ /*@out@*/ uint32_t *, /*@null@*/ /*@out@*/ int *,
+    /*@null@*/ /*@out@*/ const char **);
+/*@null@*/ /*@observer@*/ const char *mport_arch_from_elf_machine(unsigned int);
 #if defined(__LP64__)
 #define MPORT_HOST_ELFCLASS ELFCLASS64
 #else
