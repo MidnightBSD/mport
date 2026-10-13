@@ -320,6 +320,10 @@ int mport_fetch_index(mportInstance *);
 int mport_fetch_bootstrap_index(mportInstance *);
 char *mport_fetch_cves(mportInstance *mport, char *cpe);
 
+/* audit */
+int mport_audit_report(/*@notnull@*/ mportInstance *, /*@notnull@*/ mportPackageMeta *,
+    /*@notnull@*/ const char *, bool, /*@out@*/ /*@null@*/ char **);
+
 /* a few index things */
 int mport_index_get_mirror_list(mportInstance *, char ***, int *);
 char *mport_index_file_path(void);

@@ -156,7 +156,7 @@ Format changed files with `clang-format -i <file>`.
 
 ## Testing
 
-There is an ATF/Kyua test suite in `tests/` (15 programs, ~185 cases; not yet
+There is an ATF/Kyua test suite in `tests/` (16 programs, ~190 cases; not yet
 comprehensive — the main `mport(8)` command paths are still thinly covered).
 The root `make` builds it. No installed `mport` or populated registry is
 required for most cases. CI also runs via Jenkins (`Jenkinsfile`, matrix builds
@@ -176,6 +176,7 @@ C programs (`ATF_TESTS_C` in `tests/Makefile`) link against `libmport` directly:
 
 | File | Covers |
 |------|--------|
+| `mport_audit_test` | Audit report formatting and index fix status (fixed / still affected / no newer version) |
 | `mport_confirm_test` | Confirm/select callbacks on non-tty and assume-yes paths |
 | `mport_db_test` | DB count/prepare helpers |
 | `mport_fetch_test` | `force_http` URL rewriting |

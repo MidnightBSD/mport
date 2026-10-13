@@ -23,7 +23,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"
-.Dd October 4, 2026
+.Dd October 13, 2026
 .Dt MPORT 1
 .Os
 .Sh NAME
@@ -347,6 +347,10 @@ Delete an annotation tag from a package.
 .It Cm audit Op Fl r Op Ar package
 Display vulnerable installed packages using CPE data matched against the
 MidnightBSD security feed.
+When the index offers a newer version of a vulnerable package, each
+vulnerability is marked as fixed or not fixed in that version, followed by a
+summary of whether upgrading resolves them; otherwise the report notes that no
+newer version is available.
 With
 .Fl r ,
 also include packages that depend on a vulnerable package.
