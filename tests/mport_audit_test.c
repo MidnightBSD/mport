@@ -32,6 +32,14 @@ int mport_audit_report(mportInstance *, mportPackageMeta *, const char *, bool, 
 	"[{\"cveId\": \"CVE-0001\", \"description\": \"first\", \"severity\": \"HIGH\", " \
 	"\"products\": [{\"version\": \"1.2\"}]}]"
 
+/*
+ * CVE-0001 plus an entry without a cveId that affects every version, so only
+ * CVE-0001 can be listed.
+ */
+#define CVE_FEED_NO_ID                                                         \
+	"[{\"cveId\": \"CVE-0001\", \"products\": [{\"version\": \"1.2\"}]}, " \
+	"{\"description\": \"no id\", \"products\": [{\"version\": \"*\"}]}]"
+
 static void
 cleanup_test_root(void)
 {
@@ -298,6 +306,47 @@ ATF_TC_CLEANUP(not_vulnerable, tc)
 	cleanup_test_root();
 }
 
+ATF_TC_WITH_CLEANUP(missing_cve_id);
+ATF_TC_HEAD(missing_cve_id, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "audit ignores CVE entries without an id in the listing and counts");
+}
+ATF_TC_BODY(missing_cve_id, tc)
+{
+	mportInstance *mport;
+	char *out;
+
+	(void)tc;
+
+	mport = create_indexed_instance("1.5");
+	out = report(mport, CVE_FEED_NO_ID);
+
+	ATF_REQUIRE(strstr(out, "CVE-0001\nFixed in: demo-1.5\n") != NULL);
+	ATF_REQUIRE(strstr(out, "no id") == NULL);
+	ATF_REQUIRE(strstr(out, "Not fixed in:") == NULL);
+	ATF_REQUIRE(strstr(out, "Upgrade to demo-1.5 to fix this vulnerability.\n") != NULL);
+	free(out);
+
+	/* with only the id-less entry, nothing is reported in either verbosity */
+	out = report(mport, "[{\"products\": [{\"version\": \"*\"}]}]");
+	ATF_REQUIRE_STREQ("", out);
+	free(out);
+
+	mport->verbosity = MPORT_VQUIET;
+	out = report(mport, "[{\"products\": [{\"version\": \"*\"}]}]");
+	ATF_REQUIRE_STREQ("", out);
+	free(out);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(missing_cve_id, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 ATF_TC_WITH_CLEANUP(bad_json);
 ATF_TC_HEAD(bad_json, tc)
 {
@@ -335,6 +384,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, no_index);
 	ATF_TP_ADD_TC(tp, quiet_unchanged);
 	ATF_TP_ADD_TC(tp, not_vulnerable);
+	ATF_TP_ADD_TC(tp, missing_cve_id);
 	ATF_TP_ADD_TC(tp, bad_json);
 
 	return atf_no_error();

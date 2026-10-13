@@ -160,10 +160,21 @@ mport_audit_report(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ mportPackag
 
 	while ((cur = ucl_object_iterate(root, &it, true))) {
 		const ucl_object_t *cveId;
+		const ucl_object_t *desc;
+		const ucl_object_t *severity;
 		bool fixed = true;
 
 		if (ucl_object_type(cur) != UCL_OBJECT) {
 			SET_ERROR(MPORT_ERR_FATAL, "Expected an object in the array");
+			continue;
+		}
+
+		/*
+		 * An entry without an id cannot be listed, so skip it entirely
+		 * rather than count it in the header and summary.
+		 */
+		cveId = ucl_object_find_key(cur, "cveId");
+		if (cveId == NULL || ucl_object_type(cveId) != UCL_STRING) {
 			continue;
 		}
 
@@ -186,24 +197,21 @@ mport_audit_report(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ mportPackag
 			stillAffected++;
 		}
 
-		cveId = ucl_object_find_key(cur, "cveId");
-		if (cveId != NULL && ucl_object_type(cveId) == UCL_STRING) {
-			const ucl_object_t *desc = ucl_object_find_key(cur, "description");
-			const ucl_object_t *severity = ucl_object_find_key(cur, "severity");
+		desc = ucl_object_find_key(cur, "description");
+		severity = ucl_object_find_key(cur, "severity");
 
-			fprintf(bufferFp, "%s\n", ucl_object_tostring(cveId));
-			if (desc != NULL && ucl_object_type(desc) == UCL_STRING) {
-				fprintf(bufferFp, "Description: %s\n", ucl_object_tostring(desc));
-			}
-			if (severity != NULL && ucl_object_type(severity) == UCL_STRING) {
-				fprintf(bufferFp, "Severity: %s\n", ucl_object_tostring(severity));
-			}
-			if (indexVersion != NULL) {
-				fprintf(bufferFp, "%s in: %s-%s\n", fixed ? "Fixed" : "Not fixed",
-				    indexName, indexVersion);
-			}
-			fprintf(bufferFp, "\n");
+		fprintf(bufferFp, "%s\n", ucl_object_tostring(cveId));
+		if (desc != NULL && ucl_object_type(desc) == UCL_STRING) {
+			fprintf(bufferFp, "Description: %s\n", ucl_object_tostring(desc));
 		}
+		if (severity != NULL && ucl_object_type(severity) == UCL_STRING) {
+			fprintf(bufferFp, "Severity: %s\n", ucl_object_tostring(severity));
+		}
+		if (indexVersion != NULL) {
+			fprintf(bufferFp, "%s in: %s-%s\n", fixed ? "Fixed" : "Not fixed",
+			    indexName, indexVersion);
+		}
+		fprintf(bufferFp, "\n");
 	}
 
 	if (vulnerable > 0 && haveIndex) {
