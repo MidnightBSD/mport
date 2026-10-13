@@ -33,6 +33,28 @@ int mport_audit_report(mportInstance *, mportPackageMeta *, const char *, bool, 
 	"\"products\": [{\"version\": \"1.2\"}]}]"
 
 /*
+ * Products from other vendors and platforms mixed into each CVE, the way the
+ * feed lists them: CVE-0001 and CVE-0002 match demo only through another
+ * product, CVE-0003 lists demo (in another case) up to 1.2, CVE-0004 has an
+ * entry without names, and CVE-0005 lists demo up to 1.2 next to another
+ * product whose version would mark demo-1.5 as still affected.
+ */
+#define CVE_FEED_PRODUCTS                                                                     \
+	"[{\"cveId\": \"CVE-0001\", \"products\": ["                                          \
+	"{\"vendorName\": \"redhat\", \"name\": \"enterprise_linux\", \"version\": \"10\"}, " \
+	"{\"vendorName\": \"demo\", \"name\": \"demo\", \"version\": \"-\"}]}, "              \
+	"{\"cveId\": \"CVE-0002\", \"products\": ["                                           \
+	"{\"vendorName\": \"demo\", \"name\": \"other\", \"version\": \"*\"}]}, "             \
+	"{\"cveId\": \"CVE-0003\", \"products\": ["                                           \
+	"{\"vendorName\": \"Demo\", \"name\": \"DEMO\", \"version\": \"1.2\"}]}, "            \
+	"{\"cveId\": \"CVE-0004\", \"products\": [{\"version\": \"1.1\"}]}, "                 \
+	"{\"cveId\": \"CVE-0005\", \"products\": ["                                           \
+	"{\"vendorName\": \"netapp\", \"name\": \"ontap\", \"version\": \"9\"}, "             \
+	"{\"vendorName\": \"demo\", \"name\": \"demo\", \"version\": \"1.2\"}]}]"
+
+#define DEMO_CPE "cpe:2.3:a:demo:demo:1.0:::::midnightbsd4:x64:0"
+
+/*
  * CVE-0001 plus an entry without a cveId that affects every version, so only
  * CVE-0001 can be listed.
  */
@@ -103,6 +125,24 @@ installed_demo(void)
 	ATF_REQUIRE(pkg->name != NULL && pkg->version != NULL && pkg->origin != NULL);
 
 	return pkg;
+}
+
+static char *
+report_cpe(mportInstance *mport, const char *cpe, const char *feed)
+{
+	mportPackageMeta *pkg = installed_demo();
+	char *out = NULL;
+
+	if (cpe != NULL) {
+		pkg->cpe = strdup(cpe);
+		ATF_REQUIRE(pkg->cpe != NULL);
+	}
+
+	ATF_REQUIRE_EQ(MPORT_OK, mport_audit_report(mport, pkg, feed, false, &out));
+	ATF_REQUIRE(out != NULL);
+	mport_pkgmeta_free(pkg);
+
+	return out;
 }
 
 static char *
@@ -347,6 +387,87 @@ ATF_TC_CLEANUP(missing_cve_id, tc)
 	cleanup_test_root();
 }
 
+ATF_TC_WITH_CLEANUP(product_filter);
+ATF_TC_HEAD(product_filter, tc)
+{
+	atf_tc_set_md_var(
+	    tc, "descr", "audit compares only the versions of the product the installed CPE names");
+}
+ATF_TC_BODY(product_filter, tc)
+{
+	mportInstance *mport;
+	char *out;
+
+	(void)tc;
+
+	mport = create_indexed_instance("1.5");
+	out = report_cpe(mport, DEMO_CPE, CVE_FEED_PRODUCTS);
+
+	ATF_REQUIRE(strstr(out, "CVE-0001") == NULL);
+	ATF_REQUIRE(strstr(out, "CVE-0002") == NULL);
+	ATF_REQUIRE(strstr(out, "CVE-0003\nFixed in: demo-1.5\n") != NULL);
+	ATF_REQUIRE(strstr(out, "CVE-0004\nFixed in: demo-1.5\n") != NULL);
+	ATF_REQUIRE(strstr(out, "CVE-0005\nFixed in: demo-1.5\n") != NULL);
+	ATF_REQUIRE(strstr(out, "Upgrade to demo-1.5 to fix these vulnerabilities.\n") != NULL);
+	free(out);
+
+	/* a CPE with a quoted ':' still names the product */
+	out = report_cpe(mport, "cpe:2.3:a:demo:de\\:mo:1.0:::::midnightbsd4:x64:0",
+	    "[{\"cveId\": \"CVE-0006\", \"products\": ["
+	    "{\"vendorName\": \"demo\", \"name\": \"de:mo\", \"version\": \"1.2\"}]}, "
+	    "{\"cveId\": \"CVE-0007\", \"products\": ["
+	    "{\"vendorName\": \"demo\", \"name\": \"de\", \"version\": \"1.2\"}]}]");
+	ATF_REQUIRE(strstr(out, "CVE-0006\n") != NULL);
+	ATF_REQUIRE(strstr(out, "CVE-0007") == NULL);
+	free(out);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(product_filter, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(product_filter_without_cpe);
+ATF_TC_HEAD(product_filter_without_cpe, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "audit compares every product when the installed CPE gives no vendor and product");
+}
+ATF_TC_BODY(product_filter_without_cpe, tc)
+{
+	mportInstance *mport;
+	char *out;
+
+	(void)tc;
+
+	mport = create_indexed_instance("1.5");
+
+	out = report_cpe(mport, NULL, CVE_FEED_PRODUCTS);
+	ATF_REQUIRE(strstr(out, "CVE-0001\n") != NULL);
+	ATF_REQUIRE(strstr(out, "CVE-0002\n") != NULL);
+	ATF_REQUIRE(strstr(out, "CVE-0005\nNot fixed in: demo-1.5\n") != NULL);
+	free(out);
+
+	out = report_cpe(mport, "cpe:2.3:a:*:*:1.0:::::midnightbsd4:x64:0", CVE_FEED_PRODUCTS);
+	ATF_REQUIRE(strstr(out, "CVE-0001\n") != NULL);
+	free(out);
+
+	out = report_cpe(mport, "cpe:/a:demo:demo:1.0", CVE_FEED_PRODUCTS);
+	ATF_REQUIRE(strstr(out, "CVE-0001\n") != NULL);
+	free(out);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(product_filter_without_cpe, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 ATF_TC_WITH_CLEANUP(bad_json);
 ATF_TC_HEAD(bad_json, tc)
 {
@@ -385,6 +506,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, quiet_unchanged);
 	ATF_TP_ADD_TC(tp, not_vulnerable);
 	ATF_TP_ADD_TC(tp, missing_cve_id);
+	ATF_TP_ADD_TC(tp, product_filter);
+	ATF_TP_ADD_TC(tp, product_filter_without_cpe);
 	ATF_TP_ADD_TC(tp, bad_json);
 
 	return atf_no_error();

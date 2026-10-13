@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 #include <err.h>
 #include <unistd.h>
@@ -38,7 +39,11 @@
 #include <ucl.h>
 
 static char *readJsonFile(char *jsonFile);
-static bool cve_affects_version(const ucl_object_t *cve, const char *version);
+static bool cve_affects_version(const ucl_object_t *cve, const char *version,
+    /*@null@*/ const char *vendor, /*@null@*/ const char *product);
+static bool cpe_vendor_product(
+    /*@null@*/ const char *cpe, char *vendor, size_t vendorLen, char *product, size_t productLen)
+    /*@requires maxSet(vendor) >= (vendorLen - 1) /\ maxSet(product) >= (productLen - 1)@*/;
 
 MPORT_PUBLIC_API char *
 mport_audit(mportInstance *mport, const char *packageName, bool dependOn)
@@ -112,6 +117,10 @@ mport_audit_report(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ mportPackag
 	bool haveIndex = false;
 	int vulnerable = 0;
 	int stillAffected = 0;
+	char cpeVendor[256];
+	char cpeProduct[256];
+	const char *vendor = NULL;
+	const char *product = NULL;
 
 	if (out == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid audit report arguments");
@@ -119,6 +128,17 @@ mport_audit_report(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ mportPackag
 
 	if (mport == NULL || pack == NULL || jsonData == NULL || pack->version == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Invalid audit report arguments");
+
+	/*
+	 * The feed lists every product in each CVE's configurations, including
+	 * other products and the platforms they run on.  Only compare versions
+	 * of the product the installed package's CPE names.
+	 */
+	if (cpe_vendor_product(
+		pack->cpe, cpeVendor, sizeof(cpeVendor), cpeProduct, sizeof(cpeProduct))) {
+		vendor = cpeVendor;
+		product = cpeProduct;
+	}
 
 	// Create a UCL parser and parse the JSON string
 	parser = ucl_parser_new(0);
@@ -178,7 +198,7 @@ mport_audit_report(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ mportPackag
 			continue;
 		}
 
-		if (!cve_affects_version(cur, pack->version)) {
+		if (!cve_affects_version(cur, pack->version, vendor, product)) {
 			continue;
 		}
 
@@ -192,7 +212,8 @@ mport_audit_report(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ mportPackag
 		}
 		vulnerable++;
 
-		if (indexVersion != NULL && cve_affects_version(cur, indexVersion)) {
+		if (indexVersion != NULL &&
+		    cve_affects_version(cur, indexVersion, vendor, product)) {
 			fixed = false;
 			stillAffected++;
 		}
@@ -258,26 +279,124 @@ mport_audit_report(/*@notnull@*/ mportInstance *mport, /*@notnull@*/ mportPackag
 }
 
 /*
- * A CVE affects version when one of its products matches every version ("*")
- * or lists a version at or above it.
+ * Copy field index of a CPE 2.3 formatted string into buf, dropping the
+ * backslash that quotes a character.  False when the field is missing or does
+ * not fit.
  */
 static bool
-cve_affects_version(const ucl_object_t *cve, const char *version)
+cpe_field(const char *cpe, int index, char *buf, size_t len)
+/*@requires maxSet(buf) >= (len - 1)@*/
+{
+	const char *c;
+	int field = 0;
+	size_t i = 0;
+
+	if (len == 0)
+		return (false);
+
+	for (c = cpe; *c != '\0'; c++) {
+		if (*c == ':') {
+			if (field == index)
+				break;
+			field++;
+			continue;
+		}
+		if (*c == '\\' && c[1] != '\0')
+			c++;
+		if (field == index) {
+			if (i + 1 >= len)
+				return (false);
+			buf[i++] = *c;
+		}
+	}
+
+	if (field != index)
+		return (false);
+
+	buf[i] = '\0';
+	return (true);
+}
+
+/*
+ * Extract the vendor and product of a CPE 2.3 formatted string such as
+ * cpe:2.3:a:apache:http_server:2.4.69:...  False when the CPE is not in that
+ * form or either field is empty or a wildcard, in which case nothing can be
+ * filtered on.
+ */
+static bool
+cpe_vendor_product(
+    /*@null@*/ const char *cpe, char *vendor, size_t vendorLen, char *product, size_t productLen)
+{
+	if (vendorLen == 0 || productLen == 0)
+		return (false);
+
+	vendor[0] = '\0';
+	product[0] = '\0';
+
+	if (cpe == NULL || strncmp(cpe, "cpe:2.3:", 8) != 0)
+		return (false);
+
+	if (!cpe_field(cpe, 3, vendor, vendorLen) || !cpe_field(cpe, 4, product, productLen))
+		return (false);
+
+	if (vendor[0] == '\0' || strcmp(vendor, "*") == 0 || product[0] == '\0' ||
+	    strcmp(product, "*") == 0)
+		return (false);
+
+	return (true);
+}
+
+/*
+ * Whether a CVE product entry is the installed package's product.  An entry
+ * without names cannot be ruled out, so it still counts.
+ */
+static bool
+cve_product_matches(
+    const ucl_object_t *entry, /*@null@*/ const char *vendor, /*@null@*/ const char *product)
+{
+	const ucl_object_t *entryVendor;
+	const ucl_object_t *entryName;
+
+	if (vendor == NULL || product == NULL)
+		return (true);
+
+	entryVendor = ucl_object_find_key(entry, "vendorName");
+	entryName = ucl_object_find_key(entry, "name");
+	if (entryVendor == NULL || ucl_object_type(entryVendor) != UCL_STRING ||
+	    entryName == NULL || ucl_object_type(entryName) != UCL_STRING)
+		return (true);
+
+	return (strcasecmp(ucl_object_tostring(entryVendor), vendor) == 0 &&
+	    strcasecmp(ucl_object_tostring(entryName), product) == 0);
+}
+
+/*
+ * A CVE affects version when one of its entries for the installed product
+ * (vendor and product, when known) matches every version ("*") or lists a
+ * version at or above it.
+ */
+static bool
+cve_affects_version(const ucl_object_t *cve, const char *version, /*@null@*/ const char *vendor,
+    /*@null@*/ const char *product)
 {
 	const ucl_object_t *products = ucl_object_find_key(cve, "products");
 	ucl_object_iter_t pit = NULL;
-	const ucl_object_t *product;
+	const ucl_object_t *entry;
 
 	if (products == NULL || ucl_object_type(products) != UCL_ARRAY) {
 		return (false);
 	}
 
-	for (product = ucl_object_iterate(products, &pit, true); product != NULL;
-	    product = ucl_object_iterate(products, &pit, true)) {
-		const ucl_object_t *productVersion = ucl_object_find_key(product, "version");
+	for (entry = ucl_object_iterate(products, &pit, true); entry != NULL;
+	    entry = ucl_object_iterate(products, &pit, true)) {
+		const ucl_object_t *productVersion = ucl_object_find_key(entry, "version");
 		const char *version_str;
 
 		if (productVersion == NULL || ucl_object_type(productVersion) != UCL_STRING) {
+			continue;
+		}
+
+		if (!cve_product_matches(entry, vendor, product)) {
 			continue;
 		}
 
