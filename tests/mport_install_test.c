@@ -1524,6 +1524,123 @@ ATF_TC_CLEANUP(fd_install_releases_duplicate_descriptor, tc)
 	cleanup_test_root();
 }
 
+/*
+ * An update that fails its preconditions must be reported to the caller,
+ * not only through the message callback, and must leave the installed
+ * copy alone.
+ */
+ATF_TC_WITH_CLEANUP(failed_update_returns_error);
+ATF_TC_HEAD(failed_update_returns_error, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "mport_update_primative returns an error when an update fails");
+}
+ATF_TC_BODY(failed_update_returns_error, tc)
+{
+	mportInstance *mport;
+	const char *oldfile;
+	const char *newfile;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	oldfile = create_package_version(mport, PKG_NAME, "1.0", NULL);
+	newfile = create_package_version(mport, PKG_NAME, "2.0", NULL);
+
+	ATF_REQUIRE_MSG(mport_install_primative(mport, newfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_STREQ("2.0", installed_version(mport, PKG_NAME));
+
+	/* 2.0 is installed, so the 1.0 bundle is not an upgrade */
+	ATF_REQUIRE(mport_update_primative(mport, oldfile) != MPORT_OK);
+	ATF_REQUIRE(mport_err_string() != NULL && mport_err_string()[0] != '\0');
+	ATF_REQUIRE_STREQ("2.0", installed_version(mport, PKG_NAME));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(failed_update_returns_error, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+ATF_TC_WITH_CLEANUP(update_upgrades_installed_package);
+ATF_TC_HEAD(update_upgrades_installed_package, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr", "mport_update_primative upgrades an older installed copy");
+}
+ATF_TC_BODY(update_upgrades_installed_package, tc)
+{
+	mportInstance *mport;
+	const char *oldfile;
+	const char *newfile;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	oldfile = create_package_version(mport, PKG_NAME, "1.0", NULL);
+	newfile = create_package_version(mport, PKG_NAME, "2.0", NULL);
+
+	ATF_REQUIRE_MSG(mport_install_primative(mport, oldfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_MSG(
+	    mport_update_primative(mport, newfile) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_STREQ("2.0", installed_version(mport, PKG_NAME));
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_EQ(0, access(test_path(PKG_FILE_ABS), F_OK));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(update_upgrades_installed_package, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
+/* A locked package is skipped on purpose; that is not a failure. */
+ATF_TC_WITH_CLEANUP(update_skips_locked_package);
+ATF_TC_HEAD(update_skips_locked_package, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr", "mport_update_primative leaves a locked package alone");
+}
+ATF_TC_BODY(update_skips_locked_package, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta **found = NULL;
+	const char *oldfile;
+	const char *newfile;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	oldfile = create_package_version(mport, PKG_NAME, "1.0", NULL);
+	newfile = create_package_version(mport, PKG_NAME, "2.0", NULL);
+
+	ATF_REQUIRE_MSG(mport_install_primative(mport, oldfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", PKG_NAME));
+	ATF_REQUIRE(found != NULL && found[0] != NULL);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_lock_lock(mport, found[0]));
+	mport_pkgmeta_vec_free(found);
+
+	ATF_REQUIRE_MSG(
+	    mport_update_primative(mport, newfile) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_STREQ("1.0", installed_version(mport, PKG_NAME));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(update_skips_locked_package, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, install_replaces_previous_os_release);
@@ -1547,6 +1664,9 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, old_release_dependency_with_superseded_libraries_is_accepted);
 	ATF_TP_ADD_TC(tp, failed_delete_rolls_back);
 	ATF_TP_ADD_TC(tp, failed_schema_upgrade_rolls_back);
+	ATF_TP_ADD_TC(tp, failed_update_returns_error);
+	ATF_TP_ADD_TC(tp, update_upgrades_installed_package);
+	ATF_TP_ADD_TC(tp, update_skips_locked_package);
 
 	return atf_no_error();
 }
