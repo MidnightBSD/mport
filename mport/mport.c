@@ -1504,13 +1504,13 @@ info_shlibs(
 		if (mport->verbosity != MPORT_VQUIET)
 			printf("Provided shared libraries:\n");
 		tll_foreach(prov, it)
-			printf("%s%s\n", mport->verbosity != MPORT_VQUIET ? "\t" : "", it->item);
+		    printf("%s%s\n", mport->verbosity != MPORT_VQUIET ? "\t" : "", it->item);
 	}
 	if (required) {
 		if (mport->verbosity != MPORT_VQUIET)
 			printf("Required shared libraries:\n");
 		tll_foreach(req, it)
-			printf("%s%s\n", mport->verbosity != MPORT_VQUIET ? "\t" : "", it->item);
+		    printf("%s%s\n", mport->verbosity != MPORT_VQUIET ? "\t" : "", it->item);
 	}
 
 	tll_free_and_free(prov, free);
@@ -1547,7 +1547,8 @@ shlib(/*@notnull@*/ mportInstance *mport, /*@null@*/ const char *library, bool p
 			    packs[i]->name, packs[i]->version);
 		if (packs == NULL && mport->verbosity != MPORT_VQUIET)
 			printf("\t%s\n",
-			    mport_shlib_in_base(library) ? "the base system" : "no installed package");
+			    mport_shlib_in_base(library) ? "the base system" :
+							   "no installed package");
 		mport_pkgmeta_vec_free(packs);
 		packs = NULL;
 	}
@@ -1574,7 +1575,8 @@ shlib(/*@notnull@*/ mportInstance *mport, /*@null@*/ const char *library, bool p
 static int
 which(/*@notnull@*/ mportInstance *mport, /*@null@*/ const char *filePath, bool origin)
 {
-	mportPackageMeta *pack = NULL;
+	/*@null@*/ /*@only@*/ mportPackageMeta *pack = NULL;
+	int rc = 0;
 
 	if (filePath == NULL) {
 		warnx("%s", "Specify file path");
@@ -1599,11 +1601,16 @@ which(/*@notnull@*/ mportInstance *mport, /*@null@*/ const char *filePath, bool 
 			printf("%s was installed by package %s-%s\n", filePath, pack->name,
 			    pack->version);
 		}
+	} else {
+		/* no installed package owns it; fail so scripts can tell, as pkg-which(8) */
+		if (mport->verbosity != MPORT_VQUIET)
+			printf("%s was not found in the database\n", filePath);
+		rc = 1;
 	}
 
 	mport_pkgmeta_free(pack);
 
-	return (0);
+	return (rc);
 }
 
 static int
