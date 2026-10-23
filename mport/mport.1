@@ -23,7 +23,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"
-.Dd October 13, 2026
+.Dd October 23, 2026
 .Dt MPORT 1
 .Os
 .Sh NAME
@@ -717,6 +717,15 @@ print only the package name and version.
 With
 .Fl o ,
 print the package origin instead.
+.Ar path
+is matched exactly against the paths recorded in the package database; it is
+not made absolute and symbolic links are not resolved.
+Exit with status 0 if an installed package owns
+.Ar path
+and 1 otherwise; when none does, print a
+.Dq was not found in the database
+message, or nothing with
+.Fl q .
 .El
 .Sh SETTINGS
 The following configuration settings commonly affect
