@@ -98,6 +98,7 @@ typedef struct {
 	mport_confirm_cb confirm_cb;
 	mport_select_cb select_cb;
 	struct _mportTriggerState *triggers; /* directories touched and cleanups queued this run */
+	bool readOnly; /* registry opened read-only: queries work, changes are refused */
 } mportInstance;
 
 /*@null@*/ mportInstance *mport_instance_new(void);
