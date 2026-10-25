@@ -42,6 +42,8 @@
 .Ft int
 .Fn mport_instance_free "mportInstance *mport"
 .Ft int
+.Fn mport_require_writable "mportInstance *mport"
+.Ft int
 .Fn mport_call_msg_cb "mportInstance *mport" "const char *fmt" "..."
 .Ft int
 .Fn mport_call_progress_init_cb "mportInstance *mport" "const char *fmt" "..."
@@ -290,6 +292,11 @@ opens the registry read-only and sets
 .Va readOnly
 in the instance.
 Queries work as usual; functions that change the registry fail.
+.Fn mport_require_writable
+returns
+.Dv MPORT_OK
+for a writable registry and an error naming the privileged action needed
+for a read-only one, so callers can refuse a change before starting it.
 A write-ahead-log registry whose
 .Pa -wal
 and
@@ -332,6 +339,7 @@ when they are available.
 .Fn mport_instance_new ,
 .Fn mport_instance_init ,
 .Fn mport_instance_free ,
+.Fn mport_require_writable ,
 .Fn mport_verbosity ,
 .Fn mport_set_msg_cb ,
 .Fn mport_set_progress_init_cb ,
