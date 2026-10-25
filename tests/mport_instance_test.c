@@ -41,6 +41,7 @@
 /* Internal libmport symbols (declared in mport_private.h). */
 int mport_db_do(sqlite3 *, const char *, ...);
 int mport_db_count(sqlite3 *, int *, const char *, ...);
+char *mport_registry_immutable_uri(const char *);
 
 /* Splint does not understand ATF's generated test-case wrappers. */
 /*@-boundsread -boundswrite -compdef -compdestroy -dependenttrans -fullinitblock@*/
@@ -207,8 +208,37 @@ ATF_TC_CLEANUP(writable_registry_unchanged, tc)
 	restore_and_remove_root();
 }
 
+ATF_TC(immutable_uri);
+ATF_TC_HEAD(immutable_uri, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "The immutable registry URI keeps a single leading slash and encodes URI metacharacters");
+}
+ATF_TC_BODY(immutable_uri, tc)
+{
+	char *uri;
+
+	(void)tc;
+	/* no chroot: root "" + "/var/db/mport/master.db" starts with "//" */
+	uri = mport_registry_immutable_uri("//var/db/mport/master.db");
+	ATF_REQUIRE(uri != NULL);
+	ATF_REQUIRE_STREQ("file:/var/db/mport/master.db?immutable=1", uri);
+	free(uri);
+
+	uri = mport_registry_immutable_uri("/tmp/root//var/db/mport/master.db");
+	ATF_REQUIRE(uri != NULL);
+	ATF_REQUIRE_STREQ("file:/tmp/root//var/db/mport/master.db?immutable=1", uri);
+	free(uri);
+
+	uri = mport_registry_immutable_uri("/odd ?#%/master.db");
+	ATF_REQUIRE(uri != NULL);
+	ATF_REQUIRE_STREQ("file:/odd %3F%23%25/master.db?immutable=1", uri);
+	free(uri);
+}
+
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, immutable_uri);
 	ATF_TP_ADD_TC(tp, readonly_registry_queries);
 	ATF_TP_ADD_TC(tp, readonly_registry_old_schema);
 	ATF_TP_ADD_TC(tp, writable_registry_unchanged);

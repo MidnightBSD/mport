@@ -41,8 +41,6 @@
 
 static bool registry_is_read_only(/*@notnull@*/ /*@observer@*/ const char *);
 static int open_registry_read_only(mportInstance *, /*@notnull@*/ /*@observer@*/ const char *);
-/*@null@*/ /*@only@*/ static char *registry_immutable_uri(
-    /*@notnull@*/ /*@observer@*/ const char *);
 
 /**
  * @brief Allocates memory for a new mportInstance structure.
@@ -255,19 +253,19 @@ open_registry_read_only(mportInstance *mport, /*@notnull@*/ /*@observer@*/ const
 	sqlite3_close(mport->db);
 	mport->db = NULL;
 
-	uri = registry_immutable_uri(file);
+	uri = mport_registry_immutable_uri(file);
 	if (uri == NULL)
 		RETURN_ERROR(MPORT_ERR_FATAL, "Could not allocate memory");
 
 	if (sqlite3_open_v2(uri, &(mport->db), SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, NULL) !=
 	    SQLITE_OK) {
 		SET_ERROR(MPORT_ERR_FATAL, sqlite3_errmsg(mport->db));
-		sqlite3_free(uri);
+		free(uri);
 		sqlite3_close(mport->db);
 		mport->db = NULL;
 		RETURN_CURRENT_ERROR;
 	}
-	sqlite3_free(uri);
+	free(uri);
 
 	return (MPORT_OK);
 }
@@ -275,10 +273,14 @@ open_registry_read_only(mportInstance *mport, /*@notnull@*/ /*@observer@*/ const
 /*
  * file:<path>?immutable=1 with the path percent-encoded the way SQLite URI
  * filenames require, so '?', '#' and '%' in a chroot path stay literal.
+ * The registry path is built as root + "/var/db/mport/master.db", so with
+ * no root it starts with "//"; "file://var/..." would make SQLite read
+ * "var" as a URI authority and reject it, so collapse leading slashes to
+ * one.  The caller frees the result with free().
  */
 /*@null@*/ /*@only@*/
-static char *
-registry_immutable_uri(/*@notnull@*/ /*@observer@*/ const char *file)
+char *
+mport_registry_immutable_uri(/*@notnull@*/ /*@observer@*/ const char *file)
 {
 	static const char hex[] = "0123456789ABCDEF";
 	const char *prefix = "file:";
@@ -288,10 +290,13 @@ registry_immutable_uri(/*@notnull@*/ /*@observer@*/ const char *file)
 	char *uri;
 	char *out;
 
+	while (file[0] == '/' && file[1] == '/')
+		file++;
+
 	for (in = file; *in != '\0'; in++)
 		length += (*in == '?' || *in == '#' || *in == '%') ? 3 : 1;
 
-	uri = sqlite3_malloc64(length);
+	uri = malloc(length);
 	if (uri == NULL)
 		return (NULL);
 

@@ -84,6 +84,8 @@ int mport_upgrade_master_schema(sqlite3 *, int);
 
 /* instance */
 int mport_get_database_version(sqlite3 *);
+/* file:<path>?immutable=1 for a registry that can only be read; free with free() */
+/*@null@*/ /*@only@*/ char *mport_registry_immutable_uri(/*@notnull@*/ /*@observer@*/ const char *);
 int mport_set_database_version(sqlite3 *);
 
 /* Various database convenience functions */
