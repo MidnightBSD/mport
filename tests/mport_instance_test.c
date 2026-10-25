@@ -124,6 +124,8 @@ ATF_TC_BODY(readonly_registry_queries, tc)
 	    mport_instance_init(mport, test_root, "root", true, MPORT_VQUIET), "%s",
 	    mport_err_string());
 	ATF_REQUIRE(mport->readOnly);
+	ATF_REQUIRE(mport_require_writable(mport) != MPORT_OK);
+	ATF_REQUIRE(strstr(mport_err_string(), "run mport as root") != NULL);
 	ATF_REQUIRE_EQ(
 	    MPORT_OK, mport_db_count(mport->db, &count, "SELECT count(*) FROM packages"));
 	ATF_REQUIRE_EQ(0, count);
@@ -198,6 +200,7 @@ ATF_TC_BODY(writable_registry_unchanged, tc)
 	    mport_instance_init(mport, test_root, "root", true, MPORT_VQUIET), "%s",
 	    mport_err_string());
 	ATF_REQUIRE(!mport->readOnly);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_require_writable(mport));
 	ATF_REQUIRE_EQ(MPORT_OK,
 	    mport_db_do(mport->db, "INSERT INTO settings (name, val) VALUES ('probe', '1')"));
 	ATF_REQUIRE_EQ(MPORT_OK, mport_instance_free(mport));

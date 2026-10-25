@@ -105,6 +105,8 @@ typedef struct {
 int mport_instance_init(
     mportInstance *, const char *, const char *, bool noIndex, mportVerbosity verbosity);
 int mport_instance_free(mportInstance *);
+/* MPORT_OK unless the registry was opened read-only; see readOnly */
+int mport_require_writable(mportInstance *);
 
 /* Run the callbacks. will display messages, etc */
 int mport_call_msg_cb(/*@null@*/ mportInstance *, /*@notnull@*/ const char *, ...);

@@ -223,6 +223,23 @@ mport_instance_init(mportInstance *mport, const char *root, const char *outputPa
 }
 
 /*
+ * Commands and callers that would change the registry, the index or the
+ * package files check this first, so a read-only registry refuses them
+ * with one clear message instead of failing inside a write transaction.
+ */
+MPORT_PUBLIC_API int
+mport_require_writable(mportInstance *mport)
+{
+	if (mport == NULL)
+		RETURN_ERROR(MPORT_ERR_FATAL, "mport not initialized");
+	if (mport->readOnly)
+		RETURN_ERROR(MPORT_ERR_FATAL,
+		    "The package registry is read-only for this user; run mport as root to install, remove or update packages or change settings");
+
+	return (MPORT_OK);
+}
+
+/*
  * Open the registry for queries only.  A plain read-only connection keeps
  * SQLite's locking, so prefer it; it reads a WAL-mode registry only while
  * readable -wal/-shm files exist or can be created.  /var/db/mport belongs

@@ -227,6 +227,31 @@ installs, upgrades, removes, and inspects
 packages.
 It can work with repository packages, local package files, and the local
 package database.
+.Pp
+A user who cannot write the package database, normally anyone but root,
+can still run the inspection commands such as
+.Cm search ,
+.Cm query ,
+.Cm info ,
+.Cm list
+and
+.Cm stats .
+Commands that would change packages, the index, package files or settings,
+including
+.Cm install ,
+.Cm delete ,
+.Cm update ,
+.Cm upgrade ,
+.Cm config set
+and
+.Cm annotate
+with
+.Fl A
+or
+.Fl D ,
+are refused with a message asking to run
+.Nm
+as root.
 .Sh OPTIONS
 The following global options are supported by
 .Nm :
