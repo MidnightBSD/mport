@@ -31,6 +31,9 @@
 
 static char test_root[PATH_MAX];
 
+/* A "tag:value" annotation that create_package_message() adds when set. */
+static const char *pkg_annotation;
+
 /*
  * The install-time age check asks getlogin(2) and agev_get_age_bracket(3)
  * for the installing user's age.  These definitions interpose on libc and
@@ -224,6 +227,12 @@ create_package_message(mportInstance *mport, const char *name, const char *versi
 		write_file(buf, message);
 		extra->pkgmessage = strdup(buf);
 		ATF_REQUIRE(extra->pkgmessage != NULL);
+	}
+	if (pkg_annotation != NULL) {
+		char *annotation = strdup(pkg_annotation);
+
+		ATF_REQUIRE(annotation != NULL);
+		tll_push_back(extra->annotations, annotation);
 	}
 
 	ATF_REQUIRE_MSG(mport_create_primative(mport, assetlist, pack, extra) == MPORT_OK, "%s",
@@ -568,8 +577,9 @@ ATF_TC_BODY(invalid_age_annotation_is_reported, tc)
 	(void)tc;
 
 	mport = create_test_instance();
+	pkg_annotation = "age:18x";
 	pkgfile = create_test_package(mport);
-	ATF_REQUIRE_EQ(MPORT_OK, mport_annotation_set(mport, PKG_NAME, "age", "18x"));
+	pkg_annotation = NULL;
 
 	age_bracket[0] = 30;
 	age_bracket[1] = -1;
@@ -590,6 +600,99 @@ ATF_TC_CLEANUP(invalid_age_annotation_is_reported, tc)
 	(void)tc;
 
 	age_lookup = false;
+	cleanup_test_root();
+}
+
+/*
+ * Annotations given to mport.create (-A tag:value) travel in the bundle and
+ * are registered under the package name, so an age-restricted package
+ * installs for an adult and records its "age" annotation.
+ */
+ATF_TC_WITH_CLEANUP(bundle_annotations_are_registered);
+ATF_TC_HEAD(bundle_annotations_are_registered, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "annotations in a bundle are registered for the installed package");
+}
+ATF_TC_BODY(bundle_annotations_are_registered, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	char *age = NULL;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkg_annotation = "age:18";
+	pkgfile = create_test_package(mport);
+	pkg_annotation = NULL;
+
+	age_bracket[0] = 30;
+	age_bracket[1] = -1;
+	age_lookup = true;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	age_lookup = false;
+
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_EQ(MPORT_OK, mport_annotation_get(mport, PKG_NAME, "age", &age));
+	ATF_REQUIRE_STREQ("18", age);
+	free(age);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(bundle_annotations_are_registered, tc)
+{
+	(void)tc;
+
+	age_lookup = false;
+	pkg_annotation = NULL;
+	cleanup_test_root();
+}
+
+/*
+ * The age check has to read the restriction from the bundle being
+ * installed: the registry only holds it once the package is installed.
+ */
+ATF_TC_WITH_CLEANUP(underage_install_is_refused);
+ATF_TC_HEAD(underage_install_is_refused, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "a package whose age annotation exceeds the user's age is not installed");
+}
+ATF_TC_BODY(underage_install_is_refused, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	int ret;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkg_annotation = "age:18";
+	pkgfile = create_test_package(mport);
+	pkg_annotation = NULL;
+
+	age_bracket[0] = 13;
+	age_bracket[1] = 15;
+	age_lookup = true;
+	ret = mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT);
+	age_lookup = false;
+
+	ATF_REQUIRE(ret != MPORT_OK);
+	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_EQ(-1, access(test_path(PKG_FILE_ABS), F_OK));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(underage_install_is_refused, tc)
+{
+	(void)tc;
+
+	age_lookup = false;
+	pkg_annotation = NULL;
 	cleanup_test_root();
 }
 
@@ -1841,6 +1944,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, force_reinstall_over_orphaned_rows);
 	ATF_TP_ADD_TC(tp, failed_install_registers_nothing);
 	ATF_TP_ADD_TC(tp, invalid_age_annotation_is_reported);
+	ATF_TP_ADD_TC(tp, bundle_annotations_are_registered);
+	ATF_TP_ADD_TC(tp, underage_install_is_refused);
 	ATF_TP_ADD_TC(tp, dir_asset_through_symlinked_parent);
 	ATF_TP_ADD_TC(tp, add_installs_missing_dependency_from_sibling);
 	ATF_TP_ADD_TC(tp, forced_add_leaves_installed_dependency_alone);
