@@ -159,11 +159,13 @@ do_pre_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *
 				    *endptr != '\0' || /* trailing garbage */
 				    parsed_age < 0 || /* negative ages not allowed */
 				    parsed_age > INT_MAX) { /* out of int range */
-					free(ages);
-					free(age_annotation);
-					RETURN_ERRORX(MPORT_ERR_FATAL,
+					/* format the message before freeing what it quotes */
+					SET_ERRORX(MPORT_ERR_FATAL,
 					    "Invalid age annotation '%s' for package %s",
 					    age_annotation, pkg->name);
+					free(ages);
+					free(age_annotation);
+					RETURN_CURRENT_ERROR;
 				}
 
 				required_age = (int)parsed_age;
