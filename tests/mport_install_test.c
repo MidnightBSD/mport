@@ -3,7 +3,9 @@
 
 #include <atf-c.h>
 #include <fcntl.h>
+#include <libutil.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +30,45 @@
 #define PKG_DIR_ABS PKG_PREFIX "/" PKG_DIR_REL
 
 static char test_root[PATH_MAX];
+
+/*
+ * The install-time age check asks getlogin(2) and agev_get_age_bracket(3)
+ * for the installing user's age.  These definitions interpose on libc and
+ * libutil so a case can supply an age bracket without a login session or a
+ * running aged(8).  While age_lookup is false they fail, and libmport skips
+ * the check as it does when the user's age is unknown.
+ */
+static bool age_lookup;
+static int age_bracket[2];
+
+/*
+ * Fill freed memory so a use after free shows up as a wrong value instead of
+ * reading back the old contents.
+ */
+const char *malloc_conf = "junk:true";
+
+char *
+getlogin(void)
+{
+	static char login[] = "mport-test";
+
+	return age_lookup ? login : NULL;
+}
+
+int *
+agev_get_age_bracket(const char *username)
+{
+	int *ages;
+
+	(void)username;
+	if (!age_lookup)
+		return NULL;
+	ages = malloc(sizeof(age_bracket));
+	if (ages != NULL)
+		memcpy(ages, age_bracket, sizeof(age_bracket));
+
+	return ages;
+}
 
 static const char *
 test_path(const char *suffix)
@@ -503,6 +544,52 @@ ATF_TC_CLEANUP(failed_install_registers_nothing, tc)
 {
 	(void)tc;
 
+	cleanup_test_root();
+}
+
+/*
+ * An age annotation that is not a plain non-negative integer fails the
+ * install with an error that names the annotation.  The annotation used to
+ * be freed before the error message was formatted from it.
+ */
+ATF_TC_WITH_CLEANUP(invalid_age_annotation_is_reported);
+ATF_TC_HEAD(invalid_age_annotation_is_reported, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "an invalid age annotation fails the install and is named in the error");
+}
+ATF_TC_BODY(invalid_age_annotation_is_reported, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+	int ret;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkgfile = create_test_package(mport);
+	ATF_REQUIRE_EQ(MPORT_OK, mport_annotation_set(mport, PKG_NAME, "age", "18x"));
+
+	age_bracket[0] = 30;
+	age_bracket[1] = -1;
+	age_lookup = true;
+	ret = mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT);
+	age_lookup = false;
+
+	ATF_REQUIRE(ret != MPORT_OK);
+	ATF_REQUIRE_MSG(strstr(mport_err_string(),
+			    "Invalid age annotation '18x' for package " PKG_NAME) != NULL,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(invalid_age_annotation_is_reported, tc)
+{
+	(void)tc;
+
+	age_lookup = false;
 	cleanup_test_root();
 }
 
@@ -1753,6 +1840,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, fd_install_releases_duplicate_descriptor);
 	ATF_TP_ADD_TC(tp, force_reinstall_over_orphaned_rows);
 	ATF_TP_ADD_TC(tp, failed_install_registers_nothing);
+	ATF_TP_ADD_TC(tp, invalid_age_annotation_is_reported);
 	ATF_TP_ADD_TC(tp, dir_asset_through_symlinked_parent);
 	ATF_TP_ADD_TC(tp, add_installs_missing_dependency_from_sibling);
 	ATF_TP_ADD_TC(tp, forced_add_leaves_installed_dependency_alone);
