@@ -46,7 +46,13 @@ mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack)
 	char *age_str = NULL;
 	int age = 0;
 
-	mport_annotation_get(mport, pack->origin, "age", &age_str);
+	/* pack is a stub entry: its annotations are still in the bundle */
+	(void)pack;
+	if (mport_stub_annotation_get(mport, "age", &age_str) != MPORT_OK) {
+		mport_call_msg_cb(
+		    mport, "Could not read the age restriction: %s", mport_err_string());
+		return false;
+	}
 
 	if (age_str == NULL) {
 		return true; /* No age annotation means it's appropriate for all ages */

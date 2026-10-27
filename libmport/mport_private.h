@@ -111,6 +111,8 @@ bool mport_is_terminal(void);
 
 /* Age verification */
 bool mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack);
+int mport_stub_annotation_get(
+    mportInstance *mport, const char *tag, /*@out@*/ /*@null@*/ char **annotation);
 
 /* Utils */
 bool mport_starts_with(const char *, const char *);

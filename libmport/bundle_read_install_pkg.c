@@ -139,9 +139,10 @@ do_pre_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *
 	mportAssetListEntry *e = NULL;
 	char *age_annotation = NULL;
 
-	/* Check for age restrictions */
-	if (mport_annotation_get(mport, pkg->name, "age", &age_annotation) == MPORT_OK &&
-	    age_annotation != NULL) {
+	/* Check for age restrictions, which are still in the bundle's stub.meta */
+	if (mport_stub_annotation_get(mport, "age", &age_annotation) != MPORT_OK)
+		RETURN_CURRENT_ERROR;
+	if (age_annotation != NULL) {
 		const char *user = getlogin();
 		if (user != NULL) {
 			int *ages = agev_get_age_bracket(user);
@@ -366,7 +367,7 @@ create_annotations(mportInstance *mport, mportPackageMeta *pkg)
 
 	/* Insert the annotations into the master table */
 	if (mport_db_do(mport->db,
-		"INSERT INTO annotation (pkg, tag, val) SELECT %Q as pkg, field as tag, value as val FROM stub.meta",
+		"INSERT OR REPLACE INTO annotation (pkg, tag, val) SELECT %Q as pkg, field as tag, value as val FROM stub.meta",
 		pkg->name) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
