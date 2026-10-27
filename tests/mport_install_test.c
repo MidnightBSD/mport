@@ -97,6 +97,8 @@ create_test_instance(void)
  */
 static const char *create_package_version(
     mportInstance *, const char *, const char *, const char *);
+static const char *create_package_message(
+    mportInstance *, const char *, const char *, const char *, const char *);
 
 static const char *
 create_package(mportInstance *mport, const char *name, const char *depend)
@@ -107,6 +109,14 @@ create_package(mportInstance *mport, const char *name, const char *depend)
 static const char *
 create_package_version(
     mportInstance *mport, const char *name, const char *version, const char *depend)
+{
+	return create_package_message(mport, name, version, depend, NULL);
+}
+
+/* As create_package_version(), with `message`, if not NULL, as its pkg-message. */
+static const char *
+create_package_message(mportInstance *mport, const char *name, const char *version,
+    const char *depend, const char *message)
 {
 	mportAssetList *assetlist;
 	mportPackageMeta *pack;
@@ -167,6 +177,12 @@ create_package_version(
 		extra->depends[0] = strdup(buf);
 		ATF_REQUIRE(extra->depends[0] != NULL);
 		extra->depends_count = 1;
+	}
+	if (message != NULL) {
+		(void)snprintf(buf, sizeof(buf), "%s/pkg-message-%s-%s", test_root, name, version);
+		write_file(buf, message);
+		extra->pkgmessage = strdup(buf);
+		ATF_REQUIRE(extra->pkgmessage != NULL);
 	}
 
 	ATF_REQUIRE_MSG(mport_create_primative(mport, assetlist, pack, extra) == MPORT_OK, "%s",
@@ -1641,6 +1657,94 @@ ATF_TC_CLEANUP(update_skips_locked_package, tc)
 	cleanup_test_root();
 }
 
+/* pkg-message entries a test package sees on install, update and delete */
+static char shown_messages[4096];
+
+static void
+capture_message(const char *msg)
+{
+	size_t len = strlen(shown_messages);
+
+	(void)snprintf(shown_messages + len, sizeof(shown_messages) - len, "%s|", msg);
+}
+
+/*
+ * An update shows the new package's upgrade entries whose version range
+ * matches the version it replaces, and none of its install or remove
+ * entries; a delete shows only the remove entries.
+ */
+ATF_TC_WITH_CLEANUP(update_shows_upgrade_messages_for_replaced_version);
+ATF_TC_HEAD(update_shows_upgrade_messages_for_replaced_version, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "install, update and delete show the pkg-message entries for that action");
+}
+ATF_TC_BODY(update_shows_upgrade_messages_for_replaced_version, tc)
+{
+	mportInstance *mport;
+	mportPackageMeta **found = NULL;
+	const char *oldfile;
+	const char *newfile;
+	static const char new_message[] = "[\n"
+					  "{ type: install, message: \"install-2.0\" }\n"
+					  "{ type: upgrade, message: \"upgrade-any\" }\n"
+					  "{ type: upgrade, maximum_version: \"1.5\",\n"
+					  "  message: \"upgrade-from-before-1.5\" }\n"
+					  "{ type: upgrade, maximum_version: \"0.5\",\n"
+					  "  message: \"upgrade-from-before-0.5\" }\n"
+					  "{ type: upgrade, minimum_version: \"1.0\",\n"
+					  "  message: \"upgrade-from-after-1.0\" }\n"
+					  "{ type: remove, message: \"remove-2.0\" }\n"
+					  "]\n";
+
+	(void)tc;
+
+	mport = create_test_instance();
+	mport->msg_cb = capture_message;
+	oldfile = create_package_message(mport, PKG_NAME, "1.0", NULL,
+	    "[\n{ type: install, message: \"install-1.0\" }\n"
+	    "{ type: remove, message: \"remove-1.0\" }\n]\n");
+	newfile = create_package_message(mport, PKG_NAME, "2.0", NULL, new_message);
+
+	shown_messages[0] = '\0';
+	ATF_REQUIRE_MSG(mport_install_primative(mport, oldfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE(strstr(shown_messages, "install-1.0|") != NULL);
+	ATF_REQUIRE(strstr(shown_messages, "remove-1.0") == NULL);
+
+	shown_messages[0] = '\0';
+	ATF_REQUIRE_MSG(
+	    mport_update_primative(mport, newfile) == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_STREQ("2.0", installed_version(mport, PKG_NAME));
+	ATF_REQUIRE_MSG(strstr(shown_messages, "upgrade-any|upgrade-from-before-1.5|") != NULL,
+	    "%s", shown_messages);
+	ATF_REQUIRE_MSG(
+	    strstr(shown_messages, "upgrade-from-before-0.5") == NULL, "%s", shown_messages);
+	ATF_REQUIRE_MSG(
+	    strstr(shown_messages, "upgrade-from-after-1.0") == NULL, "%s", shown_messages);
+	ATF_REQUIRE_MSG(strstr(shown_messages, "install-") == NULL, "%s", shown_messages);
+	ATF_REQUIRE_MSG(strstr(shown_messages, "remove-") == NULL, "%s", shown_messages);
+
+	shown_messages[0] = '\0';
+	ATF_REQUIRE_EQ(MPORT_OK, mport_pkgmeta_search_master(mport, &found, "pkg=%Q", PKG_NAME));
+	ATF_REQUIRE(found != NULL && found[0] != NULL);
+	ATF_REQUIRE_MSG(
+	    mport_delete_primative(mport, found[0], 1) == MPORT_OK, "%s", mport_err_string());
+	mport_pkgmeta_vec_free(found);
+	ATF_REQUIRE_MSG(strstr(shown_messages, "remove-2.0|") != NULL, "%s", shown_messages);
+	ATF_REQUIRE_MSG(strstr(shown_messages, "install-") == NULL, "%s", shown_messages);
+	ATF_REQUIRE_MSG(strstr(shown_messages, "upgrade-") == NULL, "%s", shown_messages);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(update_shows_upgrade_messages_for_replaced_version, tc)
+{
+	(void)tc;
+
+	cleanup_test_root();
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, install_replaces_previous_os_release);
@@ -1667,6 +1771,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, failed_update_returns_error);
 	ATF_TP_ADD_TC(tp, update_upgrades_installed_package);
 	ATF_TP_ADD_TC(tp, update_skips_locked_package);
+	ATF_TP_ADD_TC(tp, update_shows_upgrade_messages_for_replaced_version);
 
 	return atf_no_error();
 }
