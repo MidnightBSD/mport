@@ -63,7 +63,8 @@ static int do_pre_install(mportInstance *, mportBundleRead *, mportPackageMeta *
 
 static int do_actual_install(mportInstance *, mportBundleRead *, mportPackageMeta *);
 
-static int do_post_install(mportInstance *, mportBundleRead *, mportPackageMeta *);
+static int do_post_install(
+    mportInstance *, mportBundleRead *, mportPackageMeta *, /*@null@*/ const char *);
 
 static int run_postexec(mportInstance *, mportPackageMeta *);
 
@@ -102,10 +103,12 @@ static int copy_metafile(mportInstance *, mportBundleRead *, mportPackageMeta *,
 static bool is_linux_module_loaded(void);
 
 /**
- * This is a wrapper for all bundle read install operations
+ * This is a wrapper for all bundle read install operations.  prev_version is
+ * the version this install replaces when it is part of an update, else NULL.
  */
 int
-mport_bundle_read_install_pkg(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg)
+mport_bundle_read_install_pkg(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg,
+    /*@null@*/ const char *prev_version)
 {
 	if (do_pre_install(mport, bundle, pkg) != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
@@ -115,7 +118,7 @@ mport_bundle_read_install_pkg(mportInstance *mport, mportBundleRead *bundle, mpo
 		RETURN_CURRENT_ERROR;
 	}
 
-	if (do_post_install(mport, bundle, pkg) != MPORT_OK) {
+	if (do_post_install(mport, bundle, pkg, prev_version) != MPORT_OK) {
 		RETURN_CURRENT_ERROR;
 	}
 
@@ -1534,7 +1537,8 @@ insert_autodir_assets(mportInstance *mport, sqlite3_stmt *insert, mportPackageMe
 }
 
 static int
-do_post_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg)
+do_post_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *pkg,
+    /*@null@*/ const char *prev_version)
 {
 
 	copy_metafile(mport, bundle, pkg, MPORT_MTREE_FILE);
@@ -1545,7 +1549,9 @@ do_post_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta 
 	if (run_postexec(mport, pkg) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
-	if (mport_pkg_message_display(mport, pkg) != MPORT_OK)
+	if (mport_pkg_message_display(mport, pkg,
+		prev_version != NULL ? PKG_MESSAGE_UPGRADE : PKG_MESSAGE_INSTALL,
+		prev_version) != MPORT_OK)
 		RETURN_CURRENT_ERROR;
 
 	if (mport_lua_script_run(mport, pkg, MPORT_LUA_POST_INSTALL) != MPORT_OK)

@@ -193,7 +193,8 @@ int mport_bundle_read_prep_for_install(mportInstance *, mportBundleRead *);
 int mport_bundle_read_extract_metafiles(mportBundleRead *, char **);
 int mport_bundle_read_next_entry(mportBundleRead *, struct archive_entry **);
 int mport_bundle_read_extract_next_file(mportBundleRead *, struct archive_entry *);
-int mport_bundle_read_install_pkg(mportInstance *, mportBundleRead *, mportPackageMeta *);
+int mport_bundle_read_install_pkg(
+    mportInstance *, mportBundleRead *, mportPackageMeta *, /*@null@*/ const char *);
 int mport_bundle_read_update_pkg(mportInstance *, mportBundleRead *, mportPackageMeta *);
 
 int mport_install_depends(mportInstance *, const char *, const char *, mportAutomatic);
@@ -239,10 +240,12 @@ int mport_update_down(mportInstance *, mportPackageMeta *, struct ohash_info *, 
 void mport_version_cmp_sqlite(sqlite3_context *, int, sqlite3_value **);
 int mport_version_require_check(const char *, const char *);
 
-int mport_pkg_message_display(mportInstance *, mportPackageMeta *);
-int mport_pkg_message_load(mportInstance *, mportPackageMeta *, mportPackageMessage *);
-mportPackageMessage *mport_pkg_message_from_ucl(
-    mportInstance *, const ucl_object_t *, mportPackageMessage *);
+int mport_pkg_message_display(
+    mportInstance *, mportPackageMeta *, pkg_message_t, /*@null@*/ const char *);
+int mport_pkg_message_load(mportInstance *, mportPackageMeta *, /*@out@*/ mportPackageMessage **);
+int mport_pkg_message_from_ucl(
+    mportInstance *, /*@null@*/ const ucl_object_t *, mportPackageMessage **);
+void mport_pkg_message_free(/*@null@*/ /*@only@*/ mportPackageMessage *);
 
 #define RETURN_CURRENT_ERROR return mport_err_code()
 #define MPORT_ERROR_MESSAGE_MAX 1024
