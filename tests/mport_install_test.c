@@ -835,6 +835,39 @@ ATF_TC_CLEANUP(adult_install_is_never_refused, tc)
 }
 
 /*
+ * aged(8) answers -2,-2 when its region (e.g. US-MI) does not require age
+ * checks; any package installs.
+ */
+ATF_TC_WITH_CLEANUP(age_not_required_by_region_installs);
+ATF_TC_HEAD(age_not_required_by_region_installs, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr",
+	    "an age-restricted package installs where aged's region requires no age checks");
+}
+ATF_TC_BODY(age_not_required_by_region_installs, tc)
+{
+	mportInstance *mport;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	ATF_REQUIRE_MSG(install_with_age_bracket(mport, "age:18", -2, -2) == MPORT_OK, "%s",
+	    mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(age_not_required_by_region_installs, tc)
+{
+	(void)tc;
+
+	age_lookup = false;
+	pkg_annotation = NULL;
+	cleanup_test_root();
+}
+
+/*
  * With no login session (cron, rc scripts) there is no user to check, so an
  * age-restricted package installs.
  */
@@ -2289,6 +2322,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, underage_install_is_refused);
 	ATF_TP_ADD_TC(tp, age_within_bracket_is_installed);
 	ATF_TP_ADD_TC(tp, adult_install_is_never_refused);
+	ATF_TP_ADD_TC(tp, age_not_required_by_region_installs);
 	ATF_TP_ADD_TC(tp, age_check_without_login_installs);
 	ATF_TP_ADD_TC(tp, age_check_without_aged_installs);
 	ATF_TP_ADD_TC(tp, age_check_with_aged_enabled_but_down_is_refused);
