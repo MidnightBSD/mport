@@ -111,7 +111,8 @@ bool mport_is_terminal(void);
 
 /* Age verification */
 bool mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack);
-bool mport_age_bracket_allows(/*@notnull@*/ const int *bracket, int required_age);
+bool mport_age_bracket_allows(/*@notnull@*/ const int *bracket, int required_age)
+    /*@requires maxRead(bracket) >= 1@*/;
 int mport_stub_annotation_get(
     mportInstance *mport, const char *tag, /*@out@*/ /*@null@*/ char **annotation);
 

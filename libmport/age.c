@@ -78,18 +78,17 @@ mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack)
 	age = atoi(age_str);
 	free(age_str);
 
+	/*
+	 * Without a login session (cron, rc scripts) or a reachable aged(8)
+	 * there is no user to check, so install as do_pre_install() does.
+	 */
 	const char *username = getlogin();
-	if (username == NULL) {
-		mport_call_msg_cb(
-		    mport, "Could not determine username to verify age: %s", strerror(errno));
-		return false;
-	}
+	if (username == NULL)
+		return true;
 
 	int *user_age_bracket = agev_get_age_bracket(username);
-	if (user_age_bracket == NULL) {
-		mport_call_msg_cb(mport, "Could not determine user age bracket.");
-		return false;
-	}
+	if (user_age_bracket == NULL)
+		return true;
 
 	bool verified = mport_age_bracket_allows(user_age_bracket, age);
 

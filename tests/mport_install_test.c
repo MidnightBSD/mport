@@ -38,10 +38,12 @@ static const char *pkg_annotation;
  * The install-time age check asks getlogin(2) and agev_get_age_bracket(3)
  * for the installing user's age.  These definitions interpose on libc and
  * libutil so a case can supply an age bracket without a login session or a
- * running aged(8).  While age_lookup is false they fail, and libmport skips
- * the check as it does when the user's age is unknown.
+ * running aged(8).  While age_lookup is false there is no login session, and
+ * while aged_down is true agev_get_age_bracket(3) fails as it does when
+ * aged(8) cannot be reached; libmport skips the check in both cases.
  */
 static bool age_lookup;
+static bool aged_down;
 static int age_bracket[2];
 
 /*
@@ -64,7 +66,7 @@ agev_get_age_bracket(const char *username)
 	int *ages;
 
 	(void)username;
-	if (!age_lookup)
+	if (!age_lookup || aged_down)
 		return NULL;
 	ages = malloc(sizeof(age_bracket));
 	if (ages != NULL)
@@ -781,6 +783,82 @@ ATF_TC_CLEANUP(adult_install_is_never_refused, tc)
 	(void)tc;
 
 	age_lookup = false;
+	pkg_annotation = NULL;
+	cleanup_test_root();
+}
+
+/*
+ * With no login session (cron, rc scripts) there is no user to check, so an
+ * age-restricted package installs.
+ */
+ATF_TC_WITH_CLEANUP(age_check_without_login_installs);
+ATF_TC_HEAD(age_check_without_login_installs, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "an age-restricted package installs when there is no login session");
+}
+ATF_TC_BODY(age_check_without_login_installs, tc)
+{
+	mportInstance *mport;
+	const char *pkgfile;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	pkg_annotation = "age:18";
+	pkgfile = create_test_package(mport);
+	pkg_annotation = NULL;
+
+	age_lookup = false;
+	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
+	    "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(age_check_without_login_installs, tc)
+{
+	(void)tc;
+
+	pkg_annotation = NULL;
+	cleanup_test_root();
+}
+
+/*
+ * When aged(8) cannot be reached the user's age is not known, so an
+ * age-restricted package installs.
+ */
+ATF_TC_WITH_CLEANUP(age_check_without_aged_installs);
+ATF_TC_HEAD(age_check_without_aged_installs, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "an age-restricted package installs when aged cannot be reached");
+}
+ATF_TC_BODY(age_check_without_aged_installs, tc)
+{
+	mportInstance *mport;
+	int ret;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	aged_down = true;
+	ret = install_with_age_bracket(mport, "age:18", 13, 15);
+	aged_down = false;
+
+	ATF_REQUIRE_MSG(ret == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(age_check_without_aged_installs, tc)
+{
+	(void)tc;
+
+	age_lookup = false;
+	aged_down = false;
 	pkg_annotation = NULL;
 	cleanup_test_root();
 }
@@ -2037,6 +2115,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, underage_install_is_refused);
 	ATF_TP_ADD_TC(tp, age_within_bracket_is_installed);
 	ATF_TP_ADD_TC(tp, adult_install_is_never_refused);
+	ATF_TP_ADD_TC(tp, age_check_without_login_installs);
+	ATF_TP_ADD_TC(tp, age_check_without_aged_installs);
 	ATF_TP_ADD_TC(tp, dir_asset_through_symlinked_parent);
 	ATF_TP_ADD_TC(tp, add_installs_missing_dependency_from_sibling);
 	ATF_TP_ADD_TC(tp, forced_add_leaves_installed_dependency_alone);
