@@ -2,9 +2,11 @@
 #include <sys/stat.h>
 
 #include <atf-c.h>
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <libutil.h>
 #include <limits.h>
+#include <spawn.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,6 +75,40 @@ agev_get_age_bracket(const char *username)
 		memcpy(ages, age_bracket, sizeof(age_bracket));
 
 	return ages;
+}
+
+/*
+ * What "sysrc -qn aged_enable" prints, or NULL while aged_enable is unset.
+ * posix_spawn() below runs echo (or false) in place of sysrc(8), so a case
+ * does not depend on the host's rc.conf.
+ */
+static const char *aged_enable;
+
+int
+posix_spawn(pid_t *restrict pid, const char *restrict path,
+    const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *restrict attrp,
+    char *const argv[], char *const envp[])
+{
+	static int (*real_spawn)(pid_t *restrict, const char *restrict,
+	    const posix_spawn_file_actions_t *, const posix_spawnattr_t *restrict, char *const[],
+	    char *const[]);
+
+	if (real_spawn == NULL)
+		real_spawn = (int (*)(pid_t *restrict, const char *restrict,
+		    const posix_spawn_file_actions_t *, const posix_spawnattr_t *restrict,
+		    char *const[], char *const[]))dlsym(RTLD_NEXT, "posix_spawn");
+
+	if (strcmp(path, MPORT_SYSRC_BIN) == 0) {
+		char *echo_argv[] = { "echo", (char *)aged_enable, NULL };
+		char *false_argv[] = { "false", NULL };
+
+		if (aged_enable == NULL)
+			return real_spawn(
+			    pid, "/usr/bin/false", file_actions, attrp, false_argv, envp);
+		return real_spawn(pid, "/bin/echo", file_actions, attrp, echo_argv, envp);
+	}
+
+	return real_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 
 /* Messages (pkg-message entries, warnings) a test package shows */
@@ -882,6 +918,132 @@ ATF_TC_CLEANUP(age_check_without_aged_installs, tc)
 
 	age_lookup = false;
 	aged_down = false;
+	pkg_annotation = NULL;
+	cleanup_test_root();
+}
+
+/*
+ * Where aged_enable is set, aged not answering must not skip the check: the
+ * install is refused and the user is told to check on aged.
+ */
+ATF_TC_WITH_CLEANUP(age_check_with_aged_enabled_but_down_is_refused);
+ATF_TC_HEAD(age_check_with_aged_enabled_but_down_is_refused, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr",
+	    "an age-restricted package is refused when aged is enabled but not answering");
+}
+ATF_TC_BODY(age_check_with_aged_enabled_but_down_is_refused, tc)
+{
+	mportInstance *mport;
+	int ret;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	mport->msg_cb = capture_message;
+	shown_messages[0] = '\0';
+	aged_enable = "Yes";
+	aged_down = true;
+	ret = install_with_age_bracket(mport, "age:13", 18, -1);
+	aged_down = false;
+	aged_enable = NULL;
+
+	ATF_REQUIRE(ret != MPORT_OK);
+	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_MSG(strstr(shown_messages,
+			    "aged is enabled but the age bracket of mport-test "
+			    "could not be read") != NULL,
+	    "%s", shown_messages);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(age_check_with_aged_enabled_but_down_is_refused, tc)
+{
+	(void)tc;
+
+	age_lookup = false;
+	aged_down = false;
+	aged_enable = NULL;
+	pkg_annotation = NULL;
+	cleanup_test_root();
+}
+
+/*
+ * aged_enable=NO is the same as unset: aged not answering skips the check.
+ */
+ATF_TC_WITH_CLEANUP(age_check_with_aged_disabled_installs);
+ATF_TC_HEAD(age_check_with_aged_disabled_installs, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr", "an age-restricted package installs when aged_enable is NO");
+}
+ATF_TC_BODY(age_check_with_aged_disabled_installs, tc)
+{
+	mportInstance *mport;
+	int ret;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	aged_enable = "NO";
+	aged_down = true;
+	ret = install_with_age_bracket(mport, "age:18", 13, 15);
+	aged_down = false;
+	aged_enable = NULL;
+
+	ATF_REQUIRE_MSG(ret == MPORT_OK, "%s", mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(age_check_with_aged_disabled_installs, tc)
+{
+	(void)tc;
+
+	age_lookup = false;
+	aged_down = false;
+	aged_enable = NULL;
+	pkg_annotation = NULL;
+	cleanup_test_root();
+}
+
+/*
+ * A user whose age aged does not know (-1,-1) is refused and told how to set
+ * it with agectl(8).
+ */
+ATF_TC_WITH_CLEANUP(unset_age_is_refused_with_agectl_hint);
+ATF_TC_HEAD(unset_age_is_refused_with_agectl_hint, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr",
+	    "an age-restricted package is refused for a user with no age set, naming agectl");
+}
+ATF_TC_BODY(unset_age_is_refused_with_agectl_hint, tc)
+{
+	mportInstance *mport;
+	int ret;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	mport->msg_cb = capture_message;
+	shown_messages[0] = '\0';
+	ret = install_with_age_bracket(mport, "age:13", -1, -1);
+
+	ATF_REQUIRE(ret != MPORT_OK);
+	ATF_REQUIRE_EQ(0, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_MSG(strstr(shown_messages, "the age of mport-test is not set") != NULL &&
+		strstr(shown_messages, "agectl -a <age> mport-test") != NULL,
+	    "%s", shown_messages);
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(unset_age_is_refused_with_agectl_hint, tc)
+{
+	(void)tc;
+
+	age_lookup = false;
 	pkg_annotation = NULL;
 	cleanup_test_root();
 }
@@ -2129,6 +2291,9 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, adult_install_is_never_refused);
 	ATF_TP_ADD_TC(tp, age_check_without_login_installs);
 	ATF_TP_ADD_TC(tp, age_check_without_aged_installs);
+	ATF_TP_ADD_TC(tp, age_check_with_aged_enabled_but_down_is_refused);
+	ATF_TP_ADD_TC(tp, age_check_with_aged_disabled_installs);
+	ATF_TP_ADD_TC(tp, unset_age_is_refused_with_agectl_hint);
 	ATF_TP_ADD_TC(tp, dir_asset_through_symlinked_parent);
 	ATF_TP_ADD_TC(tp, add_installs_missing_dependency_from_sibling);
 	ATF_TP_ADD_TC(tp, forced_add_leaves_installed_dependency_alone);
