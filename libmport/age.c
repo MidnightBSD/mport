@@ -49,11 +49,15 @@ extern char **environ;
  * -1 for "no limit" or "unknown", meet a package's required age?  18,-1 is
  * 18 or older and meets any requirement: adults are never refused.  Other
  * brackets pass when the requirement is no higher than the top of the
- * bracket, so an unknown age (-1,-1) never does.
+ * bracket, so an unknown age (-1,-1) never does.  aged(8) answers -2,-2
+ * where its region does not require age checks, which meets any requirement.
  */
 bool
 mport_age_bracket_allows(const int *bracket, int required_age)
 {
+
+	if (bracket[0] == -2 && bracket[1] == -2)
+		return true;
 
 	if (bracket[0] >= 18 && bracket[1] == -1)
 		return true;
