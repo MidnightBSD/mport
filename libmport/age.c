@@ -64,7 +64,6 @@ mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack)
 	int age = 0;
 
 	/* pack is a stub entry: its annotations are still in the bundle */
-	(void)pack;
 	if (mport_stub_annotation_get(mport, "age", &age_str) != MPORT_OK) {
 		mport_call_msg_cb(
 		    mport, "Could not read the age restriction: %s", mport_err_string());
@@ -83,12 +82,21 @@ mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack)
 	 * there is no user to check, so install as do_pre_install() does.
 	 */
 	const char *username = getlogin();
-	if (username == NULL)
+	if (username == NULL) {
+		/* errno is only set on a lookup failure, not for "no login name" */
+		mport_call_msg_cb(mport,
+		    "Warning: %s-%s: could not determine the user name, skipping the age check",
+		    pack->name, pack->version);
 		return true;
+	}
 
 	int *user_age_bracket = agev_get_age_bracket(username);
-	if (user_age_bracket == NULL)
+	if (user_age_bracket == NULL) {
+		mport_call_msg_cb(mport,
+		    "Warning: %s-%s: could not determine the age bracket of %s, skipping the age check",
+		    pack->name, pack->version, username);
 		return true;
+	}
 
 	bool verified = mport_age_bracket_allows(user_age_bracket, age);
 

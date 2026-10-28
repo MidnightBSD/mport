@@ -75,6 +75,17 @@ agev_get_age_bracket(const char *username)
 	return ages;
 }
 
+/* Messages (pkg-message entries, warnings) a test package shows */
+static char shown_messages[4096];
+
+static void
+capture_message(const char *msg)
+{
+	size_t len = strlen(shown_messages);
+
+	(void)snprintf(shown_messages + len, sizeof(shown_messages) - len, "%s|", msg);
+}
+
 static const char *
 test_path(const char *suffix)
 {
@@ -811,9 +822,14 @@ ATF_TC_BODY(age_check_without_login_installs, tc)
 	pkg_annotation = NULL;
 
 	age_lookup = false;
+	mport->msg_cb = capture_message;
+	shown_messages[0] = '\0';
 	ATF_REQUIRE_MSG(mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT) == MPORT_OK,
 	    "%s", mport_err_string());
 	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_MSG(strstr(shown_messages, "could not determine the user name") != NULL &&
+		strstr(shown_messages, "skipping the age check") != NULL,
+	    "%s", shown_messages);
 
 	mport_instance_free(mport);
 }
@@ -844,12 +860,19 @@ ATF_TC_BODY(age_check_without_aged_installs, tc)
 	(void)tc;
 
 	mport = create_test_instance();
+	mport->msg_cb = capture_message;
+	shown_messages[0] = '\0';
 	aged_down = true;
 	ret = install_with_age_bracket(mport, "age:18", 13, 15);
 	aged_down = false;
 
 	ATF_REQUIRE_MSG(ret == MPORT_OK, "%s", mport_err_string());
 	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+	ATF_REQUIRE_MSG(
+	    strstr(shown_messages,
+		"could not determine the age bracket of mport-test, skipping the age check") !=
+		NULL,
+	    "%s", shown_messages);
 
 	mport_instance_free(mport);
 }
@@ -2012,17 +2035,6 @@ ATF_TC_CLEANUP(update_skips_locked_package, tc)
 	(void)tc;
 
 	cleanup_test_root();
-}
-
-/* pkg-message entries a test package sees on install, update and delete */
-static char shown_messages[4096];
-
-static void
-capture_message(const char *msg)
-{
-	size_t len = strlen(shown_messages);
-
-	(void)snprintf(shown_messages + len, sizeof(shown_messages) - len, "%s|", msg);
 }
 
 /*
