@@ -697,6 +697,95 @@ ATF_TC_CLEANUP(underage_install_is_refused, tc)
 }
 
 /*
+ * Install a package annotated "age:<required>" with the user in the
+ * agev_get_age_bracket(3) bracket { low, high } and return the result.
+ */
+static int
+install_with_age_bracket(mportInstance *mport, const char *annotation, int low, int high)
+{
+	const char *pkgfile;
+	int ret;
+
+	pkg_annotation = annotation;
+	pkgfile = create_test_package(mport);
+	pkg_annotation = NULL;
+
+	age_bracket[0] = low;
+	age_bracket[1] = high;
+	age_lookup = true;
+	ret = mport_install_primative(mport, pkgfile, NULL, MPORT_EXPLICIT);
+	age_lookup = false;
+
+	return ret;
+}
+
+/*
+ * A requirement within the user's bracket is met: a 13 to 15 year old can
+ * install a package for 15 and up.  The install step used to compare the
+ * requirement with the bottom of the bracket and refuse it.
+ */
+ATF_TC_WITH_CLEANUP(age_within_bracket_is_installed);
+ATF_TC_HEAD(age_within_bracket_is_installed, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(
+	    tc, "descr", "a package whose age annotation is within the user's bracket installs");
+}
+ATF_TC_BODY(age_within_bracket_is_installed, tc)
+{
+	mportInstance *mport;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	ATF_REQUIRE_MSG(install_with_age_bracket(mport, "age:15", 13, 15) == MPORT_OK, "%s",
+	    mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(age_within_bracket_is_installed, tc)
+{
+	(void)tc;
+
+	age_lookup = false;
+	pkg_annotation = NULL;
+	cleanup_test_root();
+}
+
+/*
+ * The adult bracket (18,-1) is 18 or older and is never refused, even for a
+ * package annotated above 18.
+ */
+ATF_TC_WITH_CLEANUP(adult_install_is_never_refused);
+ATF_TC_HEAD(adult_install_is_never_refused, tc)
+{
+	atf_tc_set_md_var(tc, "require.user", "root");
+	atf_tc_set_md_var(tc, "descr", "an adult can install a package with any age annotation");
+}
+ATF_TC_BODY(adult_install_is_never_refused, tc)
+{
+	mportInstance *mport;
+
+	(void)tc;
+
+	mport = create_test_instance();
+	ATF_REQUIRE_MSG(install_with_age_bracket(mport, "age:21", 18, -1) == MPORT_OK, "%s",
+	    mport_err_string());
+	ATF_REQUIRE_EQ(1, count_installed(mport, NULL, 0));
+
+	mport_instance_free(mport);
+}
+ATF_TC_CLEANUP(adult_install_is_never_refused, tc)
+{
+	(void)tc;
+
+	age_lookup = false;
+	pkg_annotation = NULL;
+	cleanup_test_root();
+}
+
+/*
  * A @dir asset whose parent directory is a symlink to a directory elsewhere
  * (the bind chroot layout, /usr/local/etc/namedb -> /var/named/...) must be
  * created through the link rather than failing the install.
@@ -1946,6 +2035,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, invalid_age_annotation_is_reported);
 	ATF_TP_ADD_TC(tp, bundle_annotations_are_registered);
 	ATF_TP_ADD_TC(tp, underage_install_is_refused);
+	ATF_TP_ADD_TC(tp, age_within_bracket_is_installed);
+	ATF_TP_ADD_TC(tp, adult_install_is_never_refused);
 	ATF_TP_ADD_TC(tp, dir_asset_through_symlinked_parent);
 	ATF_TP_ADD_TC(tp, add_installs_missing_dependency_from_sibling);
 	ATF_TP_ADD_TC(tp, forced_add_leaves_installed_dependency_alone);
