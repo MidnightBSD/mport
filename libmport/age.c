@@ -38,6 +38,23 @@
 #include "mport.h"
 #include "mport_private.h"
 
+/*
+ * Does an age bracket from agev_get_age_bracket(3), { lowest, highest } with
+ * -1 for "no limit" or "unknown", meet a package's required age?  18,-1 is
+ * 18 or older and meets any requirement: adults are never refused.  Other
+ * brackets pass when the requirement is no higher than the top of the
+ * bracket, so an unknown age (-1,-1) never does.
+ */
+bool
+mport_age_bracket_allows(const int *bracket, int required_age)
+{
+
+	if (bracket[0] >= 18 && bracket[1] == -1)
+		return true;
+
+	return required_age <= bracket[1];
+}
+
 bool
 mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack)
 {
@@ -74,12 +91,7 @@ mport_is_age_verified(mportInstance *mport, mportPackageMeta *pack)
 		return false;
 	}
 
-	bool verified = false;
-	if (user_age_bracket[0] >= 18 && user_age_bracket[1] == -1) {
-		verified = true;
-	} else {
-		verified = age <= user_age_bracket[1];
-	}
+	bool verified = mport_age_bracket_allows(user_age_bracket, age);
 
 	free(user_age_bracket);
 

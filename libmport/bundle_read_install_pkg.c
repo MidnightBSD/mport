@@ -170,13 +170,14 @@ do_pre_install(mportInstance *mport, mportBundleRead *bundle, mportPackageMeta *
 				}
 
 				required_age = (int)parsed_age;
-				if (required_age > ages[0]) {
-					int user_age = ages[0];
+				if (!mport_age_bracket_allows(ages, required_age)) {
+					int user_min = ages[0];
+					int user_max = ages[1];
 					free(ages);
 					free(age_annotation);
 					RETURN_ERRORX(MPORT_ERR_FATAL,
-					    "User not old enough to install this package. Required age: %d, user age: %d",
-					    required_age, user_age);
+					    "User not old enough to install this package. Required age: %d, user age bracket: %d-%d",
+					    required_age, user_min, user_max);
 				}
 				free(ages);
 			}
