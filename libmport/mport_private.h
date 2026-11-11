@@ -297,10 +297,10 @@ int mport_set_errx(int, const char *, ...);
 #define MPORT_ARCH "i386"
 #elif defined(__amd64__)
 #define MPORT_ARCH "amd64"
-#elif defined(__aarch64__) || defined(__arm64__)
-#define MPORT_ARCH "arm64"
-#elif defined(__riscv)
-#define MPORT_ARCH "riscv"
+#elif defined(__aarch64__)
+#define MPORT_ARCH "aarch64"
+#elif defined(__riscv) && __riscv_xlen == 64
+#define MPORT_ARCH "riscv64"
 #else
 #error "Unable to detect arch!"
 #endif
